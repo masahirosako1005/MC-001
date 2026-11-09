@@ -96,6 +96,16 @@
       <h2 id="finder-name"></h2>
       <img id="finder-avatar" class="finder-avatar" alt="" width="150" height="225">
       <p id="finder-obtained" class="finder-obtained" role="status" aria-live="polite"></p>
+      {# スポット名を押したときの「これをみっけに行く」 #}
+      <div id="finder-goto" class="finder-goto" role="group" aria-labelledby="finder-goto-title" hidden>
+        <p class="finder-goto-lead"><span aria-hidden="true">🗺️</span> これをみっけに行く</p>
+        <p id="finder-goto-title" class="finder-goto-title"></p>
+        <p class="help">地図でスポットの場所を表示します。近くまで行ったら「近くのシンボルを探す」を押してね。</p>
+        <div class="dialog-actions">
+          <button type="button" class="btn btn-primary" id="finder-goto-yes">地図で見る</button>
+          <button type="button" class="btn btn-ghost" id="finder-goto-no">やめる</button>
+        </div>
+      </div>
       <ul id="finder-items" class="finder-items"></ul>
     </div>
   </div>

@@ -30,7 +30,7 @@ from accounts.models import ManagerProfile, User, email_hash_of
 from core import audit
 from core.timeutil import season_of, slot_of
 from explore.models import Discovery, DropEntry, NearbyVisit, Spot, SpotVisit, Symbol
-from wardrobe.models import Item, UserItem
+from wardrobe.models import CATEGORY_CHOICES, Item, UserItem
 
 DEMO_SPOT_PREFIX = "demo-spot-"
 DEMO_MANAGER_GROUP = "デモ管理者"
@@ -122,6 +122,21 @@ class Command(BaseCommand):
                                      idempotency_key=uuid.uuid4(),
                                      found_at=now - dt.timedelta(minutes=_rng.randrange(1, 28))))
         Discovery.objects.bulk_create(out, batch_size=2000)
+        # みっけしたアイテムを持たせ、体のタイプに合えば着せる
+        # (「こんな人が獲得しているよ」でコーデを押したとき、そのスポットに案内できるように)
+        from wardrobe.models import AvatarConfig
+
+        UserItem.objects.bulk_create([UserItem(user_id=d.user_id, item_id=d.drop.item_id) for d in out if d.drop],
+                                     batch_size=2000, ignore_conflicts=True)
+        configs = {c.user_id: c for c in AvatarConfig.objects.filter(user_id__in={d.user_id for d in out})}
+        changed = set()
+        for d in out:
+            cfg = configs.get(d.user_id)
+            if cfg is not None and d.drop and d.drop.item.fits(cfg.body_type):
+                setattr(cfg, d.drop.item.category, d.drop.item)
+                changed.add(d.user_id)
+        AvatarConfig.objects.bulk_update([configs[u] for u in changed],
+                                         [c for c, _ in CATEGORY_CHOICES], batch_size=500)
         return len(out)
 
     # ------------------------------------------------------------ 削除

@@ -116,10 +116,20 @@ class FinderProfileTests(FinderBase):
         self.assertIn("シークレットシンボル", items["top-x"]["obtained"])
         self.assertNotIn("森の社", items["top-x"]["obtained"])
         self.assertNotIn(":", items["hair-x"]["obtained"])  # 時刻は出さない
+        # 「これをみっけに行く」用のスポット情報 (シークレット由来は伏せる)
+        self.assertEqual(items["hair-x"]["spot"], {"id": self.spot.pk, "name": "森の社", "lat": 34.69, "lng": 135.53})
+        self.assertIsNone(items["top-x"]["spot"])
         for url in (data["avatar"], items["hair-x"]["image"]):
             r = self.client.get(url)
             self.assertEqual(r.status_code, 200)
             self.assertIn("sandbox", r["Content-Security-Policy"])
+
+    def test_no_map_link_for_unavailable_spot(self):
+        self.spot.expires_at = timezone.now() - dt.timedelta(minutes=1)
+        self.spot.save()
+        items = {i["code"]: i for i in self.client.get(reverse("explore:api_finder", args=[self.token])).json()["items"]}
+        self.assertIsNone(items["hair-x"]["spot"])  # 期限切れのスポットには案内しない
+        self.assertIn("森の社でみっけ", items["hair-x"]["obtained"])
 
     def test_item_not_worn_is_404(self):
         Item.objects.create(code="shoes-y", name="下駄", category="shoes", style="geta", color="#333333")

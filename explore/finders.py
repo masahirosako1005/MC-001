@@ -87,23 +87,31 @@ def read_token(token: str, viewer):
     return user
 
 
-def obtained_label(target, item, viewer) -> str:
-    """そのコーデをどこで手に入れたか (スポットと季節。日時は出さない)。"""
+def obtained_info(target, item, viewer) -> dict:
+    """そのコーデをどこで手に入れたか (スポットと季節。日時は出さない)。
+
+    返り値: {"text": 表示文, "spot": {"id", "name", "lat", "lng"} または None, "season": 季節}
+    spot は「これをみっけに行く」で地図に出すためのもの。公開中で位置があるスポットのときだけ付ける。
+    """
     disc = (Discovery.objects.filter(user=target, reward_kind="item", reward_ref=item.code)
             .select_related("symbol__spot").order_by("-found_at").first())
     if disc is not None:
         season = SEASON_LABELS.get(season_of(timezone.localtime(disc.found_at).date()), "")
         sym = disc.symbol
         if sym.is_secret and not Discovery.objects.filter(user=viewer, symbol=sym).exists():
-            return f"シークレットシンボルでみっけ({season})"
-        return f"{sym.spot.name}でみっけ({season})"
+            return {"text": f"シークレットシンボルでみっけ({season})", "spot": None, "season": season}
+        spot = sym.spot
+        info = None
+        if spot.is_available() and spot.latitude is not None and spot.longitude is not None:
+            info = {"id": spot.pk, "name": spot.name, "lat": float(spot.latitude), "lng": float(spot.longitude)}
+        return {"text": f"{spot.name}でみっけ({season})", "spot": info, "season": season}
     if item.is_starter:
-        return "はじめから持っているアイテム"
+        return {"text": "はじめから持っているアイテム", "spot": None, "season": ""}
     from rewards.models import UserAchievement
 
     if UserAchievement.objects.filter(user=target, achievement__reward_item=item).exists():
-        return "実績のごほうび"
-    return "みっけ以外で手に入れたアイテム"
+        return {"text": "実績のごほうび", "spot": None, "season": ""}
+    return {"text": "みっけ以外で手に入れたアイテム", "spot": None, "season": ""}
 
 
 def finder_profile(target, viewer, token: str) -> dict:
@@ -118,9 +126,10 @@ def finder_profile(target, viewer, token: str) -> dict:
         item = getattr(config, cat, None)
         if item is None:
             continue
+        info = obtained_info(target, item, viewer)
         items.append({
             "code": item.code, "name": item.name, "category": label, "rarity": item.rarity,
             "image": reverse("explore:finder_item_svg", args=[token, item.code]),
-            "obtained": obtained_label(target, item, viewer),
+            "obtained": info["text"], "spot": info["spot"], "season": info["season"],
         })
     return {"nickname": target.nickname, "avatar": reverse("explore:finder_avatar_svg", args=[token]), "items": items}

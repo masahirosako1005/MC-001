@@ -491,10 +491,24 @@
       link.textContent = "クーポンを見る";
       link.href = `${root.dataset.couponBase}${encodeURIComponent(d.coupon.id)}/`;
     } else {
-      title.textContent = "…しーん";
-      showArt(root.dataset.nothingImg, "何もいなかった", "none", 150, 150);
-      text.textContent = "いまは何もいないみたい。季節や時間帯を変えて、また来てね。";
+      // 何も出なかった理由を伝える (ごほうび未設定 / 条件が今は合わない)
+      showArt(root.dataset.nothingImg, "今回は何も出なかった", "none", 150, 150);
       link.hidden = true;
+      if (d.empty_reason === "no_drops") {
+        title.textContent = "このシンボルは準備中";
+        text.textContent = "このシンボルには、まだごほうびが用意されていません。";
+        notes.push("みっけした記録は残りました(実績にも数えられます)。");
+        if (d.manage_url) {
+          link.hidden = false;
+          link.textContent = "ごほうびを設定する";
+          link.href = d.manage_url;
+        }
+      } else {
+        title.textContent = "今回は何も出なかった";
+        text.textContent = "このシンボルのごほうびは、条件がそろうと出てきます。";
+        if (d.hints && d.hints.length) notes.push(`出る条件: ${d.hints.join(" / ")}。また来てね!`);
+        else notes.push("季節や時間帯を変えて、また来てね。");
+      }
     }
     extra.textContent = notes.join(" ");
     // 実績のごほうびも、絵つきで並べる
@@ -579,6 +593,7 @@
     finderAvatar.src = finderUrl(f.token, "avatar.svg");
     finderAvatar.alt = `${f.nickname}さんのアバター`;
     finderItems.replaceChildren();
+    $("finder-goto").hidden = true;
     finderObtained.textContent = "読み込んでいます…";
     $("finder-back").focus();
     let d;
@@ -606,7 +621,7 @@
       b.addEventListener("click", () => {
         for (const other of finderItems.querySelectorAll("button")) other.setAttribute("aria-pressed", "false");
         b.setAttribute("aria-pressed", "true");
-        finderObtained.textContent = `「${it.name}」は、${it.obtained}`;
+        showObtained(it);
       });
       li.appendChild(b);
       finderItems.appendChild(li);
@@ -616,6 +631,49 @@
   $("finder-back").addEventListener("click", () => {
     showFinderView(false);
     if (finderOpener) finderOpener.focus();
+  });
+
+  // どこで手に入れたか。スポット名は押せるようにして「これをみっけに行く」につなぐ
+  const gotoBox = $("finder-goto");
+  let gotoTarget = null;
+
+  function showObtained(it) {
+    gotoBox.hidden = true;
+    finderObtained.replaceChildren();
+    if (!it.spot) {
+      finderObtained.textContent = `「${it.name}」は、${it.obtained}`;
+      return;
+    }
+    const link = el("button", "spot-link", it.spot.name);
+    link.type = "button";
+    link.setAttribute("aria-label", `${it.spot.name}(地図で見る)`);
+    link.addEventListener("click", () => openGoto(it, link));
+    finderObtained.append(`「${it.name}」は、`, link, `でみっけ${it.season ? `(${it.season})` : ""}`);
+  }
+
+  function openGoto(it, opener) {
+    gotoTarget = { ...it.spot, item: it.name, opener };
+    $("finder-goto-title").textContent = `「${it.name}」を ${it.spot.name} でみっけしよう`;
+    gotoBox.hidden = false;
+    $("finder-goto-yes").focus();
+  }
+
+  $("finder-goto-no").addEventListener("click", () => {
+    gotoBox.hidden = true;
+    if (gotoTarget && gotoTarget.opener) gotoTarget.opener.focus();
+  });
+
+  $("finder-goto-yes").addEventListener("click", () => {
+    if (!gotoTarget) return;
+    const target = gotoTarget;
+    gotoBox.hidden = true;
+    dialog.close();
+    // カメラ中なら止めて、地図 (①さがす) にもどってからスポットを表示する
+    if (stream || still) stopCamera(true);
+    else showCameraView(false);
+    document.dispatchEvent(new CustomEvent("mikke:focus-spot", {
+      detail: { id: target.id, name: target.name, lat: target.lat, lng: target.lng, item: target.item },
+    }));
   });
 
   // ---------- 近くにシンボルがあるときだけカメラを使える ----------

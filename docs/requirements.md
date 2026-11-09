@@ -55,6 +55,8 @@
 | R47 | Must | シンボルを取得したとき、直近 30 分以内に取得したユーザを「こんな人が獲得しているよ」と 3〜6 名表示。名前でコーデ、コーデでどのスポットで取得したかを表示 |
 | R48 | Must | 管理者がクーポンを登録でき、有効期限と内容を設定できる |
 | R49 | Must | 配るクーポン 1 枚ごとにユニークな ID(他ユーザと重複しない・1 回だけ使える)、クーポンそのものにも ID |
+| R50 | Should | 取得場所のスポット名をタップすると「これをみっけに行く」を出し、マップ上でそのスポットを分かりやすく表示する |
+| R51 | Should | 何も出なかったとき、理由(ごほうび未設定 / 条件が今は合わない)と出る条件を表示する |
 
 ## トレーサビリティ
 
@@ -108,6 +110,8 @@
 | R47 | `explore/finders.py`(直近 30 分・最大 6 人・署名付きトークン)、`/explore/finders/<token>/`、`User.share_activity`(既存利用者は OFF から)、`camera.js:renderFinders / openFinder` | `RecentFindersTests` `FinderProfileTests` `SharingSettingTests`、ブラウザで受け取り → 一覧 → コーデ → 取得スポットを確認 | ✅ |
 | R48 | `CouponTemplate.available_until / owner`、`CouponForm`、`/explore/manage/coupons/`、`managed_coupons` | `ManagerCouponTests` `test_expiry_caps_and_stops` `test_expired_coupon_not_dropped` | ✅ |
 | R49 | `CouponTemplate.coupon_id`(CP-)、`UserCoupon.redeem_hash`(一意制約)、`issue_coupon` の再試行、`use_coupon` の条件付き UPDATE | `CouponIdTests` | ✅ |
+| R50 | `finders.obtained_info`(公開中のスポットだけ `spot` を返す)、`camera.js:showObtained / openGoto`、`spotmap.js` の `mikke:focus-spot`(強調マーカーとポップアップ) | `test_profile_shows_outfit_and_where` `test_no_map_link_for_unavailable_spot`、ブラウザでスポット名 → 「これをみっけに行く」→ 地図で表示を確認 | ✅ |
+| R51 | `services.empty_reason / drop_conditions`、`CollectResult.empty_reason / hints`、`api_collect` の `manage_url`、`camera.js:showReward` | `test_no_drop` `test_empty_reason_tells_conditions` `test_manage_link_only_for_people_who_can_set_drops`、ブラウザで「準備中」と設定ボタンを確認 | ✅ |
 | R18 | `maps/`(Range 配信)、`maps/tiles/kyobashi.pmtiles`、`scripts/extract_tiles.py`、`static/js/spotmap.js`(Leaflet + protomaps-leaflet) | `maps/tests.py`(Range・416・パストラバーサル・ログイン必須・外部 API を CSP で許可していない)、ブラウザで外部への通信がないことを確認 | ✅ |
 
 ## 未達・残課題

@@ -165,5 +165,27 @@
   // カメラから地図にもどったとき、隠れていた間の大きさの変化を反映する
   document.addEventListener("mikke:find-shown", () => map.invalidateSize());
 
+  // 「これをみっけに行く」: ほかの人のコーデを手に入れたスポットを、目立つ印で地図に出す
+  const focusLayer = L.layerGroup().addTo(map);
+  document.addEventListener("mikke:focus-spot", (ev) => {
+    const s = ev.detail;
+    if (typeof s.lat !== "number" || typeof s.lng !== "number") return;
+    focusLayer.clearLayers();
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    map.invalidateSize();
+    map.setView([s.lat, s.lng], Math.max(map.getZoom(), 17));
+    const box = mk("div", "coord-popup focus-popup");
+    box.appendChild(mk("p", "focus-popup-lead", "これをみっけに行く"));
+    box.appendChild(mk("h3", null, s.name));
+    box.appendChild(mk("p", null, `ここで「${s.item}」をみっけしよう!`));
+    box.appendChild(mk("p", "muted", bounds.contains([s.lat, s.lng])
+      ? "近くまで行ったら「近くのシンボルを探す」を押してね。季節や時間帯によっては出ないこともあります。"
+      : "このスポットは地図データの範囲外です(京橋付近のみ収録)。"));
+    const icon = L.divIcon({ className: "", iconSize: [44, 44], html: '<div class="focus-marker" aria-hidden="true">★</div>' });
+    L.marker([s.lat, s.lng], { icon, title: `${s.name}(みっけに行く)`, alt: s.name, keyboard: true, zIndexOffset: 1000 })
+      .bindPopup(box, { maxWidth: 260, autoPanPaddingTopLeft: [12, 56], autoPanPaddingBottomRight: [12, 12] })
+      .addTo(focusLayer).openPopup();
+  });
+
   window.__mikkeMap = { map, markers };
 })();

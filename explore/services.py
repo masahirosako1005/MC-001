@@ -296,9 +296,42 @@ def record_camera_start(user, now=None) -> int:
     return NearbyVisit.objects.filter(user=user, last_at__gte=since).update(camera_starts=F("camera_starts") + 1)
 
 
+def drop_conditions(d: DropEntry) -> list[str]:
+    """ドロップが出る条件の表示 (例: 「秋限定」「夜だけ」「2日目の訪問から」)。"""
+    from core.timeutil import SEASON_LABELS, SLOT_LABELS
+
+    conds = []
+    if d.season != "any":
+        conds.append(f"{SEASON_LABELS[d.season]}限定")
+    if d.time_slot != "any":
+        conds.append(f"{SLOT_LABELS[d.time_slot]}だけ")
+    if d.min_visit_days > 1:
+        conds.append(f"{d.min_visit_days}日目の訪問から")
+    return conds
+
+
+def empty_reason(symbol: Symbol, now=None) -> tuple[str, list[str]]:
+    """みっけしても何も出なかった理由。
+
+    - ("no_drops", [])       … このシンボルには、ごほうび (ドロップ) がまだ用意されていない
+    - ("conditions", [...])  … ごほうびはあるが、季節・時間帯・訪問日数の条件が今は合わない (条件を最大 3 つ返す)
+    """
+    from rewards.models import distributable_coupons_q
+
+    drops = symbol.drops.filter(Q(item__is_active=True)
+                                | (Q(coupon__isnull=False) & distributable_coupons_q("coupon__", now)))
+    hints: list[str] = []
+    for d in drops.order_by("min_visit_days", "season", "time_slot", "pk"):
+        label = "・".join(drop_conditions(d))
+        if label and label not in hints:
+            hints.append(label)
+    if not hints:
+        return ("no_drops", []) if not drops.exists() else ("conditions", [])
+    return "conditions", hints[:3]
+
+
 def obtainable_items(symbol: Symbol, now=None) -> list[dict]:
     """このシンボルで手に入るコーデ (アイテム)。季節・時間帯・再訪日数の条件と、いま出るかどうか付き。"""
-    from core.timeutil import SEASON_LABELS, SLOT_LABELS
 
     local = local_now(now)
     season, slot = season_of(local.date()), slot_of(local)
@@ -307,13 +340,7 @@ def obtainable_items(symbol: Symbol, now=None) -> list[dict]:
              .order_by("min_visit_days", "item__rarity", "item__code"))
     for d in drops:
         it = d.item
-        conds = []
-        if d.season != "any":
-            conds.append(f"{SEASON_LABELS[d.season]}限定")
-        if d.time_slot != "any":
-            conds.append(f"{SLOT_LABELS[d.time_slot]}だけ")
-        if d.min_visit_days > 1:
-            conds.append(f"{d.min_visit_days}日目の訪問から")
+        conds = drop_conditions(d)
         now_ok = d.season in ("any", season) and d.time_slot in ("any", slot)
         prev = items.get(it.code)
         if prev is None or (now_ok and not prev["now"]):
@@ -372,6 +399,9 @@ class CollectResult:
     replay: bool = False
     symbol: dict | None = None
     symbol_id: int | None = None  # 「こんな人が獲得しているよ」を探すため (応答には含めない)
+    # 何も出なかったとき: "no_drops" (ごほうび未設定) / "conditions" (条件が今は合わない) と、その条件
+    empty_reason: str | None = None
+    hints: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict:
         data = self.__dict__.copy()
@@ -453,5 +483,7 @@ def collect(user, ticket: str, idempotency_key: str, coords: tuple[float, float]
                 )
         except IntegrityError as exc:  # 同一キーの競合 (ロックにより通常は起きない)
             raise ExploreError("処理が重複しました。もう一度お試しください。") from exc
+        if result.reward_kind == "none":
+            result.empty_reason, result.hints = empty_reason(symbol, now)
         result.achievements = evaluate_achievements(user)
     return result

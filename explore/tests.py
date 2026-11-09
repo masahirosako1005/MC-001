@@ -167,6 +167,32 @@ class ServiceTests(Base):
         self.drop.delete()
         r = services.collect(self.user, self.ticket(), str(uuid.uuid4()))
         self.assertEqual(r.reward_kind, "none")
+        self.assertEqual((r.empty_reason, r.hints), ("no_drops", []))  # ごほうびが未設定
+
+    def test_empty_reason_tells_conditions(self):
+        # 今の季節・時間帯では出ないドロップだけにする
+        now = at(2026, 4, 10, 12)  # 春の昼
+        self.drop.season, self.drop.time_slot = "autumn", "night"
+        self.drop.save()
+        DropEntry.objects.create(symbol=self.symbol, item=self.item, min_visit_days=3)
+        r = services.collect(self.user, self.ticket(), str(uuid.uuid4()), now=now)
+        self.assertEqual(r.reward_kind, "none")
+        self.assertEqual(r.empty_reason, "conditions")
+        self.assertEqual(r.hints, ["秋限定・夜だけ", "3日目の訪問から"])
+
+    def test_manage_link_only_for_people_who_can_set_drops(self):
+        self.drop.delete()
+        url = reverse("explore:api_collect")
+
+        def collect_as(user):
+            self.client.force_login(user)
+            body = json.dumps({"ticket": services.make_ticket(user, self.symbol)})
+            return self.client.post(url, data=body, content_type="application/json",
+                                    headers={"Idempotency-Key": str(uuid.uuid4())}).json()
+
+        self.assertNotIn("manage_url", collect_as(self.user))
+        op = User.objects.create_user("op@example.com", PW, "運営", role="operator")
+        self.assertEqual(collect_as(op)["manage_url"], reverse("explore:manage_symbol_edit", args=[self.symbol.pk]))
 
     def test_achievement_unlocked_once(self):
         bonus = Item.objects.create(code="b", name="ごほうび", category="accessory", style="glasses", color="#B8892B")
