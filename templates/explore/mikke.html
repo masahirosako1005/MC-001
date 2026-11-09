@@ -12,8 +12,7 @@
          data-finder-base="{% url 'explore:mikke' %}finders/"
          data-wardrobe-url="{% url 'wardrobe:index' %}"
          data-item-svg-base="{% url 'wardrobe:index' %}items/"
-         data-coupon-base="{% url 'rewards:coupons' %}"
-         data-nothing-img="{% static 'img/nothing.svg' %}">
+         data-coupon-base="{% url 'rewards:coupons' %}">
 
   {# ① 近くのシンボルをさがす (現在地の取得 → シンボルの検索) #}
   <div id="mikke-find" class="mikke-find" data-nearby-url="{{ nearby_url }}" data-radius="{{ radius_m }}">

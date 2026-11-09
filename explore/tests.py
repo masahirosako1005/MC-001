@@ -163,36 +163,36 @@ class ServiceTests(Base):
         c = UserCoupon.objects.get(user=self.user)
         self.assertTrue(c.redeem_code.startswith("MK-"))
 
-    def test_no_drop(self):
+    def test_no_drop_still_gives_outfit(self):
+        # 衣装全振り: ドロップが未設定でも「何もなし」にはせず、ふだん用のコーデを渡す
         self.drop.delete()
         r = services.collect(self.user, self.ticket(), str(uuid.uuid4()))
-        self.assertEqual(r.reward_kind, "none")
-        self.assertEqual((r.empty_reason, r.hints), ("no_drops", []))  # ごほうびが未設定
+        self.assertEqual(r.reward_kind, "item")
+        self.assertEqual(r.item["code"], "hair-a")
+        self.assertTrue(UserItem.objects.filter(user=self.user, item=self.item).exists())
+        self.assertIsNone(Discovery.objects.get(user=self.user).drop)
 
-    def test_empty_reason_tells_conditions(self):
-        # 今の季節・時間帯では出ないドロップだけにする
+    def test_fallback_outfit_choice(self):
+        # 条件外 (秋の夜限定) のときは、限定アイテムではなく、ふだん用 (レア度 2 まで・体のタイプが合う・未所持) を渡す
         now = at(2026, 4, 10, 12)  # 春の昼
-        self.drop.season, self.drop.time_slot = "autumn", "night"
+        limited = Item.objects.create(code="hair-limited", name="限定髪", category="hair", style="bob", color="#111111",
+                                      rarity=5)
+        self.drop.item, self.drop.season, self.drop.time_slot = limited, "autumn", "night"
         self.drop.save()
-        DropEntry.objects.create(symbol=self.symbol, item=self.item, min_visit_days=3)
+        Item.objects.create(code="boy-top", name="男の子用", category="top", style="tshirt", color="#222222",
+                            body_type="boy")
+        Item.objects.create(code="rare-top", name="レア", category="top", style="tshirt", color="#333333", rarity=4)
+        Item.objects.create(code="starter", name="初期", category="top", style="tshirt", color="#444444",
+                            is_starter=True)
         r = services.collect(self.user, self.ticket(), str(uuid.uuid4()), now=now)
-        self.assertEqual(r.reward_kind, "none")
-        self.assertEqual(r.empty_reason, "conditions")
-        self.assertEqual(r.hints, ["秋限定・夜だけ", "3日目の訪問から"])
+        self.assertEqual(r.item["code"], "hair-a")
+        self.assertTrue(r.item["new"])
 
-    def test_manage_link_only_for_people_who_can_set_drops(self):
+    def test_fallback_when_everything_owned_is_marked_owned(self):
         self.drop.delete()
-        url = reverse("explore:api_collect")
-
-        def collect_as(user):
-            self.client.force_login(user)
-            body = json.dumps({"ticket": services.make_ticket(user, self.symbol)})
-            return self.client.post(url, data=body, content_type="application/json",
-                                    headers={"Idempotency-Key": str(uuid.uuid4())}).json()
-
-        self.assertNotIn("manage_url", collect_as(self.user))
-        op = User.objects.create_user("op@example.com", PW, "運営", role="operator")
-        self.assertEqual(collect_as(op)["manage_url"], reverse("explore:manage_symbol_edit", args=[self.symbol.pk]))
+        UserItem.objects.create(user=self.user, item=self.item)
+        r = services.collect(self.user, self.ticket(), str(uuid.uuid4()))
+        self.assertEqual((r.reward_kind, r.item["code"], r.item["new"]), ("item", "hair-a", False))
 
     def test_achievement_unlocked_once(self):
         bonus = Item.objects.create(code="b", name="ごほうび", category="accessory", style="glasses", color="#B8892B")

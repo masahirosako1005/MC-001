@@ -313,6 +313,7 @@ class CouponRegressionTests(TestCase):
         viewer = User.objects.create_user("u@example.com", PW, "ゆーざ")
         with mock.patch("explore.services.candidate_drops", return_value=[self.drop]):
             res = services.collect(viewer, services.make_ticket(viewer, self.symbol), str(uuid.uuid4()))
-        self.assertEqual(res.reward_kind, "none")
-        self.assertEqual(Discovery.objects.get(user=viewer).reward_kind, "none")
+        # クーポンの代わりに、ふだん用のコーデを渡す
+        self.assertEqual((res.reward_kind, res.item["code"]), ("item", "hair-r"))
+        self.assertEqual(Discovery.objects.get(user=viewer).reward_kind, "item")
         self.assertFalse(UserCoupon.objects.filter(user=viewer).exists())

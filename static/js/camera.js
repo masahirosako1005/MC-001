@@ -473,42 +473,33 @@
 
     if (d.reward_kind === "item" && d.item) {
       title.textContent = d.item.new ? "NEW!みっけ!" : "みっけ!";
-      showArt(itemImg(d.item.code), `手に入れたアイテム: ${d.item.name}`, "item", 180, 242);
+      showArt(itemImg(d.item.code), `手に入れたアイテム: ${d.item.name}${d.item.new ? "" : "(取得済み)"}`, "item", 180, 242);
       if (ZOOMABLE.has(d.item.slot)) showZoom(d.item.code);
-      badgeNew.hidden = !d.item.new;
+      // 初めてなら「NEW」、もう持っているコーデなら「取得済み」
+      badgeNew.hidden = false;
+      badgeNew.textContent = d.item.new ? "NEW" : "取得済み";
+      badgeNew.classList.toggle("is-owned", !d.item.new);
       if (d.item.rarity) rarity.textContent = "★".repeat(d.item.rarity);
       text.textContent = `${d.item.name} を手に入れた!`;
       if (d.item.rarity) notes.unshift(`${d.item.category || ""} ${"★".repeat(d.item.rarity)}${"☆".repeat(5 - d.item.rarity)}`);
-      if (!d.item.new) notes.push("もう持っているアイテムです(コレクション回数が増えました)。");
+      if (!d.item.new) notes.push("取得済みのコーデです(コレクション回数が増えました)。");
       link.textContent = "着せかえる";
       link.href = root.dataset.wardrobeUrl;
     } else if (d.reward_kind === "coupon" && d.coupon) {
       title.textContent = "クーポンをみっけ!";
       showArt(couponImg(d.coupon.id), `手に入れたクーポン: ${d.coupon.shop || ""}「${d.coupon.title}」`, "coupon", 288, 180);
       badgeNew.hidden = false;
+      badgeNew.textContent = "NEW";
+      badgeNew.classList.remove("is-owned");
       text.textContent = `${d.coupon.shop || ""}「${d.coupon.title}」`;
       if (d.coupon.benefit) notes.unshift(d.coupon.benefit);
       link.textContent = "クーポンを見る";
       link.href = `${root.dataset.couponBase}${encodeURIComponent(d.coupon.id)}/`;
     } else {
-      // 何も出なかった理由を伝える (ごほうび未設定 / 条件が今は合わない)
-      showArt(root.dataset.nothingImg, "今回は何も出なかった", "none", 150, 150);
+      // ふつうは必ずコーデが出る (衣装全振り)。アイテムが 1 つも登録されていない場合だけここに来る
+      title.textContent = "みっけ!";
+      text.textContent = "シンボルをみっけしました。";
       link.hidden = true;
-      if (d.empty_reason === "no_drops") {
-        title.textContent = "このシンボルは準備中";
-        text.textContent = "このシンボルには、まだごほうびが用意されていません。";
-        notes.push("みっけした記録は残りました(実績にも数えられます)。");
-        if (d.manage_url) {
-          link.hidden = false;
-          link.textContent = "ごほうびを設定する";
-          link.href = d.manage_url;
-        }
-      } else {
-        title.textContent = "今回は何も出なかった";
-        text.textContent = "このシンボルのごほうびは、条件がそろうと出てきます。";
-        if (d.hints && d.hints.length) notes.push(`出る条件: ${d.hints.join(" / ")}。また来てね!`);
-        else notes.push("季節や時間帯を変えて、また来てね。");
-      }
     }
     extra.textContent = notes.join(" ");
     // 実績のごほうびも、絵つきで並べる

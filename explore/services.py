@@ -310,26 +310,6 @@ def drop_conditions(d: DropEntry) -> list[str]:
     return conds
 
 
-def empty_reason(symbol: Symbol, now=None) -> tuple[str, list[str]]:
-    """みっけしても何も出なかった理由。
-
-    - ("no_drops", [])       … このシンボルには、ごほうび (ドロップ) がまだ用意されていない
-    - ("conditions", [...])  … ごほうびはあるが、季節・時間帯・訪問日数の条件が今は合わない (条件を最大 3 つ返す)
-    """
-    from rewards.models import distributable_coupons_q
-
-    drops = symbol.drops.filter(Q(item__is_active=True)
-                                | (Q(coupon__isnull=False) & distributable_coupons_q("coupon__", now)))
-    hints: list[str] = []
-    for d in drops.order_by("min_visit_days", "season", "time_slot", "pk"):
-        label = "・".join(drop_conditions(d))
-        if label and label not in hints:
-            hints.append(label)
-    if not hints:
-        return ("no_drops", []) if not drops.exists() else ("conditions", [])
-    return "conditions", hints[:3]
-
-
 def obtainable_items(symbol: Symbol, now=None) -> list[dict]:
     """このシンボルで手に入るコーデ (アイテム)。季節・時間帯・再訪日数の条件と、いま出るかどうか付き。"""
 
@@ -399,9 +379,6 @@ class CollectResult:
     replay: bool = False
     symbol: dict | None = None
     symbol_id: int | None = None  # 「こんな人が獲得しているよ」を探すため (応答には含めない)
-    # 何も出なかったとき: "no_drops" (ごほうび未設定) / "conditions" (条件が今は合わない) と、その条件
-    empty_reason: str | None = None
-    hints: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict:
         data = self.__dict__.copy()
@@ -413,7 +390,7 @@ def _result_from_discovery(d: Discovery) -> CollectResult:
     res = CollectResult(reward_kind=d.reward_kind, label=d.reward_label, is_new=d.is_new, replay=True,
                         symbol={"name": d.symbol.name, "spot": d.symbol.spot.name}, symbol_id=d.symbol_id)
     if d.reward_kind == "item":
-        res.item = {"code": d.reward_ref, "name": d.reward_label}
+        res.item = {"code": d.reward_ref, "name": d.reward_label, "new": d.is_new}
     elif d.reward_kind == "coupon":
         res.coupon = {"id": d.reward_ref, "title": d.reward_label}
     return res
@@ -457,23 +434,27 @@ def collect(user, ticket: str, idempotency_key: str, coords: tuple[float, float]
                                is_revisit_day=created_visit and visit_days > 1,
                                symbol={"name": symbol.name, "spot": symbol.spot.name}, symbol_id=symbol.pk)
         ref = ""
-        if drop and drop.item_id:
-            _, is_new = grant_item(user, drop.item)
-            result.reward_kind, result.label, result.is_new = "item", drop.item.name, is_new
-            result.item = {"code": drop.item.code, "name": drop.item.name, "category": drop.item.get_category_display(),
-                           "slot": drop.item.category, "rarity": drop.item.rarity, "new": is_new}
-            ref = drop.item.code
-        elif drop and drop.coupon_id:
+        item = drop.item if drop and drop.item_id else None
+        if drop and drop.coupon_id:
             try:
                 c = issue_coupon(user, drop.coupon, source=f"{symbol.spot.name}でみっけ", now=now)
             except CouponNotDistributable:
-                # 抽選と発行のあいだに配布停止・期限切れになった場合は「何もなし」として記録する (500 にしない)
+                # 抽選と発行のあいだに配布停止・期限切れになった場合は、クーポンの代わりにコーデを渡す (500 にしない)
                 c, drop = None, None
             if c is not None:
                 result.reward_kind, result.label, result.is_new = "coupon", c.template.title, True
                 result.coupon = {"id": str(c.pk), "title": c.template.title, "shop": c.template.shop_name,
                                  "benefit": c.template.benefit}
                 ref = str(c.pk)
+        if drop is None:
+            # 衣装全振り: ドロップが未設定・条件外でも「何もなし」にはせず、ふだん用のコーデを 1 つ渡す
+            item = fallback_outfit(user)
+        if item is not None:
+            _, is_new = grant_item(user, item)
+            result.reward_kind, result.label, result.is_new = "item", item.name, is_new
+            result.item = {"code": item.code, "name": item.name, "category": item.get_category_display(),
+                           "slot": item.category, "rarity": item.rarity, "new": is_new}
+            ref = item.code
         try:
             with transaction.atomic():
                 Discovery.objects.create(
@@ -483,7 +464,27 @@ def collect(user, ticket: str, idempotency_key: str, coords: tuple[float, float]
                 )
         except IntegrityError as exc:  # 同一キーの競合 (ロックにより通常は起きない)
             raise ExploreError("処理が重複しました。もう一度お試しください。") from exc
-        if result.reward_kind == "none":
-            result.empty_reason, result.hints = empty_reason(symbol, now)
         result.achievements = evaluate_achievements(user)
     return result
+
+
+FALLBACK_MAX_RARITY = 2  # 季節限定などの特別なアイテムの価値を保つため、ふだん用はレア度 2 まで
+
+
+def fallback_outfit(user):
+    """ドロップが出ないときに渡す、ふだん用のコーデ。
+
+    体のタイプに合うもの・まだ持っていないものを優先する。全部持っていたら持っているものから選ぶ
+    (結果画面では「取得済み」と表示する)。
+    """
+    from wardrobe.models import AvatarConfig, Item, UserItem
+
+    body = AvatarConfig.objects.filter(user=user).values_list("body_type", flat=True).first() or "girl"
+    pool = Item.objects.filter(is_active=True, is_starter=False, body_type__in=["any", body])
+    common = pool.filter(rarity__lte=FALLBACK_MAX_RARITY)
+    owned = UserItem.objects.filter(user=user).values("item_id")
+    for qs in (common.exclude(pk__in=owned), pool.exclude(pk__in=owned), common, pool):
+        ids = list(qs.values_list("pk", flat=True))
+        if ids:
+            return Item.objects.get(pk=_rng.choice(ids))
+    return None

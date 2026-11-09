@@ -236,10 +236,6 @@ def api_collect(request):
     payload = result.as_dict()
     symbol = Symbol.objects.filter(pk=result.symbol_id).first()
     payload["recent_finders"] = finders.recent_finders(symbol, request.user) if symbol else []
-    # ごほうび未設定のシンボルを、設定できる人 (担当の管理者・運営者) が読んだときは設定画面へ案内する
-    if (result.empty_reason == "no_drops" and symbol is not None
-            and managed_symbols(request.user).filter(pk=symbol.pk).exists()):
-        payload["manage_url"] = reverse("explore:manage_symbol_edit", args=[symbol.pk])
     return JsonResponse(payload)
 
 

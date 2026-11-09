@@ -56,7 +56,7 @@
 | R48 | Must | 管理者がクーポンを登録でき、有効期限と内容を設定できる |
 | R49 | Must | 配るクーポン 1 枚ごとにユニークな ID(他ユーザと重複しない・1 回だけ使える)、クーポンそのものにも ID |
 | R50 | Should | 取得場所のスポット名をタップすると「これをみっけに行く」を出し、マップ上でそのスポットを分かりやすく表示する |
-| R51 | Should | 何も出なかったとき、理由(ごほうび未設定 / 条件が今は合わない)と出る条件を表示する |
+| R51 | Must | 衣装全振り: みっけしたら必ずコーデを出す(「準備中」「からっぽ」は出さない)。取得済みのコーデも出し、「取得済み」と表示する |
 
 ## トレーサビリティ
 
@@ -97,7 +97,7 @@
 | R34 | `SiteSetting.camera_radius_m`、`/explore/api/nearby`、`services.nearby_symbols`、`camera.js:gpsGate` | `NearbyApiTests`(範囲内・範囲外といちばん近いスポット・設定変更・不正入力・GET 不可・レート制限・位置を記録しない)、`SiteSettingRadiusTests`、`test_admin_switches_theme_for_everyone`(距離の変更) | ✅ |
 | R35 | `services.obtainable_items`、`/explore/symbols/<id>/items/<code>.svg`、`spotmap.js`(★マーカー・ポップアップ・一覧) | `test_within_radius` `test_preview_image` `test_secret_and_unrelated_items_are_404` | ✅ |
 | R36 | `Symbol.is_secret`、`static/img/secret.svg`、API でのマスク、スポット一覧の「？？？」 | `test_secret_is_masked`(名前・ヒント・アイテムを応答に含めない) `SecretSpotListTests` | ✅ |
-| R37 | `camera.js:showReward`(全身 + 拡大図・NEW・レア度)、`wardrobe.services.item_zoom_svg`(`?zoom=1`)、`rewards/coupon_art.py` + `/rewards/coupons/<id>.svg`、`static/img/nothing.svg` | `test_collect_grants_item_and_records`(`slot`) `test_item_zoom_crops_to_part` `CouponImageTests`(本人のみ・XSS エスケープ・使用済み・長文の切り詰め)、ブラウザで実際にみっけ → アイテムの絵、クーポン・何もなしの絵を確認 | ✅ |
+| R37 | `camera.js:showReward`(全身 + 拡大図・NEW・レア度)、`wardrobe.services.item_zoom_svg`(`?zoom=1`)、`rewards/coupon_art.py` + `/rewards/coupons/<id>.svg` | `test_collect_grants_item_and_records`(`slot`) `test_item_zoom_crops_to_part` `CouponImageTests`(本人のみ・XSS エスケープ・使用済み・長文の切り詰め)、ブラウザで実際にみっけ → アイテムの絵、クーポン・何もなしの絵を確認 | ✅ |
 | R38 | `explore.views.mikke` + `templates/explore/mikke.html`(地図とカメラを 1 画面)、`camera.js`(検索結果でボタンを切り替え・同じ画面でカメラ)、ナビ・各ホームのリンク、`/explore/camera/` → 301 | `test_search_first_then_camera` `test_old_camera_url_redirects` `test_nav_has_single_mikke_tab`、ブラウザで 遠く → 起動不可 / 近く → 起動 → 地図にもどる / 写真読み取り を確認 | ✅ |
 | R39 | `static/js/nearby.js`(① 現在地 → ② 検索、二重実行しない、`mikke:nearby` イベント)、`spotmap.js`(「現在地」も同じ処理) | ブラウザで「現在地」「近くのシンボルを探す」の両方で ①→②→結果 の順に表示されることを確認 | ✅(JS は🔶手動) |
 | R40 | `SHOW_SPOT_CARDS = False`、`explore/_spot_cards.html` | `test_spot_cards_hidden_and_secret_not_leaked` `test_spot_cards_can_be_shown_again` | ✅ |
@@ -111,7 +111,7 @@
 | R48 | `CouponTemplate.available_until / owner`、`CouponForm`、`/explore/manage/coupons/`、`managed_coupons` | `ManagerCouponTests` `test_expiry_caps_and_stops` `test_expired_coupon_not_dropped` | ✅ |
 | R49 | `CouponTemplate.coupon_id`(CP-)、`UserCoupon.redeem_hash`(一意制約)、`issue_coupon` の再試行、`use_coupon` の条件付き UPDATE | `CouponIdTests` | ✅ |
 | R50 | `finders.obtained_info`(公開中のスポットだけ `spot` を返す)、`camera.js:showObtained / openGoto`、`spotmap.js` の `mikke:focus-spot`(強調マーカーとポップアップ) | `test_profile_shows_outfit_and_where` `test_no_map_link_for_unavailable_spot`、ブラウザでスポット名 → 「これをみっけに行く」→ 地図で表示を確認 | ✅ |
-| R51 | `services.empty_reason / drop_conditions`、`CollectResult.empty_reason / hints`、`api_collect` の `manage_url`、`camera.js:showReward` | `test_no_drop` `test_empty_reason_tells_conditions` `test_manage_link_only_for_people_who_can_set_drops`、ブラウザで「準備中」と設定ボタンを確認 | ✅ |
+| R51 | `services.fallback_outfit`(レア度 2 まで・体のタイプが合う・未所持を優先)、`collect`、`camera.js:showReward`(NEW / 取得済み) | `test_no_drop_still_gives_outfit` `test_fallback_outfit_choice` `test_fallback_when_everything_owned_is_marked_owned` `test_coupon_stopped_between_draw_and_issue_is_not_500`、ブラウザでドロップ未設定のシンボルからコーデが出ることを確認 | ✅ |
 | R18 | `maps/`(Range 配信)、`maps/tiles/kyobashi.pmtiles`、`scripts/extract_tiles.py`、`static/js/spotmap.js`(Leaflet + protomaps-leaflet) | `maps/tests.py`(Range・416・パストラバーサル・ログイン必須・外部 API を CSP で許可していない)、ブラウザで外部への通信がないことを確認 | ✅ |
 
 ## 未達・残課題
