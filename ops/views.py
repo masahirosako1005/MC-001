@@ -15,7 +15,7 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 from accounts.forms import OperatorLoginForm
 from accounts.models import ManagerProfile, User, email_hash_of
 from core import audit
-from core.ids import random_code
+from core.ids import temp_password
 from core.permissions import operator_required
 from core.timeutil import SEASON_LABELS, SLOT_LABELS
 
@@ -26,12 +26,7 @@ FUNNEL = [("visitors", "付近に来た"), ("camera", "カメラ起動"), ("coor
 
 
 def _temp_password() -> str:
-    """仮パスワード (例: 7QK4H-2ZMNP-X8RTA-C3WVE)。31 種類 × 20 文字 ≒ 2^99 通り。最初のログインで変更してもらう。
-
-    読み間違えやすい文字 (0/O, 1/I/L) を除き、5 文字ずつ区切って書き写しやすくしている。
-    """
-    body = random_code(20)
-    return "-".join(body[i:i + 5] for i in range(0, 20, 5))
+    return temp_password()
 
 
 class OperatorLoginView(LoginView):

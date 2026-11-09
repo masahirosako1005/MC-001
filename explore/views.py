@@ -212,14 +212,18 @@ def api_collect(request):
         return JsonResponse({"error": "bad_request", "message": "リクエストが正しくありません。"}, status=400)
     except services.Cooldown as exc:
         return _error(exc, 409)
-    except (services.LocationRequired, services.TooFar) as exc:
+    except (services.LocationRequired, services.TooFar, services.NotNearby, services.ImplausibleTravel) as exc:
+        # 位置偽装の疑い (離れすぎ・直前の確認なし・移動が速すぎる) は監査ログに残す (座標そのものは記録しない)
+        if not isinstance(exc, services.LocationRequired):
+            audit.record("explore.collect_rejected", request=request, reason=exc.code)
         return _error(exc, 403)
     except services.UnknownSymbol as exc:
         return _error(exc, 404)
     except services.ExploreError as exc:
         return _error(exc, 400)
     if not result.replay:
-        audit.record("explore.collect", request=request, kind=result.reward_kind, label=result.label)
+        audit.record("explore.collect", request=request, kind=result.reward_kind, label=result.label,
+                     symbol=result.symbol_id, spot=result.spot_id, distance_m=result.distance_m)
     payload = result.as_dict()
     symbol = Symbol.objects.filter(pk=result.symbol_id).first()
     payload["recent_finders"] = finders.recent_finders(symbol, request.user) if symbol else []

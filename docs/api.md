@@ -83,11 +83,13 @@ AR マークをタップしたときに呼ぶ。レート制限: 20 回/分/利�
 リクエスト: `{"ticket": "<scan で得たチケット>", "location": {"lat": number, "lng": number} | null}`
 (`location` は `requires_location` が true のときだけ送る。サーバーは保存しない)
 
+現地確認(スポットの「現地確認を必須にする」。位置のあるスポットは既定で ON)は 3 段階: ① `MIKKE_PRESENCE_WINDOW_MINUTES`(既定 30 分)以内に `POST /explore/api/nearby` でそのスポットの付近にいたこと、② `location` がシンボル(未設定ならスポット)の判定半径内、③ 直前のみっけ(別スポット)からの移動速度が `MIKKE_MAX_TRAVEL_SPEED_KMH`(既定 200)以下。
+
 | ステータス | 内容 |
 |---|---|
 | 200 | `{"reward_kind": "item" \| "coupon" \| "none", "label", "is_new", "item": {...} \| null, "coupon": {...} \| null, "visit_days", "is_revisit_day", "achievements": [...], "replay", "symbol"}` |
 | 400 | `invalid_ticket`(期限切れ 5 分 / 改ざん / 他人のチケット)、`error`(キー不正など) |
-| 403 | `location_required` / `too_far` |
+| 403 | `location_required`(位置情報なし)/ `too_far`(判定半径の外)/ `not_nearby`(直前 30 分以内に `api/nearby` でこのスポットの付近に来た記録がない)/ `implausible_travel`(直前のみっけ地点からの移動速度が 200km/h を超える)。`location_required` 以外は監査ログ `explore.collect_rejected` に残る |
 | 404 | `unknown_symbol` |
 | 409 | `{"error": "cooldown", "next_available_at": RFC3339}` |
 | 429 | `rate_limited` |

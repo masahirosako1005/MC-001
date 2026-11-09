@@ -115,7 +115,7 @@ class Command(BaseCommand):
         for slug, name, area, desc, lat, lng in SPOTS:
             spots[slug], _ = Spot.objects.update_or_create(slug=slug, defaults=dict(
                 name=name, area=area, description=desc, latitude=lat, longitude=lng, radius_m=300,
-                require_location=False, is_active=True))
+                require_location=True, is_active=True))
 
         coupons = {}
         for code, title, shop, benefit, spot_slug, days in COUPONS:

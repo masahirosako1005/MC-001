@@ -11,12 +11,13 @@ from django.db import transaction
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
-from django.views.decorators.http import require_GET, require_http_methods
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from core import audit
 from core.permissions import managed_coupons, managed_spots, managed_symbols, manager_required
 from rewards.models import CouponTemplate, distributable_coupons_q
 
+from . import services
 from .forms import CouponForm, DropFormSet, SpotForm, SymbolSettingsForm
 from .models import Discovery, NearbyVisit, Spot, SpotVisit, Symbol
 from .views import _map_context
@@ -152,6 +153,17 @@ def symbol_create(request):
 @require_http_methods(["GET", "POST"])
 def symbol_edit(request, pk: int):
     return _symbol_form(request, get_object_or_404(managed_symbols(request.user).select_related("spot"), pk=pk))
+
+
+@manager_required
+@require_POST
+def symbol_regenerate_token(request, pk: int):
+    """QR シンボルの識別トークンを作り直す (掲示物を差し替えるとき。古い QR は使えなくなる)。"""
+    symbol = get_object_or_404(managed_symbols(request.user).select_related("spot"), pk=pk, kind=Symbol.KIND_QR)
+    services.regenerate_token(symbol)
+    audit.record("symbol.token_regenerate", request=request, target=symbol, spot=symbol.spot_id)
+    messages.success(request, f"「{symbol.name}」の QR を作り直しました。新しい印刷用 SVG を掲示してください (古い QR は使えません)。")
+    return redirect("explore:manage_symbol_edit", pk=symbol.pk)
 
 
 # ---------------------------------------------------------------- クーポンの登録

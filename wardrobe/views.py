@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from django.contrib import messages
-from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.http import Http404, HttpResponse
 from django.shortcuts import redirect, render
@@ -9,6 +8,7 @@ from django.views.decorators.http import require_GET, require_http_methods
 
 from core import audit
 from core.http import svg_response
+from core.permissions import operator_required
 
 from .avatar import (
     BODY_TYPE_CHOICES,
@@ -148,7 +148,7 @@ def item_svg(request, code: str):
     return _svg_response(render(item, cfg.skin_tone, cfg.eye_color), cacheable=True)
 
 
-@staff_member_required
+@operator_required
 @require_GET
 def catalog(request):
     """運営向け: 全パーツの一覧 (体のタイプ別・部位別)。"""

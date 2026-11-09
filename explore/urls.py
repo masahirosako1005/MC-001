@@ -22,6 +22,7 @@ urlpatterns = [
     path("manage/spots/<int:pk>/delete/", manage_views.spot_delete, name="manage_spot_delete"),
     path("manage/symbols/new/", manage_views.symbol_create, name="manage_symbol_create"),
     path("manage/symbols/<int:pk>/", manage_views.symbol_edit, name="manage_symbol_edit"),
+    path("manage/symbols/<int:pk>/token/", manage_views.symbol_regenerate_token, name="manage_symbol_token"),
     path("manage/coupons/", manage_views.coupon_list, name="manage_coupons"),
     path("manage/coupons/new/", manage_views.coupon_create, name="manage_coupon_create"),
     path("manage/coupons/<int:pk>/", manage_views.coupon_edit, name="manage_coupon_edit"),

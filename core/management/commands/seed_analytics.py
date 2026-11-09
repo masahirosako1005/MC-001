@@ -9,7 +9,8 @@
 - 行動データ: 付近に来た (NearbyVisit) → カメラ起動 → みっけ (Discovery) を、スポットごとの人気・
   時間帯・季節の傾向をつけてランダムに作る (時間・季節ごとの分析を確認できるように)
 - 動作確認用のアカウントも用意する: 管理者 manager@test.com と 利用者 user@test.com
-  (パスワードは既存の test@test.com と同じ。test@test.com はサイト運営者)
+  パスワードは実行のたびにランダムな仮パスワードを生成して画面に 1 度だけ表示する (固定値は使わない)。
+  最初のログインでパスワード変更を求める。両方とも「デモ利用者/デモ管理者」グループに入れ、--delete で消える
 """
 
 from __future__ import annotations
@@ -29,13 +30,14 @@ from django.utils import timezone
 from accounts.models import ManagerProfile, User, email_hash_of
 from core import audit
 from core.demo import DEMO_DOMAIN, DEMO_MANAGER_GROUP, DEMO_USER_GROUP
+from core.ids import temp_password
 from core.timeutil import season_of, slot_of
 from explore.models import Discovery, DropEntry, NearbyVisit, Spot, SpotVisit, Symbol
 from wardrobe.models import CATEGORY_CHOICES, Item, UserItem
 
 DEMO_SPOT_PREFIX = "demo-spot-"
-# ローカル確認用 (test@test.com と同じ)。DEBUG=True のときだけ使われ、本番では投入できない
-TEST_PASSWORD = "test1234"  # noqa: S105
+# 以前のバージョンが確認用アカウントに設定していた固定パスワード。見つけたら仮パスワードに置き換える
+LEGACY_TEST_PASSWORD = "test1234"  # noqa: S105
 _rng = secrets.SystemRandom()
 
 # ---- 架空の名前の素材 (実在の店舗・施設とは無関係)
@@ -152,16 +154,32 @@ class Command(BaseCommand):
 
     # ------------------------------------------------------------ 確認用アカウント
     def _test_accounts(self) -> dict:
+        """確認用アカウント。パスワードは毎回ランダムに作り、この場で 1 度だけ表示する (保存・固定はしない)。"""
         out = {}
-        for key, email, nickname, role in [("manager", "manager@test.com", "デモ商店 担当", User.ROLE_MANAGER),
-                                           ("user", "user@test.com", "テスト利用者", User.ROLE_USER)]:
+        for key, email, nickname, role, group_name in [
+            ("manager", "manager@test.com", "デモ商店 担当", User.ROLE_MANAGER, DEMO_MANAGER_GROUP),
+            ("user", "user@test.com", "テスト利用者", User.ROLE_USER, DEMO_USER_GROUP),
+        ]:
             user = User.objects.filter(email_hash=email_hash_of(email)).first()
+            password = None
             if user is None:
-                user = User.objects.create_user(email, TEST_PASSWORD, nickname, role=role)
+                password = temp_password()
+                user = User.objects.create_user(email, password, nickname, role=role, must_change_password=True)
                 if role == User.ROLE_USER:
                     from wardrobe.services import ensure_starter_kit
 
                     ensure_starter_kit(user)
+            elif user.check_password(LEGACY_TEST_PASSWORD):
+                # 以前のバージョンが設定した公開済みの固定パスワードは、見つけ次第ランダムな仮パスワードに置き換える
+                password = temp_password()
+                user.set_password(password)
+                user.must_change_password = True
+                user.save(update_fields=["password", "must_change_password"])
+            group, _ = Group.objects.get_or_create(name=group_name)
+            user.groups.add(group)
+            if password is not None:
+                self.stdout.write(self.style.WARNING(
+                    f"確認用アカウント {email} の仮パスワード: {password} (この 1 回だけ表示。初回ログインで変更を求めます)"))
             if role == User.ROLE_MANAGER:
                 ManagerProfile.objects.get_or_create(user=user, defaults=dict(
                     organization="デモ商店", store_name="京橋本店", industry="shop", contact_name="デモ 担当",

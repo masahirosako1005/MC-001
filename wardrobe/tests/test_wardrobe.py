@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
@@ -246,9 +247,16 @@ class BodyTypeEquipTests(TestCase):
         self.client.force_login(self.user)
         self.assertEqual(self.client.get(reverse("wardrobe:item_svg", args=["rare"]), {"zoom": "1"}).status_code, 404)
 
-    def test_catalog_staff_only(self):
+    def test_catalog_operator_only(self):
+        # 未ログインは運営者ログインへ。ログイン中の利用者には 404 (画面の存在を隠す)。
+        # 以前の staff_member_required は Django 管理画面のログイン URL (秘匿すべき DJANGO_ADMIN_URL) を
+        # リダイレクト先として漏らしていたため、core.permissions.operator_required に統一した。
+        res = self.client.get(reverse("wardrobe:catalog"))
+        self.assertEqual(res.status_code, 302)
+        self.assertTrue(res["Location"].startswith(reverse("ops:login")))
+        self.assertNotIn(settings.ADMIN_URL.rstrip("/"), res["Location"])
         self.client.force_login(self.user)
-        self.assertEqual(self.client.get(reverse("wardrobe:catalog")).status_code, 302)
+        self.assertEqual(self.client.get(reverse("wardrobe:catalog")).status_code, 404)
         self.client.force_login(self.staff)
         res = self.client.get(reverse("wardrobe:catalog"))
         self.assertContains(res, "女の子用")

@@ -418,6 +418,12 @@
       } else if (res.data.error === "invalid_ticket") {
         clearTarget();
         setStatus(res.data.message);
+      } else if (res.data.error === "not_nearby") {
+        // 「近くのシンボルを探す」を通っていない (時間がたった・省略した)。地図に戻って探し直してもらう
+        clearTarget();
+        setStatus(res.data.message);
+        showCameraView(false);
+        if (window.MikkeNearby) window.MikkeNearby.search().catch(() => {});
       } else {
         setStatus(res.data.message || "受け取れませんでした。もう一度お試しください。");
       }

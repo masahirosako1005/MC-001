@@ -35,7 +35,8 @@ class FinderBase(TestCase):
     def setUp(self):
         cache.clear()
         self.viewer = User.objects.create_user("v@example.com", PW, "みるひと")
-        self.spot = Spot.objects.create(slug="s", name="森の社", latitude=Decimal("34.69"), longitude=Decimal("135.53"))
+        self.spot = Spot.objects.create(slug="s", name="森の社", latitude=Decimal("34.69"), longitude=Decimal("135.53"),
+                                        require_location=False)  # 受け取りの流れだけを見るテスト
         self.symbol = Symbol.objects.create(spot=self.spot, name="灯籠")
         self.other_symbol = Symbol.objects.create(spot=self.spot, name="狛犬")
         self.secret = Symbol.objects.create(spot=self.spot, name="ひみつ", is_secret=True)
@@ -326,6 +327,19 @@ class CouponRegressionTests(TestCase):
         other = Symbol.objects.create(spot=self.spot, name="別の看板")
         res = self.client.get(reverse("explore:manage_symbol_edit", args=[other.pk]))
         self.assertNotContains(res, "運営のクーポン")
+
+    def test_regenerate_token_only_for_own_symbols(self):
+        other_manager = User.objects.create_user("m2@example.com", PW, "別の管理者", role="manager")
+        self.client.force_login(other_manager)
+        res = self.client.post(reverse("explore:manage_symbol_token", args=[self.symbol.pk]))
+        self.assertEqual(res.status_code, 404)
+        before = self.symbol.token
+        self.client.force_login(self.manager)
+        res = self.client.post(reverse("explore:manage_symbol_token", args=[self.symbol.pk]))
+        self.assertEqual(res.status_code, 302)
+        self.symbol.refresh_from_db()
+        self.assertNotEqual(self.symbol.token, before)
+        self.assertEqual(self.client.get(reverse("explore:manage_symbol_token", args=[self.symbol.pk])).status_code, 405)
 
     def test_coupon_stopped_between_draw_and_issue_is_not_500(self):
         viewer = User.objects.create_user("u@example.com", PW, "ゆーざ")

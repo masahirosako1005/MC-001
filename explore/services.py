@@ -20,7 +20,16 @@ from core.timeutil import local_now, season_of, slot_of
 from rewards.services import CouponNotDistributable, evaluate_achievements, issue_coupon
 from wardrobe.services import grant_item
 
-from .models import SYMBOL_PREFIX, Discovery, DropEntry, NearbyVisit, SpotVisit, Symbol, spot_available_q
+from .models import (
+    SYMBOL_PREFIX,
+    Discovery,
+    DropEntry,
+    NearbyVisit,
+    SpotVisit,
+    Symbol,
+    new_symbol_token,
+    spot_available_q,
+)
 
 TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
 TICKET_SALT = "mikke.scan-ticket"
@@ -56,6 +65,18 @@ class TooFar(ExploreError):
     code = "too_far"
 
 
+class NotNearby(ExploreError):
+    """受け取りの前に「近くのシンボルを探す」(api_nearby) で付近に来た記録がない。"""
+
+    code = "not_nearby"
+
+
+class ImplausibleTravel(ExploreError):
+    """直前のみっけ地点から、ありえない速さで移動している (位置偽装の疑い)。"""
+
+    code = "implausible_travel"
+
+
 def parse_payload(payload: str) -> str | None:
     if not isinstance(payload, str) or not payload.startswith(SYMBOL_PREFIX):
         return None
@@ -82,6 +103,15 @@ def next_available_at(user, symbol: Symbol, now: dt.datetime | None = None) -> d
         return None
     nxt = last + dt.timedelta(hours=symbol.cooldown_hours)
     return nxt if nxt > (now or timezone.now()) else None
+
+
+def regenerate_token(symbol: Symbol) -> Symbol:
+    """QR シンボルの識別トークンを作り直す (掲示物の差し替え)。古い QR は以後「シンボルではない」扱いになる。"""
+    if symbol.kind != Symbol.KIND_QR:
+        raise ExploreError("画像シンボルにはトークンがありません。")
+    symbol.token = new_symbol_token()
+    symbol.save(update_fields=["token"])
+    return symbol
 
 
 def make_ticket(user, symbol: Symbol) -> str:
@@ -331,15 +361,52 @@ def obtainable_items(symbol: Symbol, now=None) -> list[dict]:
     return list(items.values())
 
 
-def check_location(symbol: Symbol, coords: tuple[float, float] | None) -> None:
+def check_location(symbol: Symbol, coords: tuple[float, float] | None) -> float | None:
+    """現地確認。端末の位置がシンボル (未設定ならスポット) の判定半径内か。距離 (m) を返す。確認しないスポットは None。"""
     spot = symbol.spot
     if not spot.require_location:
-        return
+        return None
+    loc = symbol.location
+    if loc is None:  # 位置のないスポットは Spot.save() で require_location=False になるので通常は来ない
+        return None
     if coords is None:
         raise LocationRequired("このスポットでは現地確認のため位置情報が必要です。位置情報の利用を許可してください。")
-    d = distance_m(coords[0], coords[1], float(spot.latitude), float(spot.longitude))
+    d = distance_m(coords[0], coords[1], loc[0], loc[1])
     if d > spot.radius_m:
         raise TooFar("スポットから離れているようです。現地でもう一度お試しください。")
+    return d
+
+
+def check_presence(user, symbol: Symbol, now: dt.datetime) -> None:
+    """受け取りの前に、画面の「近くのシンボルを探す」(api_nearby) でこのスポットの付近に来た記録があるか。
+
+    位置そのものは端末の申告なので偽装は可能だが、「探す → 受け取る」の 2 段階を正しい順で踏ませることで
+    保存済みの QR 文字列を自宅から送るだけの不正を止め、監査ログで追える形にする。
+    """
+    if not symbol.spot.require_location:
+        return
+    since = now - dt.timedelta(minutes=settings.MIKKE_PRESENCE_WINDOW_MINUTES)
+    if not NearbyVisit.objects.filter(user=user, spot=symbol.spot, last_at__gte=since).exists():
+        raise NotNearby("先に「近くのシンボルを探す」で現在地を確認してから、カメラでみっけしてください。")
+
+
+def check_travel_speed(user, symbol: Symbol, now: dt.datetime) -> None:
+    """直前のみっけ (別のスポット) からの移動速度が非現実的なら拒否する (位置偽装の疑い)。"""
+    limit = settings.MIKKE_MAX_TRAVEL_SPEED_KMH
+    here = symbol.location
+    if not limit or here is None or not symbol.spot.require_location:
+        return
+    last = (Discovery.objects.filter(user=user, found_at__lte=now).exclude(symbol__spot=symbol.spot)
+            .select_related("symbol__spot").order_by("-found_at").first())
+    if last is None:
+        return
+    there = last.symbol.location
+    hours = (now - last.found_at).total_seconds() / 3600
+    if there is None or hours <= 0:
+        return
+    km = distance_m(here[0], here[1], there[0], there[1]) / 1000
+    if km / hours > limit:
+        raise ImplausibleTravel("直前のみっけから移動が速すぎるため、受け取れませんでした。しばらくしてからお試しください。")
 
 
 def candidate_drops(symbol: Symbol, *, season: str, slot: str, visit_days: int, now=None):
@@ -380,16 +447,20 @@ class CollectResult:
     replay: bool = False
     symbol: dict | None = None
     symbol_id: int | None = None  # 「こんな人が獲得しているよ」を探すため (応答には含めない)
+    spot_id: int | None = None  # 監査ログ用 (応答には含めない)
+    distance_m: int | None = None  # 現地確認したときの距離。監査ログ用 (応答には含めない)
 
     def as_dict(self) -> dict:
         data = self.__dict__.copy()
-        data.pop("symbol_id", None)
+        for k in ("symbol_id", "spot_id", "distance_m"):
+            data.pop(k, None)
         return data
 
 
 def _result_from_discovery(d: Discovery) -> CollectResult:
     res = CollectResult(reward_kind=d.reward_kind, label=d.reward_label, is_new=d.is_new, replay=True,
-                        symbol={"name": d.symbol.name, "spot": d.symbol.spot.name}, symbol_id=d.symbol_id)
+                        symbol={"name": d.symbol.name, "spot": d.symbol.spot.name}, symbol_id=d.symbol_id,
+                        spot_id=d.symbol.spot_id)
     if d.reward_kind == "item":
         res.item = {"code": d.reward_ref, "name": d.reward_label, "new": d.is_new}
     elif d.reward_kind == "coupon":
@@ -421,7 +492,10 @@ def collect(user, ticket: str, idempotency_key: str, coords: tuple[float, float]
         if nxt:
             raise Cooldown("このシンボルはもうみっけ済みです。時間をおいてまた来てね。",
                            next_available_at=nxt.isoformat())
-        check_location(symbol, coords)
+        # 現地確認: ①直前に「近くのシンボルを探す」で付近に来ている ②端末の位置が判定半径内 ③移動速度が現実的
+        check_presence(user, symbol, now)
+        distance = check_location(symbol, coords)
+        check_travel_speed(user, symbol, now)
 
         local = local_now(now)
         season, slot = season_of(local.date()), slot_of(local)
@@ -433,7 +507,8 @@ def collect(user, ticket: str, idempotency_key: str, coords: tuple[float, float]
         drop = pick_weighted(list(candidate_drops(symbol, season=season, slot=slot, visit_days=visit_days, now=now)))
         result = CollectResult(reward_kind="none", label="", visit_days=visit_days,
                                is_revisit_day=created_visit and visit_days > 1,
-                               symbol={"name": symbol.name, "spot": symbol.spot.name}, symbol_id=symbol.pk)
+                               symbol={"name": symbol.name, "spot": symbol.spot.name}, symbol_id=symbol.pk,
+                               spot_id=symbol.spot_id, distance_m=round(distance) if distance is not None else None)
         ref = ""
         item = drop.item if drop and drop.item_id else None
         if drop and drop.coupon_id:

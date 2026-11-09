@@ -32,7 +32,8 @@ class Base(TestCase):
         cache.clear()
         self.user = User.objects.create_user("e@example.com", PW, "えくす")
         self.other = User.objects.create_user("o@example.com", PW, "おーさー")
-        self.spot = Spot.objects.create(slug="s", name="テスト温泉", latitude=Decimal("35.0"), longitude=Decimal("139.0"))
+        self.spot = Spot.objects.create(slug="s", name="テスト温泉", latitude=Decimal("35.0"), longitude=Decimal("139.0"),
+                                        require_location=False)
         self.symbol = Symbol.objects.create(spot=self.spot, name="かっぱ", cooldown_hours=20)
         self.item = Item.objects.create(code="hair-a", name="髪A", category="hair", style="bob", color="#222222")
         self.drop = DropEntry.objects.create(symbol=self.symbol, item=self.item, weight=10)
@@ -120,12 +121,94 @@ class ServiceTests(Base):
         self.spot.require_location = True
         self.spot.radius_m = 300
         self.spot.save()
+        # ① 先に「近くのシンボルを探す」で付近に来た記録が要る (保存した QR 文字列を自宅から送るだけでは通らない)
+        with self.assertRaises(services.NotNearby):
+            services.collect(self.user, self.ticket(), str(uuid.uuid4()), coords=(35.001, 139.0))
+        services.record_nearby_visit(self.user, {self.spot.pk})
+        # ② 端末の位置が判定半径内
         with self.assertRaises(services.LocationRequired):
             services.collect(self.user, self.ticket(), str(uuid.uuid4()))
         with self.assertRaises(services.TooFar):
             services.collect(self.user, self.ticket(), str(uuid.uuid4()), coords=(35.1, 139.0))  # 約11km
         r = services.collect(self.user, self.ticket(), str(uuid.uuid4()), coords=(35.001, 139.0))  # 約111m
         self.assertEqual(r.reward_kind, "item")
+        self.assertEqual(r.distance_m, 111)  # 監査ログ用。応答には含めない
+        self.assertNotIn("distance_m", r.as_dict())
+        self.assertNotIn("spot_id", r.as_dict())
+
+    def test_presence_record_expires(self):
+        self.spot.require_location = True
+        self.spot.save()
+        now = timezone.now()
+        services.record_nearby_visit(self.user, {self.spot.pk}, now=now - dt.timedelta(minutes=31))
+        with self.assertRaises(services.NotNearby):
+            services.collect(self.user, self.ticket(), str(uuid.uuid4()), coords=(35.0, 139.0), now=now)
+        services.record_nearby_visit(self.user, {self.spot.pk}, now=now - dt.timedelta(minutes=29))
+        r = services.collect(self.user, self.ticket(), str(uuid.uuid4()), coords=(35.0, 139.0), now=now)
+        self.assertEqual(r.reward_kind, "item")
+
+    def test_presence_must_be_same_spot(self):
+        self.spot.require_location = True
+        self.spot.save()
+        other = Spot.objects.create(slug="o", name="別の店", latitude=Decimal("35.5"), longitude=Decimal("139.5"))
+        services.record_nearby_visit(self.user, {other.pk})
+        with self.assertRaises(services.NotNearby):
+            services.collect(self.user, self.ticket(), str(uuid.uuid4()), coords=(35.0, 139.0))
+
+    def test_symbol_location_used_for_distance(self):
+        """シンボル独自の位置があるときは、スポットではなくシンボルの位置で判定する。"""
+        self.spot.require_location = True
+        self.spot.radius_m = 100
+        self.spot.save()
+        self.symbol.latitude, self.symbol.longitude = Decimal("35.01"), Decimal("139.0")  # スポットから約1.1km
+        self.symbol.save()
+        services.record_nearby_visit(self.user, {self.spot.pk})
+        with self.assertRaises(services.TooFar):
+            services.collect(self.user, self.ticket(), str(uuid.uuid4()), coords=(35.0, 139.0))  # スポット位置
+        r = services.collect(self.user, self.ticket(), str(uuid.uuid4()), coords=(35.01, 139.0))  # シンボル位置
+        self.assertEqual(r.reward_kind, "item")
+
+    def test_implausible_travel_rejected(self):
+        """直前に別のスポット (約 400km 先) でみっけした 10 分後に受け取ろうとすると、位置偽装とみなす。"""
+        self.spot.require_location = True
+        self.spot.save()
+        far = Spot.objects.create(slug="far", name="遠い街", latitude=Decimal("38.6"), longitude=Decimal("139.0"))
+        far_symbol = Symbol.objects.create(spot=far, name="遠くの看板")
+        now = timezone.now()
+        Discovery.objects.create(user=self.user, symbol=far_symbol, reward_kind="none",
+                                 idempotency_key=uuid.uuid4(), found_at=now - dt.timedelta(minutes=10))
+        services.record_nearby_visit(self.user, {self.spot.pk}, now=now)
+        with self.assertRaises(services.ImplausibleTravel):
+            services.collect(self.user, self.ticket(), str(uuid.uuid4()), coords=(35.0, 139.0), now=now)
+        # 3 時間後なら 133km/h なので通る
+        later = now + dt.timedelta(hours=3)
+        services.record_nearby_visit(self.user, {self.spot.pk}, now=later)
+        r = services.collect(self.user, self.ticket(), str(uuid.uuid4()), coords=(35.0, 139.0), now=later)
+        self.assertEqual(r.reward_kind, "item")
+
+    def test_travel_check_can_be_disabled(self):
+        self.spot.require_location = True
+        self.spot.save()
+        far = Spot.objects.create(slug="far", name="遠い街", latitude=Decimal("38.6"), longitude=Decimal("139.0"))
+        far_symbol = Symbol.objects.create(spot=far, name="遠くの看板")
+        now = timezone.now()
+        Discovery.objects.create(user=self.user, symbol=far_symbol, reward_kind="none",
+                                 idempotency_key=uuid.uuid4(), found_at=now - dt.timedelta(minutes=10))
+        services.record_nearby_visit(self.user, {self.spot.pk}, now=now)
+        with self.settings(MIKKE_MAX_TRAVEL_SPEED_KMH=0):
+            r = services.collect(self.user, self.ticket(), str(uuid.uuid4()), coords=(35.0, 139.0), now=now)
+        self.assertEqual(r.reward_kind, "item")
+
+    def test_regenerate_token_invalidates_old_qr(self):
+        old_payload = self.symbol.payload
+        services.regenerate_token(self.symbol)
+        self.assertNotEqual(self.symbol.payload, old_payload)
+        with self.assertRaises(services.UnknownSymbol):
+            services.scan(self.user, old_payload)
+        self.assertEqual(services.scan(self.user, self.symbol.payload)["status"], "ready")
+        image = Symbol.objects.create(spot=self.spot, name="絵", kind=Symbol.KIND_IMAGE)
+        with self.assertRaises(services.ExploreError):
+            services.regenerate_token(image)
 
     def test_distance(self):
         self.assertAlmostEqual(services.distance_m(35.0, 139.0, 35.001, 139.0), 111.2, delta=1)
@@ -222,9 +305,16 @@ class ConstraintTests(Base):
         with self.assertRaises(IntegrityError), transaction.atomic():
             DropEntry.objects.create(symbol=self.symbol, item=self.item, coupon=tpl)
 
-    def test_location_required_needs_coords(self):
-        with self.assertRaises(IntegrityError), transaction.atomic():
-            Spot.objects.create(slug="x", name="x", require_location=True)
+    def test_location_default_on_for_located_spots(self):
+        """位置のあるスポットは既定で現地確認 ON。位置のないスポットは確認できないので自動的に OFF。"""
+        located = Spot.objects.create(slug="l", name="l", latitude=Decimal("35.0"), longitude=Decimal("139.0"))
+        self.assertTrue(located.require_location)
+        unlocated = Spot.objects.create(slug="x", name="x", require_location=True)
+        self.assertFalse(unlocated.require_location)
+        self.assertFalse(Spot.objects.get(pk=unlocated.pk).require_location)
+        unlocated.require_location = True
+        unlocated.save(update_fields=["require_location"])
+        self.assertFalse(Spot.objects.get(pk=unlocated.pk).require_location)
 
     def test_one_visit_per_day(self):
         SpotVisit.objects.create(user=self.user, spot=self.spot, visit_date=dt.date(2026, 1, 1), season="winter")
@@ -261,6 +351,28 @@ class ApiTests(Base):
         self.assertTrue(again.json()["replay"])
         other_key = self.api("api_collect", {"ticket": ticket}, **{"Idempotency-Key": str(uuid.uuid4())})
         self.assertEqual(other_key.status_code, 409)
+
+    def test_collect_requires_presence_via_api(self):
+        from core.models import AuditLog
+
+        self.spot.require_location = True
+        self.spot.save()
+        self.client.force_login(self.user)
+        ticket = self.api("api_scan", {"payload": self.symbol.payload}).json()["ticket"]
+        res = self.api("api_collect", {"ticket": ticket, "location": {"lat": 35.0, "lng": 139.0}},
+                       **{"Idempotency-Key": str(uuid.uuid4())})
+        self.assertEqual(res.status_code, 403)
+        self.assertEqual(res.json()["error"], "not_nearby")
+        self.assertTrue(AuditLog.objects.filter(action="explore.collect_rejected", detail__reason="not_nearby").exists())
+        # 「近くのシンボルを探す」を通すと受け取れる。監査ログにはシンボル・スポット・距離が残る (座標は残さない)
+        self.api("api_nearby", {"lat": 35.0005, "lng": 139.0})
+        res = self.api("api_collect", {"ticket": ticket, "location": {"lat": 35.0005, "lng": 139.0}},
+                       **{"Idempotency-Key": str(uuid.uuid4())})
+        self.assertEqual(res.status_code, 200, res.content)
+        log = AuditLog.objects.get(action="explore.collect")
+        self.assertEqual((log.detail["symbol"], log.detail["spot"]), (self.symbol.pk, self.spot.pk))
+        self.assertEqual(log.detail["distance_m"], 56)
+        self.assertNotIn("lat", str(log.detail))
 
     def test_unknown_payload_404(self):
         self.client.force_login(self.user)

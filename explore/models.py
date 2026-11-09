@@ -39,8 +39,10 @@ class Spot(models.Model):
     longitude = models.DecimalField("経度", max_digits=9, decimal_places=6, null=True, blank=True)
     radius_m = models.PositiveIntegerField("判定半径(m)", default=300)
     require_location = models.BooleanField(
-        "現地確認を必須にする", default=False,
-        help_text="ON のとき、受け取り時に端末の位置情報がスポットの判定半径内か確認します",
+        "現地確認を必須にする", default=True,
+        help_text="ON のとき、受け取りの直前に「近くのシンボルを探す」で付近に来ていること、"
+                  "および受け取り時の位置情報が判定半径内であることを確認します。"
+                  "位置が未設定のスポットでは確認できないため自動的に OFF になります",
     )
     is_active = models.BooleanField("公開", default=True)
     starts_at = models.DateTimeField("公開開始", null=True, blank=True, help_text="空欄ならすぐに公開")
@@ -79,6 +81,14 @@ class Spot(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+    def save(self, *args, **kwargs):
+        # 位置が未設定なら現地確認はできない (DB 制約 spot_location_required_has_coords とも整合させる)
+        if self.latitude is None or self.longitude is None:
+            self.require_location = False
+            if kwargs.get("update_fields") is not None:
+                kwargs["update_fields"] = {*kwargs["update_fields"], "require_location"}
+        super().save(*args, **kwargs)
 
     def status(self, now=None) -> str:
         """"active" (公開中) / "scheduled" (公開前) / "expired" (期限切れ) / "hidden" (非公開)。"""

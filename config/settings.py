@@ -174,6 +174,13 @@ elif _CACHE.startswith(("redis://", "rediss://")):
     CACHES = {"default": {"BACKEND": "django.core.cache.backends.redis.RedisCache", "LOCATION": _CACHE}}
 else:
     CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "mikke"}}
+    if not DEBUG and not env_bool("MIKKE_ALLOW_LOCMEM_CACHE"):
+        # 本番 (DEBUG=False) でプロセス内キャッシュを使うと、ログインロックやレート制限がワーカーごとに
+        # 別々に数えられて実質的に無効になる。明示的に許可しない限り起動を止める。
+        raise ImproperlyConfigured(
+            "DEBUG=False では MIKKE_CACHE=db または MIKKE_CACHE=redis://… を設定してください "
+            "(単一プロセスで動かすことを理解したうえで許可する場合は MIKKE_ALLOW_LOCMEM_CACHE=1)"
+        )
 
 # ---- セキュリティ (OWASP ASVS L2 / Top 10:2025) ----
 SECURE_COOKIES = env_bool("DJANGO_SECURE_COOKIES", not DEBUG)
@@ -190,8 +197,15 @@ SECURE_REFERRER_POLICY = "same-origin"
 SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
 if not DEBUG:
     SECURE_SSL_REDIRECT = env_bool("DJANGO_SSL_REDIRECT", True)
-    SECURE_HSTS_SECONDS = 60 * 60 * 24 * 365
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    # HSTS はホスト名単位 (ポートは区別しない)。localhost で有効にすると、同じブラウザで開く
+    # ほかの http://localhost:XXXX の開発サーバーまで https に強制されるため、ローカルでは 0 にする
+    SECURE_HSTS_SECONDS = int(env("DJANGO_HSTS_SECONDS", str(60 * 60 * 24 * 365)))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = SECURE_HSTS_SECONDS > 0
+# リバースプロキシ (nginx) で TLS を終端するとき: nginx が付ける X-Forwarded-Proto: https を信用して
+# 「https のリクエスト」として扱う。アプリ本体が 127.0.0.1 だけで待ち受け、nginx を通らないと
+# 届かない構成 (scripts/devproxy.py) のときだけ有効にすること (直接つながると偽装できるため)
+if env_bool("DJANGO_BEHIND_TLS_PROXY", False):
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 SECURE_CSP = {
     "default-src": [CSP.SELF],
@@ -223,6 +237,10 @@ LOGGING = {
 
 # ---- ゲームバランス ----
 MIKKE_SCAN_TICKET_MAX_AGE = 300  # 秒: スキャンから受け取りまでの有効時間
+# 現地確認 (require_location のスポット): 受け取りの何分前までに「近くのシンボルを探す」で付近に来ている必要があるか
+MIKKE_PRESENCE_WINDOW_MINUTES = int(env("MIKKE_PRESENCE_WINDOW_MINUTES", "30"))
+# 直前のみっけ地点からの移動速度 (km/h) がこれを超える受け取りは、位置偽装とみなして拒否する (0 で無効)
+MIKKE_MAX_TRAVEL_SPEED_KMH = float(env("MIKKE_MAX_TRAVEL_SPEED_KMH", "200"))
 # 画像シンボル: 映像から切り出した画像と登録画像の類似度 (0〜1) がこの値以上なら「写っている」と判定
 MIKKE_IMAGE_SIMILARITY_THRESHOLD = float(env("MIKKE_IMAGE_SIMILARITY_THRESHOLD", "0.65"))
 

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}{% if is_new %}QR シンボルを追加{% else %}シンボルの設定{% endif %}{% endblock %}
 {% block content %}
 <h1>{% if is_new %}QR シンボルを追加{% else %}「{{ symbol.name }}」の設定{% endif %}</h1>
@@ -61,4 +62,15 @@
   </fieldset>
   <button type="submit" class="btn btn-primary btn-block btn-large">{% if is_new %}追加する{% else %}保存{% endif %}</button>
 </form>
+{% if symbol and symbol.kind == "qr" %}
+<form method="post" action="{% url 'explore:manage_symbol_token' symbol.pk %}" class="form" data-confirm="QR を作り直すと、いま掲示している QR は使えなくなります。新しい印刷用 SVG を掲示し直してください。よろしいですか?">
+  {% csrf_token %}
+  <fieldset class="option-group">
+    <legend>QR の作り直し</legend>
+    <p class="help">掲示した QR の写真が出回ったときなど、古い QR を無効にして新しい QR に差し替えます。差し替え後は新しい印刷用 SVG を掲示してください。</p>
+    <button type="submit" class="btn btn-ghost">QR を作り直す(古い QR は使えなくなります)</button>
+  </fieldset>
+</form>
+{% endif %}
 {% endblock %}
+{% block scripts %}<script src="{% static 'js/confirm.js' %}" defer></script>{% endblock %}
