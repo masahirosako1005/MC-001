@@ -6,7 +6,6 @@ from functools import wraps
 
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Max, Prefetch
 from django.http import Http404, HttpResponse, JsonResponse
@@ -17,6 +16,7 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 
 from core import audit, ratelimit
 from core.models import SiteSetting
+from core.permissions import managed_spots, managed_symbols, manager_required
 
 from . import services
 from .forms import ImageSymbolInfoForm, collect_view_uploads
@@ -127,6 +127,8 @@ def api_nearby(request):
         return JsonResponse({"error": "bad_request", "message": "位置情報を取得できませんでした。"}, status=400)
     radius = SiteSetting.current().camera_radius_m
     found, nearest = services.nearby_symbols(coords[0], coords[1], radius)
+    # 分析用: どのスポットの付近に来たかだけを記録する (座標は保存しない)
+    services.record_nearby_visit(request.user, {s.spot_id for s, _ in found})
     nearby = []
     for s, d in found:
         lat, lng = s.location
@@ -143,6 +145,16 @@ def api_nearby(request):
         "nearby": nearby,
         "nearest": ({"spot": nearest[0].spot.name, "distance_m": round(nearest[1])} if nearest and not nearby else None),
     })
+
+
+@require_POST
+@api_login_required
+def api_camera_start(request):
+    """カメラ (または写真読み取り) を起動したことを記録する (分析用)。直前に付近に来たスポットに数える。"""
+    if not ratelimit.hit(f"camstart:{request.user.pk}", 30, 60):
+        return JsonResponse({"error": "rate_limited"}, status=429)
+    n = services.record_camera_start(request.user)
+    return JsonResponse({"ok": True, "counted": n})
 
 
 @login_required
@@ -242,16 +254,17 @@ def _json_errors(errors: list[str], status: int = 400) -> JsonResponse:
     return JsonResponse({"ok": False, "errors": errors}, status=status)
 
 
-@staff_member_required
+@manager_required
 @require_http_methods(["GET", "POST"])
 def symbol_register(request):
     """スタッフがカメラで撮影した写真 (最大 9 角度) を画像シンボルとして登録する。"""
+    spots = managed_spots(request.user)  # 管理者は自分のスポットにだけ登録できる
     if request.method == "GET":
         return render(request, "explore/symbol_register.html", {
-            "form": ImageSymbolInfoForm(), "angles": _angle_grid(), "mode": "new",
+            "form": ImageSymbolInfoForm(spots=spots), "angles": _angle_grid(), "mode": "new",
             "api": reverse("explore:symbol_register"),
         })
-    form = ImageSymbolInfoForm(request.POST)
+    form = ImageSymbolInfoForm(request.POST, spots=spots)
     if not form.is_valid():
         return _json_errors([str(e) for errs in form.errors.values() for e in errs])
     cd = form.cleaned_data
@@ -266,15 +279,15 @@ def symbol_register(request):
     audit.record("symbol.register_image", request=request, target=symbol, spot=symbol.spot_id,
                  angles=sorted(uploads))
     messages.success(request, f"画像シンボル「{symbol.name}」を {len(uploads)} 角度で登録しました。"
-                              "ドロップ設定は管理画面で追加してください。")
-    return JsonResponse({"ok": True, "id": symbol.pk, "redirect": reverse("explore:symbol_print")})
+                              "続けて、手に入るコーデやクーポン (ドロップ) を設定してください。")
+    return JsonResponse({"ok": True, "id": symbol.pk, "redirect": reverse("explore:manage_symbol_edit", args=[symbol.pk])})
 
 
-@staff_member_required
+@manager_required
 @require_http_methods(["GET", "POST"])
 def symbol_views(request, pk: int):
     """既存の画像シンボルに角度を追加・撮り直し・削除する。"""
-    symbol = get_object_or_404(Symbol.objects.select_related("spot"), pk=pk, kind=Symbol.KIND_IMAGE)
+    symbol = get_object_or_404(managed_symbols(request.user).select_related("spot"), pk=pk, kind=Symbol.KIND_IMAGE)
     if request.method == "GET":
         existing = {v.angle: v for v in symbol.views.only("angle", "keypoint_count", "symbol_id")}
         return render(request, "explore/symbol_register.html", {
@@ -293,10 +306,10 @@ def symbol_views(request, pk: int):
     return JsonResponse({"ok": True, "id": symbol.pk, "redirect": reverse("explore:symbol_print")})
 
 
-@staff_member_required
+@manager_required
 @require_GET
 def symbol_view_image(request, pk: int, angle: str):
-    view = get_object_or_404(SymbolView, symbol_id=pk, angle=angle)
+    view = get_object_or_404(SymbolView, symbol__in=managed_symbols(request.user), symbol_id=pk, angle=angle)
     resp = HttpResponse(bytes(view.jpeg), content_type="image/jpeg")
     resp.headers["Cache-Control"] = "private, no-cache"
     if request.GET.get("download") == "1":
@@ -304,10 +317,10 @@ def symbol_view_image(request, pk: int, angle: str):
     return resp
 
 
-@staff_member_required
+@manager_required
 @require_GET
 def symbol_svg(request, pk: int):
-    symbol = get_object_or_404(Symbol.objects.select_related("spot"), pk=pk, kind=Symbol.KIND_QR)
+    symbol = get_object_or_404(managed_symbols(request.user).select_related("spot"), pk=pk, kind=Symbol.KIND_QR)
     resp = HttpResponse(render_symbol_svg(symbol), content_type="image/svg+xml; charset=utf-8")
     resp.headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; sandbox"
     if request.GET.get("download") == "1":
@@ -315,11 +328,11 @@ def symbol_svg(request, pk: int):
     return resp
 
 
-@staff_member_required
+@manager_required
 @require_GET
 def symbol_print(request):
     symbols = (
-        Symbol.objects.select_related("spot").filter(is_active=True).order_by("kind", "spot_id", "pk")
+        managed_symbols(request.user).select_related("spot").filter(is_active=True).order_by("kind", "spot_id", "pk")
         .prefetch_related(Prefetch("views", queryset=SymbolView.objects.only("symbol_id", "angle", "keypoint_count")))
     )
     return render(request, "explore/symbol_print.html", {"symbols": symbols})

@@ -265,8 +265,8 @@ class PageTests(Base):
 
     def test_symbol_print_staff_only(self):
         self.client.force_login(self.user)
-        self.assertEqual(self.client.get(reverse("explore:symbol_svg", args=[self.symbol.pk])).status_code, 302)
-        staff = User.objects.create_user("s@example.com", PW, "スタッフ", is_staff=True)
+        self.assertEqual(self.client.get(reverse("explore:symbol_svg", args=[self.symbol.pk])).status_code, 403)
+        staff = User.objects.create_user("s@example.com", PW, "スタッフ", role="operator")
         self.client.force_login(staff)
         res = self.client.get(reverse("explore:symbol_svg", args=[self.symbol.pk]))
         self.assertEqual(res.status_code, 200)

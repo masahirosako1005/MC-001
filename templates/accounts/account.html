@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}アカウント{% endblock %}
+{% block content %}
+<section class="narrow">
+  <h1>アカウント</h1>
+  <p class="muted">権限: <strong>{{ user.get_role_display }}</strong>
+    {% if user.is_manager and user.manager_profile %} ・ {{ user.manager_profile.display_name }}({{ user.manager_profile.manager_code }}){% endif %}</p>
+  <form method="post" class="form" novalidate>
+    {% csrf_token %}
+    {% include "includes/field.html" with field=form.nickname %}
+    <button type="submit" class="btn btn-primary">ニックネームを保存</button>
+  </form>
+  <h2>セキュリティ</h2>
+  <p><a class="btn btn-ghost" href="{% url 'accounts:password_change' %}">パスワードを変更する</a></p>
+  {% if user.role == "user" %}
+  <h2>退会</h2>
+  <p class="help">退会すると、みっけの記録・アイテム・クーポン・コンテストへの参加がすべて削除されます。</p>
+  <p><a class="btn btn-ghost" href="{% url 'accounts:withdraw' %}">退会の手続きへ</a></p>
+  {% elif user.is_manager %}
+  <h2>アカウントの停止</h2>
+  <p class="help">管理者のアカウントの停止・情報の変更は、サイト運営者にご連絡ください。</p>
+  {% endif %}
+</section>
+{% endblock %}

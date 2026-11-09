@@ -4,7 +4,7 @@
 {% block content %}
 <h1>みっけシンボル</h1>
 <div class="no-print">{% include "explore/manage/_nav.html" with active="symbols" %}</div>
-<p class="no-print muted">運営スタッフ専用ページです。QR シンボルは印刷して各スポットに掲示してください。画像シンボルは現地の看板などそのものが目印になるため、掲示は不要です。</p>
+<p class="no-print muted">{% if user.is_manager %}担当スポットのシンボルだけを表示しています。{% endif %}QR シンボルは印刷して各スポットに掲示してください。画像シンボルは現地の看板などそのものが目印になるため、掲示は不要です。</p>
 <p class="no-print"><a class="btn btn-primary" href="{% url 'explore:symbol_register' %}"><span aria-hidden="true">📷</span> 画像シンボルを撮影して登録</a></p>
 <div class="print-grid">
   {% for s in symbols %}
@@ -15,12 +15,14 @@
       <img src="{% url 'explore:symbol_view_image' s.pk v.angle %}" alt="{{ v.get_angle_display }}" title="{{ v.get_angle_display }}" loading="lazy">
       {% endfor %}
     </div>
-    <figcaption><span class="badge">画像シンボル・{{ s.views.all|length }} 角度</span> {{ s.spot.name }} / {{ s.name }} — <a href="{% url 'explore:symbol_views' s.pk %}">角度を追加・撮り直す</a></figcaption>
+    <figcaption><span class="badge">画像シンボル・{{ s.views.all|length }} 角度</span> {{ s.spot.name }} / {{ s.name }} — <a href="{% url 'explore:symbol_views' s.pk %}">角度を追加・撮り直す</a> ・ <a href="{% url 'explore:manage_symbol_edit' s.pk %}">設定・ドロップ</a></figcaption>
     {% else %}
     <img src="{% url 'explore:symbol_svg' s.pk %}" alt="{{ s.spot.name }} {{ s.name }} のシンボル" width="360">
-    <figcaption><span class="badge no-print">QR シンボル</span> {{ s.spot.name }} / {{ s.name }} — <a class="no-print" href="{% url 'explore:symbol_svg' s.pk %}?download=1">SVG を保存</a></figcaption>
+    <figcaption><span class="badge no-print">QR シンボル</span> {{ s.spot.name }} / {{ s.name }} — <a class="no-print" href="{% url 'explore:symbol_svg' s.pk %}?download=1">SVG を保存</a><span class="no-print"> ・ <a href="{% url 'explore:manage_symbol_edit' s.pk %}">設定・ドロップ</a></span></figcaption>
     {% endif %}
   </figure>
+  {% empty %}
+  <p class="empty">シンボルがまだありません。</p>
   {% endfor %}
 </div>
 {% endblock %}

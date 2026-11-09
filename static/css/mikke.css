@@ -17,6 +17,12 @@
   --radius: 14px;
   --shadow: 0 2px 10px rgba(31, 42, 68, 0.08);
   --tabbar-h: 64px;
+  /* グラフの系列色 (付近に来た / カメラ起動 / コーデ獲得)。色覚の違いでも区別できることを検証済み */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --chart-ink: #52514e;
+  --chart-grid: #e6e4de;
   color-scheme: light dark;
 }
 @media (prefers-color-scheme: dark) {
@@ -36,6 +42,11 @@
     --error: #ff8a80;
     --focus: #8ab4ff;
     --shadow: none;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --chart-ink: #c3c2b7;
+    --chart-grid: #343d52;
   }
 }
 
@@ -479,3 +490,53 @@ progress { flex: 1; height: 12px; accent-color: var(--primary); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* ---------------------------------------------------------------- 運営: 分析・利用者管理 */
+.subnav { flex-wrap: wrap; }
+.filter-bar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: end; margin: 8px 0 12px; padding: 10px 12px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+.filter-bar label { display: grid; gap: 2px; font-size: 0.85rem; font-weight: 700; color: var(--muted); }
+.filter-bar select, .filter-bar input { min-height: 40px; }
+.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; list-style: none; padding: 0; margin: 0 0 16px; }
+.kpi { display: grid; gap: 2px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+.kpi-label { font-size: 0.85rem; color: var(--muted); font-weight: 700; }
+.kpi-value { font-size: 1.9rem; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.kpi-value small { font-size: 1rem; margin-left: 2px; }
+.kpi-sub { font-size: 0.8rem; color: var(--muted); }
+.kpi-hero { border-color: var(--series-3); border-width: 2px; }
+.chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 16px; }
+.chart-card h2 { margin-top: 0; font-size: 1.1rem; }
+.chart-sub { font-size: 0.95rem; margin: 12px 0 4px; }
+.chart-pair { display: grid; gap: 16px; }
+@media (min-width: 860px) { .chart-pair { grid-template-columns: 1fr 1fr; } .page-ops main { max-width: 1100px; } }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; list-style: none; padding: 0; margin: 0 0 6px; font-size: 0.85rem; }
+.chart-legend li { display: inline-flex; align-items: center; gap: 6px; }
+.swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
+.swatch.series-1, .chart-bar.series-1 { background: var(--series-1); fill: var(--series-1); }
+.swatch.series-2, .chart-bar.series-2 { background: var(--series-2); fill: var(--series-2); }
+.swatch.series-3, .chart-bar.series-3 { background: var(--series-3); fill: var(--series-3); }
+.chart { display: block; height: auto; overflow: visible; }
+.chart-bar { stroke: var(--surface); stroke-width: 1; }
+.chart-bar:hover { opacity: 0.8; }
+.chart text { font-family: inherit; font-size: 12px; fill: var(--chart-ink); }
+.chart .chart-label { fill: var(--text); }
+.chart .chart-value { fill: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; }
+.chart .chart-tick { font-size: 11px; }
+.chart-grid { stroke: var(--chart-grid); stroke-width: 1; }
+.chart-axis { stroke: var(--chart-ink); stroke-width: 1; }
+.num-table td, .num-table th[scope="col"] { text-align: right; font-variant-numeric: tabular-nums; }
+.num-table th[scope="col"]:first-child, .num-table th[scope="row"] { text-align: left; }
+.rate-cell { font-weight: 800; }
+details > summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
+.badge.role-manager { background: #e3efff; color: #1c4f8f; }
+.badge.role-operator { background: #ffe7d6; color: #8a3a00; }
+.inline-form { display: inline; }
+.pager { display: flex; gap: 12px; align-items: center; justify-content: center; margin: 12px 0; }
+.issued-list { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; }
+.issued-list dt { font-weight: 700; color: var(--muted); }
+.temp-password { font-size: 1.2rem; padding: 4px 8px; background: var(--surface-2); border-radius: 6px; user-select: all; word-break: break-all; }
+.manager-badge { margin: -4px 0 12px; }
+.drop-table select, .drop-table input { min-width: 0; width: 100%; }
+.drop-table td { min-width: 90px; }
+.drop-table td:first-child { min-width: 200px; }
+.ops-login { border-top: 4px solid var(--text); padding-top: 8px; }

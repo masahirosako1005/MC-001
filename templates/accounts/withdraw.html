@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}退会{% endblock %}
+{% block content %}
+<section class="narrow">
+  <h1>退会</h1>
+  {% if blocked %}
+  <p>管理者・サイト運営者のアカウントは、ここから退会できません。サイト運営者にアカウントの停止を依頼してください。</p>
+  <p><a href="{% url 'accounts:account' %}">← アカウントにもどる</a></p>
+  {% else %}
+  <p>退会すると、次のデータがすべて削除され、<strong>元に戻せません</strong>。</p>
+  <ul>
+    <li>みっけの記録・訪れたスポットの記録</li>
+    <li>集めたアイテムとアバター</li>
+    <li>クーポン(未使用のものも含む)</li>
+    <li>コンテストへのエントリーと評価</li>
+  </ul>
+  <form method="post" class="form" novalidate>
+    {% csrf_token %}
+    {% include "includes/field.html" with field=form.password %}
+    <div class="field{% if form.confirm.errors %} has-error{% endif %}">
+      <label class="staff-toggle">{{ form.confirm }} {{ form.confirm.label }}</label>
+      {% if form.confirm.errors %}<ul class="errors" role="alert"><li>確認のチェックを入れてください。</li></ul>{% endif %}
+    </div>
+    <button type="submit" class="btn btn-danger btn-block">退会する</button>
+  </form>
+  <p><a href="{% url 'accounts:account' %}">← やめる</a></p>
+  {% endif %}
+</section>
+{% endblock %}

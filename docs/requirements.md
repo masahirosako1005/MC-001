@@ -46,6 +46,12 @@
 | R38 | Must | 「みっけに行く」「みっけ」を押したら、まず現在地付近のシンボルを検索し、近くにあればカメラを起動できる(「みっけ」と「スポット」を統合) |
 | R39 | Must | 地図の「現在地」「近くのシンボルを探す」で、現在地の取得 → シンボル検索 を順番に実行する |
 | R40 | Should | スポット(シンボル一覧)のカードをいったん非表示にする |
+| R41 | Must | 利用者・管理者・サイト運営者で権限を分ける。管理者はスポット・シンボルを設定できる |
+| R42 | Must | 管理者に店舗・会社名・ユニーク ID・基本情報(住所など)を持たせる |
+| R43 | Must | サイト運営者のユーザ管理で追加できるのは管理者のみ。一般利用者は自分で登録・退会できる |
+| R44 | Must | ログイン画面は利用者・管理者共通、サイト運営者用は別に用意する |
+| R45 | Must | サイト運営者がスポットごとの付近来訪ユーザ・PV・カメラ起動・コーデ獲得・利用割合(獲得÷付近×100%)を棒グラフなどで分析できる。時間・季節ごとも見られる |
+| R46 | Must | スポット・シンボル約 100、仮想利用者約 1000 名と付近来訪・コーデ獲得のデータを投入する |
 
 ## トレーサビリティ
 
@@ -90,6 +96,12 @@
 | R38 | `explore.views.mikke` + `templates/explore/mikke.html`(地図とカメラを 1 画面)、`camera.js`(検索結果でボタンを切り替え・同じ画面でカメラ)、ナビ・各ホームのリンク、`/explore/camera/` → 301 | `test_search_first_then_camera` `test_old_camera_url_redirects` `test_nav_has_single_mikke_tab`、ブラウザで 遠く → 起動不可 / 近く → 起動 → 地図にもどる / 写真読み取り を確認 | ✅ |
 | R39 | `static/js/nearby.js`(① 現在地 → ② 検索、二重実行しない、`mikke:nearby` イベント)、`spotmap.js`(「現在地」も同じ処理) | ブラウザで「現在地」「近くのシンボルを探す」の両方で ①→②→結果 の順に表示されることを確認 | ✅(JS は🔶手動) |
 | R40 | `SHOW_SPOT_CARDS = False`、`explore/_spot_cards.html` | `test_spot_cards_hidden_and_secret_not_leaked` `test_spot_cards_can_be_shown_again` | ✅ |
+| R41 | `User.role`(利用者/管理者/サイト運営者、is_staff は role から自動)、`core/permissions.py`、`Spot.owner`、`explore/manage_views.py`(担当スポットだけ・シンボル設定とドロップ) | `RoleModelTests` `PermissionTests`(他店の URL は 404・自分のスポットとして作成・ドロップ設定) | ✅ |
+| R42 | `accounts.ManagerProfile`(管理者 ID 自動採番・住所/電話は暗号化) | `test_manager_profile_encrypts_and_has_unique_code` | ✅ |
+| R43 | `ops/views.py`(管理者の追加・編集・仮パスワード再発行・停止/再開)、`accounts/views.py`(退会)、`ForcePasswordChangeMiddleware` | `UserManagementTests` `WithdrawTests` | ✅ |
+| R44 | `ThrottledLoginForm.allowed_roles`、`OperatorLoginForm`、`MIKKE_OPS_URL`、管理画面ログインの転送 | `LoginSeparationTests`、ブラウザで運営者が通常ログインで断られることを確認 | ✅ |
+| R45 | `explore.NearbyVisit`(座標なし)、`/explore/api/camera-start`、`ops/analytics.py`、`ops/charts.py`(SVG 棒グラフ)、`templates/ops/dashboard.html` | `AnalyticsTests` `TrackingTests`、ブラウザでグラフ表示を確認 | ✅ |
+| R46 | `core/management/commands/seed_analytics.py` | 投入結果: スポット 100・シンボル 133・管理者 12・仮想利用者 1,000・付近の来訪 7,612・みっけ 3,283 | ✅ |
 | R18 | `maps/`(Range 配信)、`maps/tiles/kyobashi.pmtiles`、`scripts/extract_tiles.py`、`static/js/spotmap.js`(Leaflet + protomaps-leaflet) | `maps/tests.py`(Range・416・パストラバーサル・ログイン必須・外部 API を CSP で許可していない)、ブラウザで外部への通信がないことを確認 | ✅ |
 
 ## 未達・残課題

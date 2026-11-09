@@ -157,7 +157,7 @@ class BodyTypeEquipTests(TestCase):
         self.any_top = mk("at", "top", "tshirt", "any", is_starter=True)
         self.rare = mk("rare", "top", "idol", "girl", rarity=5)
         self.user = User.objects.create_user("u@example.com", "correct horse battery staple", "ゆーざー")
-        self.staff = User.objects.create_user("s@example.com", "correct horse battery staple", "すたっふ", is_staff=True)
+        self.staff = User.objects.create_user("s@example.com", "correct horse battery staple", "すたっふ", role="operator")
         ensure_starter_kit(self.user, body_type="girl")
         ensure_starter_kit(self.staff, body_type="boy")
 

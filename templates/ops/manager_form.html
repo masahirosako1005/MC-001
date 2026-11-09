@@ -1,0 +1,56 @@
+{% extends "base.html" %}{% load static %}
+{% block title %}{% if manager %}管理者の編集{% else %}管理者を追加{% endif %}{% endblock %}
+{% block body_class %}page-ops{% endblock %}
+{% block scripts %}<script src="{% static 'js/confirm.js' %}" defer></script>{% endblock %}
+{% block content %}
+<h1>{% if manager %}管理者「{{ manager.manager_profile.display_name }}」{% else %}管理者を追加{% endif %}</h1>
+{% include "ops/_nav.html" with active=manager|yesno:",manager_new" %}
+{% if manager %}
+<p class="muted">管理者 ID: <strong>{{ manager.manager_profile.manager_code }}</strong> ・ 登録 {{ manager.manager_profile.created_at|date:"Y/n/j" }}
+  ・ {% if manager.is_active %}利用中{% else %}<strong>停止中</strong>{% endif %}</p>
+{% else %}
+<p class="muted">店舗・会社の担当者のアカウントを作ります。保存すると<strong>仮パスワード</strong>を 1 度だけ表示します。担当者は最初のログインでパスワードを変更します。
+  管理者 ID(MK-から始まる英数字)は自動で付きます。</p>
+{% endif %}
+<form method="post" class="form manager-form" novalidate>
+  {% csrf_token %}
+  <fieldset class="option-group">
+    <legend>ログイン</legend>
+    {% include "includes/field.html" with field=account.email %}
+    {% include "includes/field.html" with field=account.nickname %}
+  </fieldset>
+  <fieldset class="option-group">
+    <legend>店舗・会社</legend>
+    {% include "includes/field.html" with field=profile.organization %}
+    {% include "includes/field.html" with field=profile.store_name %}
+    {% include "includes/field.html" with field=profile.industry %}
+    {% include "includes/field.html" with field=profile.contact_name %}
+  </fieldset>
+  <fieldset class="option-group">
+    <legend>連絡先(住所・電話番号は暗号化して保存します)</legend>
+    {% include "includes/field.html" with field=profile.postal_code %}
+    {% include "includes/field.html" with field=profile.address %}
+    {% include "includes/field.html" with field=profile.phone %}
+    {% include "includes/field.html" with field=profile.website %}
+  </fieldset>
+  <fieldset class="option-group">
+    <legend>運営メモ</legend>
+    {% include "includes/field.html" with field=profile.note %}
+  </fieldset>
+  <button type="submit" class="btn btn-primary btn-block btn-large">{% if manager %}保存{% else %}追加して仮パスワードを発行{% endif %}</button>
+</form>
+
+{% if manager %}
+<section aria-labelledby="spots-h">
+  <h2 id="spots-h">担当のスポット({{ spots|length }})</h2>
+  {% if spots %}<ul class="list">{% for s in spots %}<li><a href="{% url 'explore:manage_spot_edit' s.pk %}">{{ s.name }}</a>(シンボル {{ s.n_symbols }})</li>{% endfor %}</ul>
+  {% else %}<p class="empty">まだありません。スポットの編集画面で「担当の管理者」を選ぶと割り当てられます。</p>{% endif %}
+</section>
+<section aria-labelledby="pw-h">
+  <h2 id="pw-h">パスワード</h2>
+  <form method="post" action="{% url 'ops:manager_reset_password' manager.pk %}" data-confirm="新しい仮パスワードを発行します。いまのパスワードは使えなくなります。よろしいですか?">
+    {% csrf_token %}<button type="submit" class="btn btn-ghost">仮パスワードを再発行する</button>
+  </form>
+</section>
+{% endif %}
+{% endblock %}

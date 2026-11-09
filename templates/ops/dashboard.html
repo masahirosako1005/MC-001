@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}分析{% endblock %}
+{% block body_class %}page-ops{% endblock %}
+{% block content %}
+<h1>分析</h1>
+{% include "ops/_nav.html" with active="dashboard" %}
+
+<form method="get" class="filter-bar" aria-label="絞り込み">
+  <label>期間 <select name="days">{% for d, label in periods %}<option value="{{ d }}"{% if f.days == d %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+  <label>季節 <select name="season"><option value="">すべて</option>{% for k, label in seasons %}<option value="{{ k }}"{% if f.season == k %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+  <label>時間帯 <select name="slot"><option value="">すべて</option>{% for k, label in slots %}<option value="{{ k }}"{% if f.slot == k %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+  <label>管理者 <select name="owner"><option value="">すべて</option><option value="none"{% if f.owner == "none" %} selected{% endif %}>サイト運営者のスポット</option>
+    {% for o in owners %}<option value="{{ o.pk }}"{% if f.owner == o.pk|stringformat:"d" %} selected{% endif %}>{{ o.manager_profile.display_name|default:o.nickname }}</option>{% endfor %}</select></label>
+  <label>並び順 <select name="sort">{% for k, label in sorts %}<option value="{{ k }}"{% if f.sort == k %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+  <button type="submit" class="btn btn-primary btn-small">表示</button>
+</form>
+<p class="muted">集計期間: {% if data.start %}{{ data.start|date:"Y/n/j" }}{% else %}すべて{% endif %} 〜 {{ data.end|date:"Y/n/j" }}
+  ・ 人数はすべて重複なし ・ 利用割合 = コーデ獲得ユーザ数 ÷ 付近に来たユーザ数 × 100</p>
+
+<section aria-labelledby="kpi-h">
+  <h2 id="kpi-h" class="visually-hidden">全体の数</h2>
+  <ul class="kpi-row">
+    <li class="kpi"><span class="kpi-label">付近に来たユーザ</span><span class="kpi-value">{{ data.total.visitors }}</span><span class="kpi-sub">PV {{ data.total.page_views }}</span></li>
+    <li class="kpi"><span class="kpi-label">カメラを起動したユーザ</span><span class="kpi-value">{{ data.total.camera }}</span><span class="kpi-sub">{% if data.total.camera_rate is not None %}付近の {{ data.total.camera_rate }}%{% else %}—{% endif %}</span></li>
+    <li class="kpi"><span class="kpi-label">コーデを獲得したユーザ</span><span class="kpi-value">{{ data.total.coord }}</span><span class="kpi-sub">獲得 {{ data.total.coord_count }} 回</span></li>
+    <li class="kpi kpi-hero"><span class="kpi-label">利用割合</span><span class="kpi-value">{% if data.total.rate is not None %}{{ data.total.rate }}<small>%</small>{% else %}—{% endif %}</span><span class="kpi-sub">{{ data.active_spots }} スポットで来訪あり</span></li>
+  </ul>
+</section>
+
+<section aria-labelledby="spot-h" class="chart-card">
+  <h2 id="spot-h">スポットごと(上位 {{ chart_count }} 件)</h2>
+  <ul class="chart-legend" aria-label="凡例">
+    {% for key, label in funnel %}<li><span class="swatch series-{{ forloop.counter }}" aria-hidden="true"></span>{{ label }}</li>{% endfor %}
+  </ul>
+  {% if chart_count %}{{ spot_chart }}{% else %}<p class="empty">この条件ではデータがありません。</p>{% endif %}
+  <p class="help">棒にマウスを乗せると人数が出ます。数字は「付近に来た」人数です。すべてのスポットの数値は下の表にあります。</p>
+</section>
+
+<div class="chart-pair">
+  <section aria-labelledby="slot-h" class="chart-card">
+    <h2 id="slot-h">時間帯ごと</h2>
+    <ul class="chart-legend" aria-label="凡例">
+      {% for key, label in funnel %}<li><span class="swatch series-{{ forloop.counter }}" aria-hidden="true"></span>{{ label }}</li>{% endfor %}
+    </ul>
+    {{ slot_chart }}
+    <h3 class="chart-sub">利用割合</h3>
+    {{ slot_rate_chart }}
+    <details><summary>表で見る</summary>
+      <table class="table num-table"><caption class="visually-hidden">時間帯ごとの数値</caption>
+        <thead><tr><th scope="col">時間帯</th><th scope="col">付近</th><th scope="col">PV</th><th scope="col">カメラ</th><th scope="col">コーデ獲得</th><th scope="col">利用割合</th></tr></thead>
+        <tbody>{% for r in data.by_slot %}<tr><th scope="row">{{ r.label }}</th><td>{{ r.visitors }}</td><td>{{ r.page_views }}</td><td>{{ r.camera }}</td><td>{{ r.coord }}</td><td>{% if r.rate is not None %}{{ r.rate }}%{% else %}—{% endif %}</td></tr>{% endfor %}</tbody>
+      </table>
+    </details>
+  </section>
+  <section aria-labelledby="season-h" class="chart-card">
+    <h2 id="season-h">季節ごと</h2>
+    <ul class="chart-legend" aria-label="凡例">
+      {% for key, label in funnel %}<li><span class="swatch series-{{ forloop.counter }}" aria-hidden="true"></span>{{ label }}</li>{% endfor %}
+    </ul>
+    {{ season_chart }}
+    <h3 class="chart-sub">利用割合</h3>
+    {{ season_rate_chart }}
+    <details><summary>表で見る</summary>
+      <table class="table num-table"><caption class="visually-hidden">季節ごとの数値</caption>
+        <thead><tr><th scope="col">季節</th><th scope="col">付近</th><th scope="col">PV</th><th scope="col">カメラ</th><th scope="col">コーデ獲得</th><th scope="col">利用割合</th></tr></thead>
+        <tbody>{% for r in data.by_season %}<tr><th scope="row">{{ r.label }}</th><td>{{ r.visitors }}</td><td>{{ r.page_views }}</td><td>{{ r.camera }}</td><td>{{ r.coord }}</td><td>{% if r.rate is not None %}{{ r.rate }}%{% else %}—{% endif %}</td></tr>{% endfor %}</tbody>
+      </table>
+    </details>
+  </section>
+</div>
+
+<section aria-labelledby="table-h">
+  <h2 id="table-h">すべてのスポット({{ data.spots|length }} 件)</h2>
+  <div class="table-wrap">
+  <table class="table num-table">
+    <caption class="visually-hidden">スポットごとの数値</caption>
+    <thead><tr><th scope="col">スポット</th><th scope="col">管理者</th><th scope="col">付近に来た</th><th scope="col">PV</th><th scope="col">カメラ起動</th><th scope="col">みっけ</th><th scope="col">コーデ獲得</th><th scope="col">利用割合</th></tr></thead>
+    <tbody>
+    {% for r in data.spots %}
+    <tr>
+      <th scope="row">{{ r.spot.name }}{% if not r.spot.is_active %} <span class="badge">非公開</span>{% endif %}</th>
+      <td>{{ r.owner }}</td>
+      <td>{{ r.visitors }}</td><td>{{ r.page_views }}</td><td>{{ r.camera }}</td><td>{{ r.finders }}</td><td>{{ r.coord }}</td>
+      <td>{% if r.rate is not None %}<span class="rate-cell">{{ r.rate }}%</span>{% else %}—{% endif %}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="8">スポットがありません。</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+<p class="help">「付近に来た」は「近くのシンボルを探す」でそのスポットのシンボルが周囲にあったときに数えます(位置そのものは保存していません)。</p>
+{% endblock %}

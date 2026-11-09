@@ -25,10 +25,13 @@
     <p class="now-badge" title="季節と時間帯で出会えるアイテムが変わります">
       <span class="visually-hidden">いまの季節と時間帯:</span>{{ mikke_season_label }}・{{ mikke_slot_label }}
     </p>
-    {% if user.is_staff %}
-    <a class="btn btn-ghost btn-small" href="{% url 'explore:manage_spots' %}" aria-label="スポット・シンボル管理(運営)">管理</a>
+    {% if user.is_operator %}
+    <a class="btn btn-ghost btn-small" href="{% url 'ops:dashboard' %}" aria-label="運営メニュー(利用者管理・分析)">運営</a>
+    {% elif user.can_manage_spots %}
+    <a class="btn btn-ghost btn-small" href="{% url 'explore:manage_spots' %}" aria-label="スポット・シンボルの設定">設定</a>
     {% endif %}
     {% if user.is_authenticated %}
+    <a class="btn btn-ghost btn-small" href="{% url 'accounts:account' %}">アカウント</a>
     <form method="post" action="{% url 'accounts:logout' %}" class="logout-form">
       {% csrf_token %}<button type="submit" class="btn btn-ghost btn-small">ログアウト</button>
     </form>

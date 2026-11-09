@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}{% if is_new %}QR シンボルを追加{% else %}シンボルの設定{% endif %}{% endblock %}
+{% block content %}
+<h1>{% if is_new %}QR シンボルを追加{% else %}「{{ symbol.name }}」の設定{% endif %}</h1>
+{% include "explore/manage/_nav.html" with active=is_new|yesno:"symbol_new," %}
+{% if symbol %}
+<p class="muted">{{ symbol.get_kind_display }} ・ {{ symbol.spot.name }}
+  {% if symbol.kind == "qr" %} ・ <a href="{% url 'explore:symbol_svg' symbol.pk %}?download=1">印刷用 SVG をダウンロード</a>
+  {% else %} ・ <a href="{% url 'explore:symbol_views' symbol.pk %}">撮影した角度を編集</a>{% endif %}</p>
+{% else %}
+<p class="muted">印刷して掲示する QR シンボルを追加します。看板や像などの写真をシンボルにする場合は「<a href="{% url 'explore:symbol_register' %}">画像シンボル登録</a>」から撮影してください。</p>
+{% endif %}
+
+<form method="post" class="form symbol-form" novalidate>
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="errors" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+  <fieldset class="option-group">
+    <legend>基本</legend>
+    {% include "includes/field.html" with field=form.spot %}
+    {% include "includes/field.html" with field=form.name %}
+    {% include "includes/field.html" with field=form.hint %}
+    {% include "includes/field.html" with field=form.cooldown_hours %}
+    <label class="staff-toggle">{{ form.is_active }} 公開する</label>
+    <label class="staff-toggle">{{ form.is_secret }} シークレットシンボルにする</label>
+    <p class="help">{{ form.is_secret.help_text }}</p>
+  </fieldset>
+  <fieldset class="option-group">
+    <legend>位置(空欄ならスポットの位置)</legend>
+    <div class="coord-row">
+      {% include "includes/field.html" with field=form.latitude %}
+      {% include "includes/field.html" with field=form.longitude %}
+    </div>
+    <p class="help">「近くのシンボルを探す」は、この位置からの距離で判定します。</p>
+  </fieldset>
+
+  <fieldset class="option-group">
+    <legend>手に入るもの(ドロップ)</legend>
+    <p class="help">シンボルをみっけしたとき、下の表から「出やすさ」の重みで 1 つが選ばれます。季節・時間帯・訪問日数で出るものを変えられます(再訪のきっかけになります)。</p>
+    {{ drops.management_form }}
+    {% if drops.non_form_errors %}<div class="errors" role="alert">{{ drops.non_form_errors }}</div>{% endif %}
+    <div class="table-wrap">
+    <table class="table drop-table">
+      <caption class="visually-hidden">ドロップ設定</caption>
+      <thead><tr><th scope="col">アイテム</th><th scope="col">または クーポン</th><th scope="col">出やすさ</th><th scope="col">季節</th><th scope="col">時間帯</th><th scope="col">訪問日数</th><th scope="col">削除</th></tr></thead>
+      <tbody>
+      {% for f in drops %}
+      <tr{% if f.errors %} class="has-error"{% endif %}>
+        <td>{{ f.id }}{{ f.item }}{% if f.non_field_errors %}<ul class="errors" role="alert">{% for e in f.non_field_errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}</td>
+        <td>{{ f.coupon }}</td>
+        <td>{{ f.weight }}</td>
+        <td>{{ f.season }}</td>
+        <td>{{ f.time_slot }}</td>
+        <td>{{ f.min_visit_days }}</td>
+        <td>{% if f.instance.pk %}<label class="visually-hidden" for="{{ f.DELETE.id_for_label }}">この行を削除</label>{{ f.DELETE }}{% endif %}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <p class="help">行が足りないときは、保存すると空き行が 2 つ増えます。クーポンは{% if user.is_operator %}すべて{% else %}担当スポットのもの{% endif %}から選べます。</p>
+  </fieldset>
+  <button type="submit" class="btn btn-primary btn-block btn-large">{% if is_new %}追加する{% else %}保存{% endif %}</button>
+</form>
+{% endblock %}

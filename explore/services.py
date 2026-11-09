@@ -13,14 +13,14 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core import signing
 from django.db import IntegrityError, transaction
-from django.db.models import Q
+from django.db.models import F, Q
 from django.utils import timezone
 
 from core.timeutil import local_now, season_of, slot_of
 from rewards.services import evaluate_achievements, issue_coupon
 from wardrobe.services import grant_item
 
-from .models import SYMBOL_PREFIX, Discovery, DropEntry, SpotVisit, Symbol, spot_available_q
+from .models import SYMBOL_PREFIX, Discovery, DropEntry, NearbyVisit, SpotVisit, Symbol, spot_available_q
 
 TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
 TICKET_SALT = "mikke.scan-ticket"
@@ -264,6 +264,36 @@ def nearby_symbols(lat: float, lng: float, radius_m: float, now=None):
             found.append((s, d))
     found.sort(key=lambda x: x[1])
     return found, nearest
+
+
+CAMERA_ATTRIBUTION_MINUTES = 15  # 付近に来てから何分以内のカメラ起動を、そのスポットの利用と数えるか
+
+
+def record_nearby_visit(user, spot_ids, now=None) -> None:
+    """スポット付近に来たことを記録する (分析用)。同じ人・スポット・日・時間帯は 1 行にまとめて PV を数える。"""
+    if not spot_ids:
+        return
+    now = now or timezone.now()
+    local = local_now(now)
+    date, slot, season = local.date(), slot_of(local), season_of(local.date())
+    for sid in spot_ids:
+        updated = NearbyVisit.objects.filter(user=user, spot_id=sid, date=date, slot=slot).update(
+            page_views=F("page_views") + 1, last_at=now)
+        if not updated:
+            try:
+                with transaction.atomic():
+                    NearbyVisit.objects.create(user=user, spot_id=sid, date=date, slot=slot, season=season,
+                                               first_at=now, last_at=now)
+            except IntegrityError:  # 同時に作られた場合は加算にまわす
+                NearbyVisit.objects.filter(user=user, spot_id=sid, date=date, slot=slot).update(
+                    page_views=F("page_views") + 1, last_at=now)
+
+
+def record_camera_start(user, now=None) -> int:
+    """カメラ起動を、直前 (15 分以内) に付近に来たスポットの記録に数える。数えた行数を返す。"""
+    now = now or timezone.now()
+    since = now - dt.timedelta(minutes=CAMERA_ATTRIBUTION_MINUTES)
+    return NearbyVisit.objects.filter(user=user, last_at__gte=since).update(camera_starts=F("camera_starts") + 1)
 
 
 def obtainable_items(symbol: Symbol, now=None) -> list[dict]:

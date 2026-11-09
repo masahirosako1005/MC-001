@@ -182,7 +182,7 @@ class ImageSymbolServiceTests(TestCase):
     def setUp(self):
         cache.clear()
         self.user = User.objects.create_user("u@example.com", PW, "ゆーざー")
-        self.staff = User.objects.create_user("s@example.com", PW, "すたっふ", is_staff=True)
+        self.staff = User.objects.create_user("s@example.com", PW, "すたっふ", role="operator")
         self.spot = Spot.objects.create(slug="s", name="テスト温泉")
         self.symbol = services.register_image_symbol(
             spot=self.spot, name="看板", hint="", cooldown_hours=20,
@@ -274,7 +274,7 @@ class ImageSymbolViewTests(TestCase):
     def setUp(self):
         cache.clear()
         self.user = User.objects.create_user("u@example.com", PW, "ゆーざー")
-        self.staff = User.objects.create_user("s@example.com", PW, "すたっふ", is_staff=True)
+        self.staff = User.objects.create_user("s@example.com", PW, "すたっふ", role="operator")
         self.spot = Spot.objects.create(slug="s", name="テスト温泉")
 
     def view_files(self, angle: str, seed: int = 7, features=None, jpeg=None, mask=None) -> dict:
@@ -296,8 +296,8 @@ class ImageSymbolViewTests(TestCase):
 
     def test_register_requires_staff(self):
         self.client.force_login(self.user)
-        self.assertEqual(self.client.get(reverse("explore:symbol_register")).status_code, 302)
-        self.assertEqual(self.post_register().status_code, 302)
+        self.assertEqual(self.client.get(reverse("explore:symbol_register")).status_code, 403)
+        self.assertEqual(self.post_register().status_code, 403)
         self.assertFalse(Symbol.objects.filter(kind="image").exists())
 
     def test_register_multi_angle_with_mask(self):
@@ -352,7 +352,7 @@ class ImageSymbolViewTests(TestCase):
         self.assertEqual(last.status_code, 400)
         self.assertEqual(sym.views.count(), 2)
         self.client.force_login(self.user)
-        self.assertEqual(self.client.get(url).status_code, 302)
+        self.assertEqual(self.client.get(url).status_code, 403)
 
     def test_qr_symbol_has_no_views_page(self):
         self.client.force_login(self.staff)
@@ -391,7 +391,7 @@ class ImageSymbolViewTests(TestCase):
         self.assertEqual(self.client.get(reverse("explore:symbol_view_image", args=[sym.pk, "left"])).status_code, 404)
         self.assertEqual(self.client.get(reverse("explore:symbol_svg", args=[sym.pk])).status_code, 404)
         self.client.force_login(self.user)
-        self.assertEqual(self.client.get(url).status_code, 302)
+        self.assertEqual(self.client.get(url).status_code, 403)
 
     def test_print_page_lists_both_kinds(self):
         self.client.force_login(self.staff)

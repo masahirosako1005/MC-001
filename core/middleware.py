@@ -31,6 +31,32 @@ class UiThemeMiddleware:
         return self.get_response(request)
 
 
+class ForcePasswordChangeMiddleware:
+    """サイト運営者が発行した仮パスワードでログインした人には、まずパスワードを変えてもらう。"""
+
+    ALLOWED_NAMES = {"accounts:password_change", "accounts:logout"}
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        user = getattr(request, "user", None)
+        if user is not None and user.is_authenticated and user.must_change_password:
+            from django.conf import settings
+            from django.shortcuts import redirect
+            from django.urls import Resolver404, resolve
+
+            try:
+                match = resolve(request.path_info)
+                name = f"{match.namespace}:{match.url_name}" if match.namespace else match.url_name
+            except Resolver404:
+                name = None
+            static = request.path_info.startswith("/" + settings.STATIC_URL.lstrip("/"))
+            if name not in self.ALLOWED_NAMES and not static:
+                return redirect("accounts:password_change")
+        return self.get_response(request)
+
+
 class SecurityHeadersMiddleware:
     """Django 標準で付かない追加のセキュリティヘッダーを付与する。"""
 

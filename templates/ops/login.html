@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}サイト運営者ログイン{% endblock %}
+{% block body_class %}page-ops-login{% endblock %}
+{% block content %}
+<section class="narrow ops-login">
+  <h1>サイト運営者ログイン</h1>
+  <p class="muted">サイト運営者専用の入口です。利用者・管理者の方は<a href="{% url 'accounts:login' %}">通常のログイン</a>をお使いください。</p>
+  <form method="post" novalidate class="form">
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="errors" role="alert">{% for e in form.non_field_errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+    {% for field in form %}{% include "includes/field.html" %}{% endfor %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <button type="submit" class="btn btn-primary btn-block">ログイン</button>
+  </form>
+  <p class="help">セキュリティのため、ログインは {{ ops_hours }} 時間で切れます。失敗が続くと一定時間ログインできなくなります。</p>
+</section>
+{% endblock %}

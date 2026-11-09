@@ -45,6 +45,10 @@ class Spot(models.Model):
     is_active = models.BooleanField("公開", default=True)
     starts_at = models.DateTimeField("公開開始", null=True, blank=True, help_text="空欄ならすぐに公開")
     expires_at = models.DateTimeField("有効期限", null=True, blank=True, help_text="空欄なら無期限")
+    # 管理者 (店舗・会社) のスポット。空欄はサイト運営者のスポット。管理者は自分のスポットだけを設定できる
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+                              related_name="owned_spots", verbose_name="担当の管理者",
+                              limit_choices_to={"role": "manager"})
 
     objects = SpotQuerySet.as_manager()
 
@@ -244,6 +248,35 @@ class SpotVisit(models.Model):
 
     def __str__(self) -> str:
         return f"{self.visit_date} {self.spot_id}"
+
+
+class NearbyVisit(models.Model):
+    """スポット付近に来た記録 (分析用)。「近くのシンボルを探す」でスポットのシンボルが周囲にあったときに残す。
+
+    残すのは「どのスポットの付近に、いつ (日付・時間帯・季節) 来たか」だけで、緯度経度は保存しない。
+    同じ人・スポット・日・時間帯は 1 行にまとめ、検索回数 (PV) とカメラ起動回数を数える。
+    """
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="nearby_visits")
+    spot = models.ForeignKey(Spot, on_delete=models.CASCADE, related_name="nearby_visits")
+    date = models.DateField("日付 (日本時間)")
+    slot = models.CharField("時間帯", max_length=8, choices=SLOT_CHOICES)
+    season = models.CharField("季節", max_length=8, choices=SEASON_CHOICES)
+    page_views = models.PositiveIntegerField("PV (検索回数)", default=1)
+    camera_starts = models.PositiveIntegerField("カメラ起動回数", default=0)
+    first_at = models.DateTimeField(default=timezone.now)
+    last_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        verbose_name = verbose_name_plural = "スポット付近の来訪 (分析用)"
+        constraints = [
+            models.UniqueConstraint(fields=["user", "spot", "date", "slot"], name="nearbyvisit_unique_slot"),
+        ]
+        indexes = [models.Index(fields=["spot", "date"], name="nearbyvisit_spot_date_idx"),
+                   models.Index(fields=["user", "-last_at"], name="nearbyvisit_recent_idx")]
+
+    def __str__(self) -> str:
+        return f"{self.date} {self.slot} spot={self.spot_id}"
 
 
 class Discovery(models.Model):

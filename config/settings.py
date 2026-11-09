@@ -32,6 +32,10 @@ DEBUG = env_bool("DJANGO_DEBUG", False)
 SECRET_KEY = env("DJANGO_SECRET_KEY", required=True)
 ALLOWED_HOSTS = [h.strip() for h in env("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
 ADMIN_URL = env("DJANGO_ADMIN_URL", "admin/")
+# サイト運営者の画面 (ログイン・利用者管理・分析) の場所。推測されにくい値を .env で設定する
+OPS_URL = env("MIKKE_OPS_URL", "ops/")
+# サイト運営者のログインは短めに切れるようにする (秒)
+OPS_SESSION_SECONDS = int(env("MIKKE_OPS_SESSION_SECONDS", str(60 * 60 * 4)))
 
 # ---- フィールド暗号化鍵 (core/crypto.py) ----
 MIKKE_FIELD_KEYS = env("MIKKE_FIELD_KEYS", required=True)
@@ -51,6 +55,7 @@ INSTALLED_APPS = [
     "explore",
     "maps",
     "contest",
+    "ops",
 ]
 
 MIDDLEWARE = [
@@ -63,6 +68,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    "core.middleware.ForcePasswordChangeMiddleware",
     "core.middleware.UiThemeMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]

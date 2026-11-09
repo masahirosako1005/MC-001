@@ -8,6 +8,7 @@
          data-scan-url="{% url 'explore:api_scan' %}"
          data-image-symbols-url="{% url 'explore:api_image_symbols' %}"
          data-collect-url="{% url 'explore:api_collect' %}"
+         data-camera-start-url="{% url 'explore:api_camera_start' %}"
          data-wardrobe-url="{% url 'wardrobe:index' %}"
          data-item-svg-base="{% url 'wardrobe:index' %}items/"
          data-coupon-base="{% url 'rewards:coupons' %}"
@@ -33,8 +34,8 @@
         <span aria-hidden="true">🖼️</span> 写真から読み取る
         <input type="file" id="file-input" accept="image/*" class="visually-hidden" disabled>
       </label>
-      {% if user.is_staff %}
-      <label class="staff-toggle"><input type="checkbox" id="gps-skip"> 位置の確認を省略する(管理者のテスト用)</label>
+      {% if user.can_manage_spots %}
+      <label class="staff-toggle"><input type="checkbox" id="gps-skip"> 位置の確認を省略する(管理者・運営のテスト用)</label>
       {% endif %}
     </div>
     <ul id="nearby-list" class="nearby-list" aria-label="近くのシンボル" hidden></ul>

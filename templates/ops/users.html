@@ -1,0 +1,51 @@
+{% extends "base.html" %}{% load static %}
+{% block title %}利用者管理{% endblock %}
+{% block scripts %}<script src="{% static 'js/confirm.js' %}" defer></script>{% endblock %}
+{% block body_class %}page-ops{% endblock %}
+{% block content %}
+<h1>利用者管理</h1>
+{% include "ops/_nav.html" with active="users" %}
+<p class="muted">利用者は自分で登録・退会します。ここで追加できるのは<strong>管理者(店舗・会社の担当者)</strong>だけです。
+  利用者・管理者の利用停止/再開ができます。</p>
+<form method="get" class="filter-bar" aria-label="検索">
+  <label>権限 <select name="role"><option value="">すべて</option>{% for k, label in roles %}<option value="{{ k }}"{% if role == k %} selected{% endif %}>{{ label }}({% for ck, n in counts.items %}{% if ck == k %}{{ n }}{% endif %}{% endfor %})</option>{% endfor %}</select></label>
+  <label>検索 <input type="search" name="q" value="{{ q }}" placeholder="名前・会社名・管理者 ID・メール(完全一致)"></label>
+  <button type="submit" class="btn btn-primary btn-small">検索</button>
+  <a class="btn btn-ghost btn-small" href="{% url 'ops:manager_create' %}">＋ 管理者を追加</a>
+</form>
+<div class="table-wrap">
+<table class="table manage-table">
+  <caption class="visually-hidden">アカウントの一覧</caption>
+  <thead><tr><th scope="col">名前</th><th scope="col">権限</th><th scope="col">管理者の情報</th><th scope="col">登録日</th><th scope="col">状態</th><th scope="col">操作</th></tr></thead>
+  <tbody>
+  {% for u in page %}
+  <tr>
+    <td>{{ u.nickname }}<br><span class="muted">#{{ u.pk }}</span></td>
+    <td><span class="badge role-{{ u.role }}">{{ u.get_role_display }}</span></td>
+    <td>{% if u.manager_profile %}{{ u.manager_profile.display_name }}<br><span class="muted">{{ u.manager_profile.manager_code }} ・ スポット {{ u.n_spots }}</span>{% else %}—{% endif %}</td>
+    <td>{{ u.date_joined|date:"Y/n/j" }}</td>
+    <td>{% if u.is_active %}利用中{% else %}<strong>停止中</strong>{% endif %}{% if u.must_change_password %}<br><span class="muted">仮パスワード</span>{% endif %}</td>
+    <td class="actions">
+      {% if u.role == "manager" %}<a href="{% url 'ops:manager_edit' u.pk %}">編集</a>{% endif %}
+      {% if u.role != "operator" %}
+      <form method="post" action="{% url 'ops:user_toggle' u.pk %}" class="inline-form" data-confirm="{% if u.is_active %}「{{ u.nickname }}」を利用停止にします。よろしいですか?{% else %}「{{ u.nickname }}」の利用を再開します。{% endif %}">
+        {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <button type="submit" class="btn btn-ghost btn-small">{% if u.is_active %}停止{% else %}再開{% endif %}</button>
+      </form>
+      {% endif %}
+    </td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="6">該当するアカウントがありません。</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% if page.has_other_pages %}
+<nav class="pager" aria-label="ページ">
+  {% if page.has_previous %}<a href="?role={{ role }}&amp;q={{ q|urlencode }}&amp;page={{ page.previous_page_number }}">← 前へ</a>{% endif %}
+  <span>{{ page.number }} / {{ page.paginator.num_pages }}(全 {{ page.paginator.count }} 件)</span>
+  {% if page.has_next %}<a href="?role={{ role }}&amp;q={{ q|urlencode }}&amp;page={{ page.next_page_number }}">次へ →</a>{% endif %}
+</nav>
+{% endif %}
+{% endblock %}

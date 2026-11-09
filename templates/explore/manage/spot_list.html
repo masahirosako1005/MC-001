@@ -1,25 +1,26 @@
 {% extends "base.html" %}
-{% block title %}スポット管理{% endblock %}
+{% block title %}スポット・シンボルの設定{% endblock %}
 {% block content %}
-<h1>スポット管理</h1>
+<h1>スポット・シンボルの設定</h1>
 {% include "explore/manage/_nav.html" with active="spots" %}
-<p class="muted">シンボルを置くスポットの追加・編集・削除ができます。有効期限を過ぎたスポットは、カメラ・地図・一覧に出なくなります(記録は残ります)。</p>
+<p class="muted">シンボルを置くスポットの追加・編集・削除ができます。有効期限を過ぎたスポットは、カメラ・地図に出なくなります(記録は残ります)。</p>
 <p><a class="btn btn-primary" href="{% url 'explore:manage_spot_create' %}">＋ スポットを追加</a></p>
 <div class="table-wrap">
 <table class="table manage-table">
   <caption class="visually-hidden">スポットの一覧</caption>
-  <thead><tr><th scope="col">スポット</th><th scope="col">状態</th><th scope="col">公開期間</th><th scope="col">シンボル</th><th scope="col">操作</th></tr></thead>
+  <thead><tr><th scope="col">スポット</th>{% if user.is_operator %}<th scope="col">担当の管理者</th>{% endif %}<th scope="col">状態</th><th scope="col">公開期間</th><th scope="col">シンボル</th><th scope="col">操作</th></tr></thead>
   <tbody>
   {% for s in spots %}
   <tr>
     <td><strong>{{ s.name }}</strong><br><span class="muted">{{ s.area|default:"—" }}{% if s.latitude is None %} ・ 位置未設定{% endif %}</span></td>
+    {% if user.is_operator %}<td>{% if s.owner %}{{ s.owner.manager_profile.display_name|default:s.owner.nickname }}<br><span class="muted">{{ s.owner.manager_profile.manager_code }}</span>{% else %}<span class="muted">サイト運営者</span>{% endif %}</td>{% endif %}
     <td><span class="badge spot-status-{{ s.status }}">{{ s.status_label }}</span></td>
     <td>{% if s.starts_at %}{{ s.starts_at|date:"Y/n/j H:i" }}{% else %}すぐ{% endif %} 〜<br>{% if s.expires_at %}{{ s.expires_at|date:"Y/n/j H:i" }}{% else %}<strong>無期限</strong>{% endif %}</td>
-    <td>{{ s.n_symbols }}{% if s.n_secret %}(シークレット {{ s.n_secret }}){% endif %}</td>
+    <td>{{ s.n_symbols }}{% if s.n_secret %}(シークレット {{ s.n_secret }}){% endif %}<br><a href="{% url 'explore:manage_symbol_create' %}?spot={{ s.pk }}">＋ 追加</a></td>
     <td class="actions"><a href="{% url 'explore:manage_spot_edit' s.pk %}">編集</a> <a href="{% url 'explore:manage_spot_delete' s.pk %}">削除</a></td>
   </tr>
   {% empty %}
-  <tr><td colspan="5">スポットがまだありません。</td></tr>
+  <tr><td colspan="6">担当のスポットがまだありません。「スポットを追加」から登録してください。</td></tr>
   {% endfor %}
   </tbody>
 </table>

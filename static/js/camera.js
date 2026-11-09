@@ -571,6 +571,12 @@
     }
   }
 
+  // 分析用: カメラ (写真読み取り) を起動したことだけを送る。失敗しても探索は続ける
+  function notifyCameraStart() {
+    if (!root.dataset.cameraStartUrl) return;
+    post(root.dataset.cameraStartUrl, {}).catch(() => {});
+  }
+
   // ---------- カメラ / 写真 ----------
   async function startCamera() {
     if (typeof window.jsQR !== "function") {
@@ -610,6 +616,7 @@
     clearTarget();
     video.srcObject = stream;
     try { await video.play(); } catch (_) { /* 自動再生制限: ユーザー操作起点なので通常は成功 */ }
+    notifyCameraStart();
     setReady();
     setStatus("シンボルをさがしています… 画面の中にシンボルをうつしてください。");
     if (!rafId) rafId = requestAnimationFrame(frame);
@@ -669,6 +676,7 @@
     fileInput.value = "";
     if (!f) return;
     if (!(await gpsGate())) return; // 理由は地図の上に出ている
+    notifyCameraStart();
     loadStill(f);
   });
   canvas.addEventListener("pointerdown", (ev) => {

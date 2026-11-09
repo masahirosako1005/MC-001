@@ -31,7 +31,7 @@ class Base(TestCase):
         cache.clear()
         self.user = User.objects.create_user("u@example.com", PW, "ゆーざ")
         self.staff = User.objects.create_user("staff@example.com", PW, "すたっふ")
-        self.staff.is_staff = True
+        self.staff.role = "operator"
         self.staff.save()
         self.spot = Spot.objects.create(slug="s", name="テスト温泉", latitude=Decimal("35.0"), longitude=Decimal("139.0"))
         self.symbol = Symbol.objects.create(spot=self.spot, name="かっぱ", hint="足湯のそば", cooldown_hours=20)
@@ -242,7 +242,7 @@ class SpotManageTests(Base):
             self.assertEqual(self.client.get(u).status_code, 302)
         self.client.force_login(self.user)
         for u in urls:
-            self.assertEqual(self.client.get(u).status_code, 302)
+            self.assertEqual(self.client.get(u).status_code, 403)  # 利用者には設定画面を使わせない
         self.client.force_login(self.staff)
         for u in urls:
             self.assertEqual(self.client.get(u).status_code, 200)

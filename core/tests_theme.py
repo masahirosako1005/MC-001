@@ -36,7 +36,7 @@ class ThemeSwitchTests(TestCase):
         Item.objects.create(code="bg", name="背景", category="background", style="stage", color="#E85A9A", is_starter=True)
         self.user = User.objects.create_user("u@example.com", PW, "ゆーざー")
         ensure_starter_kit(self.user)
-        self.staff = User.objects.create_user("s@example.com", PW, "すたっふ", is_staff=True, is_superuser=True)
+        self.staff = User.objects.create_user("s@example.com", PW, "すたっふ", role="operator", is_superuser=True)
         ensure_starter_kit(self.staff)
 
     def test_default_is_standard(self):
