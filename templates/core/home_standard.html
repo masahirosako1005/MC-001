@@ -8,7 +8,7 @@
   <div>
     <h1>こんにちは、{{ user.nickname }}さん</h1>
     <p>いまは <strong>{{ mikke_season_label }}の{{ mikke_slot_label }}</strong>。この時間だけのアイテムがあるかも?</p>
-    <a class="btn btn-primary btn-large" href="{% url 'explore:camera' %}"><span aria-hidden="true">📷</span> カメラでさがす</a>
+    <a class="btn btn-primary btn-large" href="{% url 'explore:mikke' %}"><span aria-hidden="true">📷</span> みっけに行く</a>
   </div>
 </section>
 
@@ -36,7 +36,7 @@
     {% endfor %}
   </ul>
   {% else %}
-  <p class="empty">まだみっけがありません。<a href="{% url 'explore:spots' %}">スポット一覧</a>からヒントを見て、出かけてみましょう。</p>
+  <p class="empty">まだみっけがありません。<a href="{% url 'explore:mikke' %}">みっけ</a>で近くのシンボルを探して、出かけてみましょう。</p>
   {% endif %}
 </section>
 {% endblock %}

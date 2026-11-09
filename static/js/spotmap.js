@@ -41,14 +41,6 @@
     const stat = document.createElement("div");
     stat.textContent = `訪問 ${s.visit_days} 日 ・ シンボル ${s.found}/${s.symbols} みっけ済み`;
     box.appendChild(stat);
-    const link = document.createElement("a");
-    link.href = `#spot-${s.id}`;
-    link.textContent = "ヒントを見る";
-    link.addEventListener("click", () => {
-      const card = document.getElementById(`spot-${s.id}`);
-      if (card) setTimeout(() => card.focus(), 0);
-    });
-    box.appendChild(link);
     return box;
   }
 
@@ -57,26 +49,19 @@
   const inArea = spots.filter((s) => bounds.contains([s.lat, s.lng]));
   if (inArea.length > 1) map.fitBounds(L.latLngBounds(inArea.map((s) => [s.lat, s.lng])).pad(0.3), { maxZoom: 16 });
 
-  // 現在地 (端末内で表示するだけでサーバーには送らない)
+  // 「現在地」: ①現在地の取得 → ②近くのシンボル検索 を順番に行う (nearby.js)。
+  // 「近くのシンボルを探す」ボタンと同じ動作で、結果は下の mikke:nearby で地図に描く。
+  let locateBtn = null;
   const LocateControl = L.Control.extend({
     options: { position: "topleft" },
     onAdd() {
       const btn = L.DomUtil.create("button", "map-locate");
       btn.type = "button";
       btn.textContent = "現在地";
-      btn.setAttribute("aria-label", "現在地を表示");
+      btn.setAttribute("aria-label", "現在地を取得して、近くのシンボルを探す");
       L.DomEvent.disableClickPropagation(btn);
-      let me = null;
-      btn.addEventListener("click", () => {
-        if (!navigator.geolocation) return;
-        navigator.geolocation.getCurrentPosition((pos) => {
-          const ll = [pos.coords.latitude, pos.coords.longitude];
-          if (me) me.remove();
-          me = L.circleMarker(ll, { radius: 8, color: "#1a5fd0", fillColor: "#1a5fd0", fillOpacity: 0.6 }).addTo(map);
-          if (bounds.contains(ll)) map.setView(ll, Math.max(map.getZoom(), 16));
-          else me.bindPopup("現在地は地図データの範囲外です(京橋付近のみ収録)").openPopup();
-        }, () => { /* 拒否時は何もしない */ }, { enableHighAccuracy: true, timeout: 10000 });
-      });
+      btn.addEventListener("click", () => { if (window.MikkeNearby) window.MikkeNearby.search(); });
+      locateBtn = btn;
       return btn;
     },
   });
@@ -85,18 +70,9 @@
   // ---------------------------------------------------------------- 近くのシンボル
   // 現在地の周囲 (サイト設定の距離) にあるシンボルを地図に出し、タップでここで手に入るコーデを見せる。
   // シークレットシンボルは、あえて「？」の画像だけを出す。
-  const btnNearby = document.getElementById("btn-nearby");
-  const statusEl = document.getElementById("nearby-status");
   const listEl = document.getElementById("nearby-list");
-  const csrf = document.querySelector('meta[name="csrf-token"]').content;
   const nearbyLayer = L.layerGroup().addTo(map);
   const fmtDist = (m) => (m >= 1000 ? `${(m / 1000).toFixed(1)}km` : `${m}m`);
-
-  function setStatus(msg, state) {
-    statusEl.hidden = false;
-    statusEl.textContent = msg;
-    statusEl.className = `gps-gate${state ? ` is-${state}` : ""}`;
-  }
 
   function mk(tag, cls, text) {
     const e = document.createElement(tag);
@@ -139,12 +115,17 @@
     return box;
   }
 
+  function drawMe(me, radiusM) {
+    L.circle(me, { radius: radiusM, color: "#1A5FD0", weight: 2, fillOpacity: 0.06 }).addTo(nearbyLayer);
+    const meMarker = L.marker(me, { icon: L.divIcon({ className: "", html: '<div class="me-marker"></div>', iconSize: [18, 18] }),
+      title: "現在地", alt: "現在地", keyboard: false }).addTo(nearbyLayer);
+    if (!bounds.contains(me)) meMarker.bindPopup("現在地は地図データの範囲外です(京橋付近のみ収録)").openPopup();
+  }
+
   function render(data, me) {
     nearbyLayer.clearLayers();
     listEl.replaceChildren();
-    L.circle(me, { radius: data.radius_m, color: "#1A5FD0", weight: 2, fillOpacity: 0.06 }).addTo(nearbyLayer);
-    L.marker(me, { icon: L.divIcon({ className: "", html: '<div class="me-marker"></div>', iconSize: [18, 18] }),
-      title: "現在地", alt: "現在地", keyboard: false }).addTo(nearbyLayer);
+    drawMe(me, data.radius_m);
     for (const s of data.nearby) {
       const icon = L.divIcon({ className: "", iconSize: [34, 34],
         html: `<div class="nearby-marker${s.secret ? " is-secret" : ""}">${s.secret ? "?" : "★"}</div>` });
@@ -161,48 +142,28 @@
       listEl.appendChild(li);
     }
     listEl.hidden = !data.nearby.length;
-    const pts = [me, ...data.nearby.map((s) => [s.lat, s.lng])];
-    if (bounds.contains(me)) map.fitBounds(L.latLngBounds(pts).pad(0.4), { maxZoom: 18 });
+    if (!bounds.contains(me)) return;
+    if (data.nearby.length) {
+      map.fitBounds(L.latLngBounds([me, ...data.nearby.map((s) => [s.lat, s.lng])]).pad(0.4), { maxZoom: 18 });
+    } else {
+      map.setView(me, Math.max(map.getZoom(), 16));
+    }
   }
 
-  async function findNearby() {
-    if (!navigator.geolocation) {
-      setStatus("この端末では位置情報を使えません。", "none");
-      return;
+  document.addEventListener("mikke:nearby-start", () => { if (locateBtn) locateBtn.disabled = true; });
+  document.addEventListener("mikke:nearby", (ev) => {
+    if (locateBtn) locateBtn.disabled = false;
+    const r = ev.detail;
+    if (r.ok) {
+      render(r.data, r.me);
+    } else if (r.me) {
+      nearbyLayer.clearLayers();
+      listEl.hidden = true;
+      drawMe(r.me, Number(document.getElementById("mikke-find").dataset.radius) || 100);
     }
-    btnNearby.disabled = true;
-    setStatus("現在地を確認しています…", "");
-    navigator.geolocation.getCurrentPosition(async (pos) => {
-      const me = [pos.coords.latitude, pos.coords.longitude];
-      try {
-        const res = await fetch(el.dataset.nearbyUrl, {
-          method: "POST", credentials: "same-origin",
-          headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
-          body: JSON.stringify({ lat: me[0], lng: me[1] }),
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          setStatus(data.message || "近くのシンボルを調べられませんでした。", "none");
-          return;
-        }
-        render(data, me);
-        if (data.has_nearby) {
-          setStatus(`周囲 ${data.radius_m}m にシンボルが ${data.nearby.length} 件あります。★をタップすると、ここで手に入るコーデが見られます。`, "ok");
-        } else {
-          const hint = data.nearest ? ` いちばん近いのは「${data.nearest.spot}」(約 ${fmtDist(data.nearest.distance_m)})です。` : "";
-          setStatus(`ここにはなさそう・・・ (周囲 ${data.radius_m}m にシンボルが見つかりません)${hint}`, "none");
-        }
-      } catch (_) {
-        setStatus("通信できませんでした。もう一度お試しください。", "none");
-      } finally {
-        btnNearby.disabled = false;
-      }
-    }, () => {
-      btnNearby.disabled = false;
-      setStatus("位置情報を取得できませんでした。ブラウザの設定で位置情報の利用を許可してください。", "none");
-    }, { enableHighAccuracy: true, timeout: 10000 });
-  }
-  if (btnNearby) btnNearby.addEventListener("click", findNearby);
+  });
+  // カメラから地図にもどったとき、隠れていた間の大きさの変化を反映する
+  document.addEventListener("mikke:find-shown", () => map.invalidateSize());
 
   window.__mikkeMap = { map, markers };
 })();

@@ -43,6 +43,9 @@
 | R35 | Should | 地図上で周囲のシンボルをタップすると、ここで獲得可能なコーデの画像を表示 |
 | R36 | Must | シークレットシンボルを設定でき、R35 の画像はあえて「？」の画像を表示 |
 | R37 | Must | シンボルをタップしたとき、何を手に入れたかを画像で表示する |
+| R38 | Must | 「みっけに行く」「みっけ」を押したら、まず現在地付近のシンボルを検索し、近くにあればカメラを起動できる(「みっけ」と「スポット」を統合) |
+| R39 | Must | 地図の「現在地」「近くのシンボルを探す」で、現在地の取得 → シンボル検索 を順番に実行する |
+| R40 | Should | スポット(シンボル一覧)のカードをいったん非表示にする |
 
 ## トレーサビリティ
 
@@ -84,6 +87,9 @@
 | R35 | `services.obtainable_items`、`/explore/symbols/<id>/items/<code>.svg`、`spotmap.js`(★マーカー・ポップアップ・一覧) | `test_within_radius` `test_preview_image` `test_secret_and_unrelated_items_are_404` | ✅ |
 | R36 | `Symbol.is_secret`、`static/img/secret.svg`、API でのマスク、スポット一覧の「？？？」 | `test_secret_is_masked`(名前・ヒント・アイテムを応答に含めない) `SecretSpotListTests` | ✅ |
 | R37 | `camera.js:showReward`(全身 + 拡大図・NEW・レア度)、`wardrobe.services.item_zoom_svg`(`?zoom=1`)、`rewards/coupon_art.py` + `/rewards/coupons/<id>.svg`、`static/img/nothing.svg` | `test_collect_grants_item_and_records`(`slot`) `test_item_zoom_crops_to_part` `CouponImageTests`(本人のみ・XSS エスケープ・使用済み・長文の切り詰め)、ブラウザで実際にみっけ → アイテムの絵、クーポン・何もなしの絵を確認 | ✅ |
+| R38 | `explore.views.mikke` + `templates/explore/mikke.html`(地図とカメラを 1 画面)、`camera.js`(検索結果でボタンを切り替え・同じ画面でカメラ)、ナビ・各ホームのリンク、`/explore/camera/` → 301 | `test_search_first_then_camera` `test_old_camera_url_redirects` `test_nav_has_single_mikke_tab`、ブラウザで 遠く → 起動不可 / 近く → 起動 → 地図にもどる / 写真読み取り を確認 | ✅ |
+| R39 | `static/js/nearby.js`(① 現在地 → ② 検索、二重実行しない、`mikke:nearby` イベント)、`spotmap.js`(「現在地」も同じ処理) | ブラウザで「現在地」「近くのシンボルを探す」の両方で ①→②→結果 の順に表示されることを確認 | ✅(JS は🔶手動) |
+| R40 | `SHOW_SPOT_CARDS = False`、`explore/_spot_cards.html` | `test_spot_cards_hidden_and_secret_not_leaked` `test_spot_cards_can_be_shown_again` | ✅ |
 | R18 | `maps/`(Range 配信)、`maps/tiles/kyobashi.pmtiles`、`scripts/extract_tiles.py`、`static/js/spotmap.js`(Leaflet + protomaps-leaflet) | `maps/tests.py`(Range・416・パストラバーサル・ログイン必須・外部 API を CSP で許可していない)、ブラウザで外部への通信がないことを確認 | ✅ |
 
 ## 未達・残課題

@@ -258,7 +258,7 @@ class ApiTests(Base):
 class PageTests(Base):
     def test_pages_render(self):
         self.client.force_login(self.user)
-        for name in ["explore:spots", "explore:camera", "explore:history", "core:home", "rewards:coupons",
+        for name in ["explore:mikke", "explore:mikke", "explore:history", "core:home", "rewards:coupons",
                      "rewards:achievements", "wardrobe:index"]:
             with self.subTest(name=name):
                 self.assertEqual(self.client.get(reverse(name)).status_code, 200)

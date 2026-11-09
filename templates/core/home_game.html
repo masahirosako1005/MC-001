@@ -16,13 +16,13 @@
     </a>
     <div class="gh-stats">
       <a class="gh-stat" href="{% url 'wardrobe:index' %}"><span aria-hidden="true">👕</span><span class="visually-hidden">集めたアイテム</span>{{ metrics.distinct_items }}<small>/{{ item_total }}</small></a>
-      <a class="gh-stat" href="{% url 'explore:spots' %}"><span aria-hidden="true">📍</span><span class="visually-hidden">訪れたスポット</span>{{ metrics.distinct_spots }}</a>
+      <a class="gh-stat" href="{% url 'explore:mikke' %}"><span aria-hidden="true">📍</span><span class="visually-hidden">訪れたスポット</span>{{ metrics.distinct_spots }}</a>
       <a class="gh-stat" href="{% url 'rewards:coupons' %}"><span aria-hidden="true">🎟️</span><span class="visually-hidden">使えるクーポン</span>{{ coupon_count }}</a>
     </div>
     <details class="gh-menu">
       <summary>メニュー</summary>
       <div class="gh-menu-panel">
-        <a href="{% url 'explore:spots' %}">スポットと地図</a>
+        <a href="{% url 'explore:mikke' %}">みっけ(地図・カメラ)</a>
         <a href="{% url 'explore:history' %}">みっけ履歴</a>
         <a href="{% url 'rewards:achievements' %}">実績</a>
         <a href="{% url 'contest:list' %}">コンテスト</a>
@@ -57,13 +57,13 @@
     <a class="gh-icon" href="{% url 'rewards:coupons' %}"><span aria-hidden="true">✉️</span><span>クーポン</span>{% if coupon_count %}<b class="gh-badge">{{ coupon_count }}</b>{% endif %}</a>
     <a class="gh-icon" href="{% url 'rewards:achievements' %}"><span aria-hidden="true">📋</span><span>実績</span>{% if achievement_count %}<b class="gh-badge gh-badge-soft">{{ achievement_count }}</b>{% endif %}</a>
     <a class="gh-icon" href="{% url 'explore:history' %}"><span aria-hidden="true">🎁</span><span>履歴</span></a>
-    <a class="gh-icon" href="{% url 'explore:spots' %}"><span aria-hidden="true">🗺️</span><span>地図</span></a>
+    <a class="gh-icon" href="{% url 'explore:mikke' %}"><span aria-hidden="true">🗺️</span><span>地図</span></a>
   </nav>
 
   {# ---- 下部: 大きなボタン ---- #}
   <div class="gh-bottom">
     <a class="gh-btn gh-btn-sub" href="{% url 'wardrobe:index' %}"><span aria-hidden="true">👗</span>きせかえ</a>
-    <a class="gh-btn gh-btn-main" href="{% url 'explore:camera' %}"><span aria-hidden="true">📷</span>みっけに行く<small>{{ mikke_season_label }}の{{ mikke_slot_label }}だけのアイテムも</small></a>
+    <a class="gh-btn gh-btn-main" href="{% url 'explore:mikke' %}"><span aria-hidden="true">📷</span>みっけに行く<small>{{ mikke_season_label }}の{{ mikke_slot_label }}だけのアイテムも</small></a>
     <a class="gh-btn gh-btn-sub" href="{% url 'contest:list' %}"><span aria-hidden="true">🏆</span>コンテスト</a>
   </div>
 </section>

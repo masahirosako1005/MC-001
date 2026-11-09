@@ -338,6 +338,27 @@ progress { flex: 1; height: 12px; accent-color: var(--primary); }
 .gps-gate { margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); font-weight: 700; }
 .gps-gate.is-none { border-left: 5px solid var(--warn); }
 .gps-gate.is-ok { border-left: 5px solid var(--ok); }
+.gps-gate.is-busy { border-left: 5px solid var(--primary); }
+.gps-gate.is-busy::before { content: ""; display: inline-block; width: 0.9em; height: 0.9em; margin-right: 6px; vertical-align: -0.1em;
+  border: 2px solid var(--primary); border-right-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .gps-gate.is-busy::before { animation: none; } }
+
+/* みっけ画面: ① 近くのシンボルをさがす → ② カメラでみっけ */
+.page-mikke main { max-width: 720px; }
+.mikke-find { display: grid; gap: 10px; }
+.mikke-steps { display: flex; gap: 6px; list-style: none; margin: 0; padding: 0; counter-reset: none; }
+.mikke-steps li { flex: 1; display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px;
+  background: var(--surface-2); color: var(--muted); font-weight: 700; font-size: 0.85rem; }
+.mikke-steps li span { display: grid; place-items: center; width: 1.5em; height: 1.5em; border-radius: 50%;
+  background: var(--muted); color: var(--surface); font-size: 0.8rem; flex: none; }
+.mikke-steps li.is-current { background: var(--primary); color: #FFFFFF; }
+.mikke-steps li.is-current span { background: #FFFFFF; color: var(--primary); }
+.mikke-steps li.is-done { color: var(--ok); }
+.mikke-steps li.is-done span { background: var(--ok); color: #FFFFFF; }
+.mikke-actions { display: grid; gap: 8px; }
+.mikke-actions #btn-start:disabled { opacity: 0.5; cursor: not-allowed; }
+.file-btn.is-disabled { opacity: 0.5; pointer-events: none; }
+.mikke-camera .ar-stage { border-radius: var(--radius); }
 .nearby-marker { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; font-size: 18px; font-weight: 900;
   background: #FFD84D; color: #6A3A00; border: 3px solid #FFFFFF; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35); }
 .nearby-marker.is-secret { background: #5A3F8F; color: #FFFFFF; }

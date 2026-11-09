@@ -1,0 +1,96 @@
+{% extends "base.html" %}{% load static %}
+{% block title %}みっけ{% endblock %}
+{% block body_class %}page-mikke{% endblock %}
+{% block head %}<link rel="stylesheet" href="{% static 'vendor/leaflet/leaflet.css' %}">{% endblock %}
+{% block content %}
+<h1 class="visually-hidden">みっけ</h1>
+<section id="ar" class="ar mikke"
+         data-scan-url="{% url 'explore:api_scan' %}"
+         data-image-symbols-url="{% url 'explore:api_image_symbols' %}"
+         data-collect-url="{% url 'explore:api_collect' %}"
+         data-wardrobe-url="{% url 'wardrobe:index' %}"
+         data-item-svg-base="{% url 'wardrobe:index' %}items/"
+         data-coupon-base="{% url 'rewards:coupons' %}"
+         data-nothing-img="{% static 'img/nothing.svg' %}">
+
+  {# ① 近くのシンボルをさがす (現在地の取得 → シンボルの検索) #}
+  <div id="mikke-find" class="mikke-find" data-nearby-url="{{ nearby_url }}" data-radius="{{ radius_m }}">
+    <ol class="mikke-steps" aria-label="みっけの手順">
+      <li id="step-search" class="is-current"><span aria-hidden="true">1</span>近くのシンボルをさがす</li>
+      <li id="step-camera"><span aria-hidden="true">2</span>カメラでみっけ</li>
+    </ol>
+    <p id="nearby-status" class="gps-gate" role="status" aria-live="polite">現在地のまわり {{ radius_m }}m にシンボルがあるか調べます。</p>
+
+    <div id="spot-map" class="spot-map" role="application" aria-label="スポットの地図(京橋付近)"
+         data-tiles="{{ map_tiles_url }}" data-secret-img="{% static 'img/secret.svg' %}"></div>
+
+    <div class="mikke-actions">
+      <button type="button" class="btn btn-ghost" id="btn-nearby"><span aria-hidden="true">✦</span> 近くのシンボルを探す(周囲 {{ radius_m }}m)</button>
+      <button type="button" class="btn btn-primary btn-large btn-block" id="btn-start" disabled aria-describedby="nearby-status">
+        <span aria-hidden="true">📷</span> カメラでみっけ
+      </button>
+      <label class="btn btn-ghost file-btn is-disabled" id="file-label">
+        <span aria-hidden="true">🖼️</span> 写真から読み取る
+        <input type="file" id="file-input" accept="image/*" class="visually-hidden" disabled>
+      </label>
+      {% if user.is_staff %}
+      <label class="staff-toggle"><input type="checkbox" id="gps-skip"> 位置の確認を省略する(管理者のテスト用)</label>
+      {% endif %}
+    </div>
+    <ul id="nearby-list" class="nearby-list" aria-label="近くのシンボル" hidden></ul>
+    <p class="help">近くにシンボルがあるときだけカメラを起動できます。★をタップすると、そこで手に入るコーデが見られます。
+      現在地は近くのシンボルを調べるためだけに使い、保存しません。地図データは端末とこのサーバーの中だけで表示しています(外部の地図サービスは使っていません)。</p>
+  </div>
+
+  {# ② カメラでみっけ #}
+  <div id="mikke-camera" class="mikke-camera" hidden>
+    <div class="ar-stage" id="ar-stage">
+      <video id="ar-video" playsinline muted aria-hidden="true"></video>
+      <canvas id="ar-canvas" aria-label="カメラ映像。シンボルが見つかると光るマークが表示されます"></canvas>
+    </div>
+    <div class="ar-panel">
+      <p id="ar-status" class="ar-status" role="status" aria-live="polite">カメラを起動するとシンボルをさがします。</p>
+      <button type="button" class="btn btn-accent btn-block btn-large" id="btn-collect" hidden>
+        <span aria-hidden="true">✨</span> <span id="btn-collect-label">みっけ!</span>
+      </button>
+      <div class="ar-tools">
+        <button type="button" class="btn btn-ghost" id="btn-stop"><span aria-hidden="true">🗺️</span> 地図にもどる</button>
+      </div>
+      <p class="help">映像は端末の中だけで処理され、サーバーには送信されません。</p>
+    </div>
+  </div>
+</section>
+
+{% if show_spot_cards %}{% include "explore/_spot_cards.html" %}{% endif %}
+
+<dialog id="reward-dialog" class="reward-dialog" aria-labelledby="reward-title">
+  <div class="reward-burst" aria-hidden="true"></div>
+  <h2 id="reward-title">みっけ!</h2>
+  <p id="reward-spot" class="muted"></p>
+  <div id="reward-art" class="reward-art" hidden>
+    <img id="reward-img" alt="" width="150" height="202">
+    <img id="reward-zoom" class="reward-zoom" alt="" width="84" height="84" hidden>
+    <span id="reward-new" class="reward-new" hidden>NEW</span>
+    <span id="reward-rarity" class="reward-rarity" aria-hidden="true"></span>
+  </div>
+  <p id="reward-text" class="reward-text"></p>
+  <p id="reward-extra" class="help"></p>
+  <ul id="reward-achievements" class="reward-achievements"></ul>
+  <div class="dialog-actions">
+    <a id="reward-link" class="btn btn-primary" href="{% url 'wardrobe:index' %}">着せかえる</a>
+    <button type="button" class="btn btn-ghost" id="reward-close">探索をつづける</button>
+  </div>
+</dialog>
+{{ spot_points|json_script:"spot-data" }}
+{{ map_config|json_script:"map-config" }}
+{% endblock %}
+{% block scripts %}
+<script src="{% static 'vendor/leaflet/leaflet.js' %}" defer></script>
+<script src="{% static 'vendor/protomaps-leaflet/protomaps-leaflet-5.1.0.js' %}" defer></script>
+<script src="{% static 'vendor/jsqr/jsQR-1.4.0.js' %}" defer></script>
+<script src="{% static 'vendor/jsfeat/jsfeat-0.0.8.min.js' %}" defer></script>
+<script src="{% static 'js/imagematch.js' %}" defer></script>
+<script src="{% static 'js/nearby.js' %}" defer></script>
+<script src="{% static 'js/spotmap.js' %}" defer></script>
+<script src="{% static 'js/camera.js' %}" defer></script>
+{% endblock %}

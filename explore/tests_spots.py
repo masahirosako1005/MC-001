@@ -6,6 +6,7 @@ import datetime as dt
 import json
 import uuid
 from decimal import Decimal
+from unittest import mock
 
 from django.core.cache import cache
 from django.db import IntegrityError, transaction
@@ -66,7 +67,7 @@ class SpotPeriodTests(Base):
         with self.assertRaises(services.UnknownSymbol):
             services.scan(self.user, self.symbol.payload)
         self.client.force_login(self.user)
-        self.assertNotContains(self.client.get(reverse("explore:spots")), "テスト温泉")
+        self.assertNotContains(self.client.get(reverse("explore:mikke")), "テスト温泉")
         self.assertFalse(self.nearby(NEAR).json()["has_nearby"])
 
     def test_no_expiry_is_forever(self):
@@ -174,16 +175,56 @@ class SymbolItemImageTests(Base):
         self.assertEqual(self.client.get(self.url(self.symbol, "hair-a")).status_code, 404)
 
 
-class SecretSpotListTests(Base):
-    def test_masked_until_found(self):
+class MikkePageTests(Base):
+    """「みっけ」画面: 地図で近くのシンボルをさがす → カメラでみっけ (スポット一覧とカメラを統合)。"""
+
+    def test_search_first_then_camera(self):
         self.client.force_login(self.user)
-        res = self.client.get(reverse("explore:spots"))
-        self.assertContains(res, "シークレットシンボル")
+        res = self.client.get(reverse("explore:mikke"))
+        self.assertTemplateUsed(res, "explore/mikke.html")
+        body = res.content.decode()
+        # 地図・検索ボタン・カメラ・写真読み取りが 1 画面にある
+        for part in ('id="spot-map"', 'id="btn-nearby"', 'id="mikke-camera"', 'id="ar-video"', 'id="reward-dialog"',
+                     reverse("explore:api_nearby"), reverse("explore:api_scan"), "js/nearby.js", "js/camera.js"):
+            self.assertIn(part, body)
+        # 近くにシンボルがあると分かるまで、カメラと写真読み取りは押せない
+        self.assertRegex(body, r'id="btn-start" disabled')
+        self.assertRegex(body, r'id="file-input"[^>]*disabled')
+        # スクリプトは nearby.js → spotmap.js → camera.js の順 (検索結果を地図とカメラが受け取る)
+        self.assertLess(body.index("js/nearby.js"), body.index("js/spotmap.js"))
+        self.assertLess(body.index("js/spotmap.js"), body.index("js/camera.js"))
+
+    def test_spot_cards_hidden_and_secret_not_leaked(self):
+        Discovery.objects.create(user=self.user, symbol=self.secret, reward_kind="none", reward_label="",
+                                 idempotency_key=uuid.uuid4())
+        self.client.force_login(self.user)
+        res = self.client.get(reverse("explore:mikke"))
+        self.assertNotContains(res, 'class="spot-card"')
+        for hidden in ("ひみつの狐", "夜の石段", "かっぱ", "足湯のそば"):
+            self.assertNotContains(res, hidden)
+
+    def test_spot_cards_can_be_shown_again(self):
+        from explore import views
+
+        self.client.force_login(self.user)
+        with mock.patch.object(views, "SHOW_SPOT_CARDS", True):
+            res = self.client.get(reverse("explore:mikke"))
+        self.assertContains(res, 'class="spot-card"')
+        self.assertContains(res, "？？？(シークレットシンボル)")  # 見つけるまでは隠す
         self.assertNotContains(res, "ひみつの狐")
-        self.assertNotContains(res, "夜の石段")
-        Discovery.objects.create(user=self.user, symbol=self.secret, reward_kind="none", reward_label="", idempotency_key=uuid.uuid4())
-        res = self.client.get(reverse("explore:spots"))
-        self.assertContains(res, "ひみつの狐")
+
+    def test_old_camera_url_redirects(self):
+        self.client.force_login(self.user)
+        res = self.client.get("/explore/camera/")
+        self.assertRedirects(res, reverse("explore:mikke"), status_code=301)
+
+    def test_nav_has_single_mikke_tab(self):
+        self.client.force_login(self.user)
+        res = self.client.get(reverse("core:home"))
+        nav = res.content.decode().split('class="tabbar"', 1)[1].split("</nav>", 1)[0]
+        self.assertIn(reverse("explore:mikke"), nav)
+        self.assertNotIn("スポット", nav)
+        self.assertNotIn("/explore/camera/", nav)
 
 
 class SpotManageTests(Base):

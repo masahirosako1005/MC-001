@@ -20,7 +20,6 @@
   const btnStop = $("btn-stop");
   const btnCollect = $("btn-collect");
   const collectLabel = $("btn-collect-label");
-  const startOverlay = $("ar-start");
   const fileInput = $("file-input");
   const dialog = $("reward-dialog");
 
@@ -527,51 +526,49 @@
 
   $("reward-close").addEventListener("click", () => dialog.close());
 
-  // ---------- 位置の確認 (近くにシンボルがあるときだけカメラを使える) ----------
-  const gateEl = $("gps-gate");
+  // ---------- 近くにシンボルがあるときだけカメラを使える ----------
+  // ①現在地の取得 → ②シンボル検索 は nearby.js が行い、その結果でボタンを切り替える。
   const skipEl = $("gps-skip"); // 管理者のテスト用
-  let gatePassedAt = 0;
+  const fileLabel = $("file-label");
+  const findView = $("mikke-find");
+  const cameraView = $("mikke-camera");
+  const PASS_MS = 3 * 60 * 1000; // 確認から 3 分以内なら、もう一度は調べない
+  let nearbyOk = false;
+  let searching = false;
 
-  function setGate(msg, state) {
-    if (!gateEl) return;
-    gateEl.textContent = msg;
-    gateEl.className = `gps-gate${state ? ` is-${state}` : ""}`;
+  function setReady() {
+    const ok = (nearbyOk || (skipEl && skipEl.checked)) && !searching;
+    btnStart.disabled = !ok;
+    fileInput.disabled = !ok;
+    fileLabel.classList.toggle("is-disabled", !ok);
+    $("step-search").classList.toggle("is-done", nearbyOk);
+    $("step-search").classList.toggle("is-current", !nearbyOk);
+    $("step-camera").classList.toggle("is-current", nearbyOk);
   }
-
-  const fmtDist = (m) => (m >= 1000 ? `${(m / 1000).toFixed(1)}km` : `${m}m`);
+  document.addEventListener("mikke:nearby-start", () => { searching = true; setReady(); });
+  document.addEventListener("mikke:nearby", (ev) => {
+    searching = false;
+    nearbyOk = !!(ev.detail.ok && ev.detail.data.has_nearby);
+    setReady();
+  });
+  if (skipEl) skipEl.addEventListener("change", setReady);
 
   async function gpsGate() {
     if (skipEl && skipEl.checked) return true;
-    if (Date.now() - gatePassedAt < 60000) return true; // 直前 1 分以内に確認済み
-    setGate("現在地を確認しています…", "");
-    let pos;
-    try {
-      pos = await getLocation();
-    } catch (_) {
-      setGate("位置情報を取得できませんでした。ブラウザの設定で位置情報の利用を許可してから、もう一度お試しください。", "none");
-      return false;
+    if (!window.MikkeNearby) return false;
+    const r = window.MikkeNearby.recent(PASS_MS) || await window.MikkeNearby.search();
+    return !!(r.ok && r.data.has_nearby);
+  }
+
+  // 地図 (①さがす) とカメラ (②みっけ) の表示を切り替える
+  function showCameraView(on) {
+    findView.hidden = on;
+    cameraView.hidden = !on;
+    if (on) {
+      cameraView.scrollIntoView({ block: "start" });
+    } else {
+      document.dispatchEvent(new CustomEvent("mikke:find-shown"));
     }
-    let res;
-    try {
-      res = await post(root.dataset.nearbyUrl, pos);
-    } catch (_) {
-      setGate("通信できませんでした。電波のよい場所でもう一度お試しください。", "none");
-      return false;
-    }
-    if (!res.ok) {
-      setGate(res.data.message || "近くのシンボルを確認できませんでした。", "none");
-      return false;
-    }
-    const d = res.data;
-    if (!d.has_nearby) {
-      const hint = d.nearest ? ` いちばん近いのは「${d.nearest.spot}」(約 ${fmtDist(d.nearest.distance_m)})です。` : "";
-      setGate(`ここにはなさそう・・・ (周囲 ${d.radius_m}m にシンボルが見つかりません)${hint}`, "none");
-      return false;
-    }
-    const s = d.nearby[0];
-    setGate(`近くにシンボルがあるよ!「${s.name}」まで約 ${fmtDist(s.distance_m)}${d.nearby.length > 1 ? ` ほか ${d.nearby.length - 1} 件` : ""}`, "ok");
-    gatePassedAt = Date.now();
-    return true;
   }
 
   // ---------- カメラ / 写真 ----------
@@ -582,16 +579,14 @@
     }
     btnStart.disabled = true;
     const ok = await gpsGate();
-    btnStart.disabled = false;
-    if (!ok) {
-      setStatus("近くにシンボルがないため、カメラは起動しません。地図でスポットを探してみよう。");
-      return;
-    }
+    setReady();
+    if (!ok) return; // 理由 (「ここにはなさそう・・・」など) は地図の上に出ている
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      setStatus("このブラウザではカメラを使えません。「写真から読み取る」をお使いください。");
+      $("nearby-status").textContent = "このブラウザではカメラを使えません。「写真から読み取る」をお使いください。";
       return;
     }
     btnStart.disabled = true;
+    showCameraView(true);
     setStatus("カメラを起動しています…");
     ensureImageRefs();
     try {
@@ -600,37 +595,38 @@
         audio: false,
       });
     } catch (e) {
-      btnStart.disabled = false;
       const messages = {
         NotAllowedError: "カメラの利用が許可されていません。ブラウザの設定でカメラを許可してから、もう一度お試しください。",
         NotFoundError: "カメラが見つかりません。「写真から読み取る」をお使いください。",
         NotReadableError: "ほかのアプリがカメラを使用中のようです。そのアプリを閉じてからお試しください。",
       };
-      setStatus(messages[e.name] || "カメラを起動できませんでした。「写真から読み取る」をお使いください。");
+      // 地図にもどして、「写真から読み取る」の近くに理由を出す
+      showCameraView(false);
+      $("nearby-status").textContent = messages[e.name] || "カメラを起動できませんでした。「写真から読み取る」をお使いください。";
+      setReady();
       return;
     }
     still = null;
     clearTarget();
     video.srcObject = stream;
     try { await video.play(); } catch (_) { /* 自動再生制限: ユーザー操作起点なので通常は成功 */ }
-    btnStart.disabled = false;
-    startOverlay.hidden = true;
-    btnStop.hidden = false;
+    setReady();
     setStatus("シンボルをさがしています… 画面の中にシンボルをうつしてください。");
     if (!rafId) rafId = requestAnimationFrame(frame);
   }
 
-  function stopCamera(showOverlay = true) {
+  /** カメラを止める。backToMap なら写真モードも終えて地図 (①さがす) にもどる。 */
+  function stopCamera(backToMap = true) {
     if (stream) stream.getTracks().forEach((t) => t.stop());
     stream = null;
     video.srcObject = null;
-    btnStop.hidden = true;
-    if (showOverlay && !still) {
-      startOverlay.hidden = false;
+    if (backToMap) {
+      still = null;
       cancelAnimationFrame(rafId);
       rafId = 0;
       clearTarget();
       setStatus("カメラを止めました。");
+      showCameraView(false);
     }
   }
 
@@ -644,7 +640,7 @@
     const img = new Image();
     img.onload = async () => {
       still = img;
-      startOverlay.hidden = true;
+      showCameraView(true);
       clearTarget();
       resizeCanvas();
       setStatus("写真からシンボルをさがしています…");
@@ -672,10 +668,7 @@
     const f = fileInput.files && fileInput.files[0];
     fileInput.value = "";
     if (!f) return;
-    if (!(await gpsGate())) {
-      setStatus("近くにシンボルがないため、写真からの読み取りもできません。");
-      return;
-    }
+    if (!(await gpsGate())) return; // 理由は地図の上に出ている
     loadStill(f);
   });
   canvas.addEventListener("pointerdown", (ev) => {

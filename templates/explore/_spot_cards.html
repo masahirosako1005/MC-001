@@ -1,0 +1,31 @@
+{# スポットとシンボルのカード一覧。いまは「みっけ」画面で非表示 (views.SHOW_SPOT_CARDS = True で再表示) #}
+{% for r in rows %}
+<article class="spot-card" id="spot-{{ r.spot.pk }}" tabindex="-1">
+  <header>
+    <h2>{{ r.spot.name }}</h2>
+    {% if r.spot.area %}<p class="muted">{{ r.spot.area }}</p>{% endif %}
+    <p class="visit-badge">{% if r.visit_days %}{{ r.visit_days }}日 訪問{% else %}未訪問{% endif %}</p>
+  </header>
+  {% if r.spot.description %}<p>{{ r.spot.description }}</p>{% endif %}
+  {% if r.spot.require_location %}<p class="help"><span aria-hidden="true">📍</span> このスポットは受け取り時に位置情報で現地確認をします。</p>{% endif %}
+  <ul class="symbol-list">
+    {% for s in r.symbols %}
+    <li>
+      <span class="symbol-status" aria-hidden="true">{% if s.masked %}🔮{% elif s.next_at %}⏳{% elif s.found %}✨{% else %}❔{% endif %}</span>
+      <div>
+        {% if s.masked %}
+        <strong>？？？(シークレットシンボル)</strong>
+        <p class="help">どこかにかくれています。見つけると名前がわかります。</p>
+        {% else %}
+        <strong>{{ s.symbol.name }}</strong>{% if s.symbol.is_secret %} <span class="badge">シークレット</span>{% endif %}
+        {% if s.symbol.hint %}<p class="help">ヒント: {{ s.symbol.hint }}</p>{% endif %}
+        {% endif %}
+        <p class="help">{% if s.next_at %}次にみっけできるのは {{ s.next_at|date:"n/j H:i" }} ごろ{% elif s.found %}もう一度みっけできます{% else %}まだみっけていません{% endif %}</p>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</article>
+{% empty %}
+<p class="empty">公開中のスポットはまだありません。</p>
+{% endfor %}

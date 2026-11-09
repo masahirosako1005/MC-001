@@ -50,9 +50,14 @@ def _error(exc: services.ExploreError, status: int = 400) -> JsonResponse:
     return JsonResponse({"error": exc.code, "message": exc.message, **exc.extra}, status=status)
 
 
+# スポットとシンボルのカード一覧 (いまは非表示。True にすると「みっけ」画面の下に出る)
+SHOW_SPOT_CARDS = False
+
+
 @login_required
 @require_GET
-def spot_list(request):
+def mikke(request):
+    """みっけ画面: ①現在地の近くのシンボルを地図でさがす → ②近くにあればカメラでみっけ。"""
     user = request.user
     spots = list(Spot.objects.available().prefetch_related("symbols"))
     visit_days = dict(SpotVisit.objects.filter(user=user).values_list("spot").annotate(n=Count("id")))
@@ -77,8 +82,9 @@ def spot_list(request):
          "found": sum(1 for s in r["symbols"] if s["found"])}
         for r in rows if r["spot"].latitude is not None and r["spot"].longitude is not None
     ]
-    return render(request, "explore/spots.html", {
+    return render(request, "explore/mikke.html", {
         "rows": rows,
+        "show_spot_cards": SHOW_SPOT_CARDS,
         "spot_points": points,
         **_map_context(),
         "nearby_url": reverse("explore:api_nearby"),
@@ -92,12 +98,6 @@ def _map_context() -> dict:
         "map_tiles_url": reverse("maps:pmtiles", args=[cfg["tiles"]]),
         "map_config": {k: cfg[k] for k in ("bounds", "center", "zoom", "max_data_zoom")},
     }
-
-
-@login_required
-@require_GET
-def camera(request):
-    return render(request, "explore/camera.html", {"radius_m": SiteSetting.current().camera_radius_m})
 
 
 def _coords_from(data: dict) -> tuple[float, float] | None:

@@ -1,12 +1,15 @@
 from django.urls import path
+from django.views.generic import RedirectView
 
 from . import manage_views, views
 
 app_name = "explore"
 
 urlpatterns = [
-    path("", views.spot_list, name="spots"),
-    path("camera/", views.camera, name="camera"),
+    # 「みっけ」: 近くのシンボルをさがす (地図) → カメラでみっけ を 1 画面で行う
+    path("", views.mikke, name="mikke"),
+    # 以前の「カメラ」画面のブックマーク用
+    path("camera/", RedirectView.as_view(pattern_name="explore:mikke", permanent=True), name="camera"),
     path("history/", views.history, name="history"),
     path("api/scan", views.api_scan, name="api_scan"),
     path("api/collect", views.api_collect, name="api_collect"),

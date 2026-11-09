@@ -62,7 +62,7 @@ class PmtilesViewTests(TestCase):
 
     def test_spot_page_embeds_local_map(self):
         self.client.force_login(self.user)
-        res = self.client.get(reverse("explore:spots"))
+        res = self.client.get(reverse("explore:mikke"))
         self.assertContains(res, 'id="spot-map"')
         self.assertContains(res, self.url)
         self.assertContains(res, "protomaps-leaflet-5.1.0.js")
