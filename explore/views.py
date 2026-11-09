@@ -9,13 +9,14 @@ from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Max, Prefetch
-from django.http import HttpResponse, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from core import audit, ratelimit
+from core.models import SiteSetting
 
 from . import services
 from .forms import ImageSymbolInfoForm, collect_view_uploads
@@ -53,7 +54,7 @@ def _error(exc: services.ExploreError, status: int = 400) -> JsonResponse:
 @require_GET
 def spot_list(request):
     user = request.user
-    spots = list(Spot.objects.filter(is_active=True).prefetch_related("symbols"))
+    spots = list(Spot.objects.available().prefetch_related("symbols"))
     visit_days = dict(SpotVisit.objects.filter(user=user).values_list("spot").annotate(n=Count("id")))
     last_found = dict(Discovery.objects.filter(user=user).values_list("symbol").annotate(m=Max("found_at")))
     now = timezone.now()
@@ -65,7 +66,9 @@ def spot_list(request):
                 continue
             last = last_found.get(s.pk)
             nxt = last + timezone.timedelta(hours=s.cooldown_hours) if last else None
-            symbols.append({"symbol": s, "found": last is not None, "next_at": nxt if nxt and nxt > now else None})
+            symbols.append({"symbol": s, "found": last is not None, "next_at": nxt if nxt and nxt > now else None,
+                            # シークレットは、見つけるまで名前とヒントを隠す
+                            "masked": s.is_secret and last is None})
         rows.append({"spot": spot, "visit_days": visit_days.get(spot.pk, 0), "symbols": symbols})
     points = [
         {"id": r["spot"].pk, "name": r["spot"].name, "area": r["spot"].area,
@@ -74,19 +77,89 @@ def spot_list(request):
          "found": sum(1 for s in r["symbols"] if s["found"])}
         for r in rows if r["spot"].latitude is not None and r["spot"].longitude is not None
     ]
-    cfg = settings.MIKKE_MAP
     return render(request, "explore/spots.html", {
         "rows": rows,
         "spot_points": points,
+        **_map_context(),
+        "nearby_url": reverse("explore:api_nearby"),
+        "radius_m": SiteSetting.current().camera_radius_m,
+    })
+
+
+def _map_context() -> dict:
+    cfg = settings.MIKKE_MAP
+    return {
         "map_tiles_url": reverse("maps:pmtiles", args=[cfg["tiles"]]),
         "map_config": {k: cfg[k] for k in ("bounds", "center", "zoom", "max_data_zoom")},
-    })
+    }
 
 
 @login_required
 @require_GET
 def camera(request):
-    return render(request, "explore/camera.html")
+    return render(request, "explore/camera.html", {"radius_m": SiteSetting.current().camera_radius_m})
+
+
+def _coords_from(data: dict) -> tuple[float, float] | None:
+    try:
+        lat, lng = float(data["lat"]), float(data["lng"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+        return None
+    return lat, lng
+
+
+@require_POST
+@api_login_required
+def api_nearby(request):
+    """現在地の近くにシンボルがあるかを返す (カメラ起動の判定と、地図の表示に使う)。
+
+    位置情報は判定にだけ使い、保存もログ出力もしない。URL にも載せない (POST の本文で受け取る)。
+    """
+    if not ratelimit.hit(f"nearby:{request.user.pk}", 30, 60):
+        return JsonResponse({"error": "rate_limited", "message": "少し時間をおいてお試しください。"}, status=429)
+    try:
+        coords = _coords_from(_json_body(request))
+    except (ValueError, json.JSONDecodeError):
+        coords = None
+    if coords is None:
+        return JsonResponse({"error": "bad_request", "message": "位置情報を取得できませんでした。"}, status=400)
+    radius = SiteSetting.current().camera_radius_m
+    found, nearest = services.nearby_symbols(coords[0], coords[1], radius)
+    nearby = []
+    for s, d in found:
+        lat, lng = s.location
+        entry = {"id": s.pk, "lat": lat, "lng": lng, "distance_m": round(d), "secret": s.is_secret,
+                 "spot": s.spot.name, "name": "？？？" if s.is_secret else s.name,
+                 "hint": "" if s.is_secret else s.hint, "items": []}
+        if not s.is_secret:  # シークレットは手に入るコーデも見せない
+            entry["items"] = [{**it, "image": reverse("explore:symbol_item_svg", args=[s.pk, it["code"]])}
+                              for it in services.obtainable_items(s)]
+        nearby.append(entry)
+    return JsonResponse({
+        "radius_m": radius,
+        "has_nearby": bool(nearby),
+        "nearby": nearby,
+        "nearest": ({"spot": nearest[0].spot.name, "distance_m": round(nearest[1])} if nearest and not nearby else None),
+    })
+
+
+@login_required
+@require_GET
+def symbol_item_svg(request, pk: int, code: str):
+    """シンボルで手に入るコーデのプレビュー画像。シークレットや公開外のシンボルは 404。"""
+    symbol = get_object_or_404(services.available_symbols(), pk=pk, is_secret=False)
+    drop = symbol.drops.select_related("item").filter(item__code=code, item__is_active=True).first()
+    if drop is None:
+        raise Http404
+    from wardrobe.services import get_config, item_preview_svg
+
+    cfg = get_config(request.user)
+    resp = HttpResponse(item_preview_svg(drop.item, cfg.skin_tone, cfg.eye_color), content_type="image/svg+xml; charset=utf-8")
+    resp.headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; sandbox"
+    resp.headers["Cache-Control"] = "private, max-age=300"
+    return resp
 
 
 @login_required
@@ -186,7 +259,7 @@ def symbol_register(request):
         uploads, _ = collect_view_uploads(request.POST, request.FILES)
         symbol = services.register_image_symbol(
             spot=cd["spot"], name=cd["name"], hint=cd["hint"], cooldown_hours=cd["cooldown_hours"],
-            uploads=uploads, created_by=request.user,
+            uploads=uploads, created_by=request.user, is_secret=cd["is_secret"],
         )
     except ImageSymbolError as exc:
         return _json_errors([str(exc)])

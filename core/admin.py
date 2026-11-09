@@ -10,8 +10,14 @@ from .themes import THEMES
 class SiteSettingForm(forms.ModelForm):
     class Meta:
         model = SiteSetting
-        fields = ["ui_theme"]
+        fields = ["ui_theme", "camera_radius_m"]
         widgets = {"ui_theme": forms.RadioSelect}
+
+    def clean_camera_radius_m(self):
+        value = self.cleaned_data["camera_radius_m"]
+        if not 10 <= value <= 5000:
+            raise forms.ValidationError("10〜5000 m の範囲で入力してください。")
+        return value
 
 
 @admin.register(SiteSetting)
@@ -19,9 +25,9 @@ class SiteSettingAdmin(admin.ModelAdmin):
     """UI テーマの切り替え。1 行だけの設定なので追加・削除はできない。"""
 
     form = SiteSettingForm
-    list_display = ("__str__", "ui_theme", "updated_by", "updated_at")
+    list_display = ("__str__", "ui_theme", "camera_radius_m", "updated_by", "updated_at")
     readonly_fields = ("theme_guide", "updated_by", "updated_at")
-    fields = ("ui_theme", "theme_guide", "updated_by", "updated_at")
+    fields = ("ui_theme", "theme_guide", "camera_radius_m", "updated_by", "updated_at")
 
     @admin.display(description="各テーマの説明と試し見")
     def theme_guide(self, obj):
@@ -50,7 +56,8 @@ class SiteSettingAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         obj.updated_by = request.user
         super().save_model(request, obj, form, change)
-        audit.record("site.ui_theme", request=request, target=obj, theme=obj.ui_theme)
+        audit.record("site.ui_theme", request=request, target=obj, theme=obj.ui_theme,
+                     camera_radius_m=obj.camera_radius_m)
 
 
 @admin.register(AuditLog)

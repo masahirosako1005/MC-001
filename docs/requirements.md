@@ -38,6 +38,10 @@
 | R30 | Must | ログイン前ページに Claude が生成した仮想の写真画像を使う |
 | R31 | Must | UI 案を管理画面から切り替えられる |
 | R32 | Must | 参考画像のように 1 画面でまとまった UI を試しに実装する |
+| R33 | Must | シンボルが存在するスポットの追加・編集・削除。各スポットに有効期限(無期限も可)を設定できる |
+| R34 | Must | GPS で周囲 100m(設定画面で変更可)にシンボルがあるときだけカメラを起動。ないときは「ここにはなさそう・・・」と表示して起動を防ぐ |
+| R35 | Should | 地図上で周囲のシンボルをタップすると、ここで獲得可能なコーデの画像を表示 |
+| R36 | Must | シークレットシンボルを設定でき、R35 の画像はあえて「？」の画像を表示 |
 
 ## トレーサビリティ
 
@@ -74,13 +78,19 @@
 | R30 | `static/img/photos/*.svg`(`scripts/make_photos.py`)、各ログイン前テンプレート | `test_landing_uses_virtual_photos_with_disclaimer` `test_photos_exist_and_are_safe_svgs` | ✅ |
 | R31 | `core.models.SiteSetting`、`SiteSettingAdmin`、`UiThemeMiddleware`(管理者の試し見) | `test_admin_switches_theme_for_everyone` `test_staff_can_preview_only_for_themselves` `test_non_staff_cannot_preview` `test_admin_singleton`、ブラウザで管理画面から切り替えを確認 | ✅ |
 | R32 | `templates/core/home_game.html`、`themes/game.css`、`/wardrobe/me.svg?layer=` | `test_game_home_is_one_screen_with_status` `test_avatar_layers`、ブラウザでスクロールなし(縦 812 = 画面 812)を確認 | ✅ |
+| R33 | `Spot.starts_at / expires_at`、`spot_available_q`、`explore/manage_views.py`、`SpotForm`、`templates/explore/manage/`、`static/js/spotpicker.js` | `SpotPeriodTests`(期限切れはどこからも見えない・無期限・制約)、`SpotManageTests`(スタッフのみ・無期限・期限付き・入力チェック・記録があると削除不可→非公開/期限切れ) | ✅ |
+| R34 | `SiteSetting.camera_radius_m`、`/explore/api/nearby`、`services.nearby_symbols`、`camera.js:gpsGate` | `NearbyApiTests`(範囲内・範囲外といちばん近いスポット・設定変更・不正入力・GET 不可・レート制限・位置を記録しない)、`SiteSettingRadiusTests`、`test_admin_switches_theme_for_everyone`(距離の変更) | ✅ |
+| R35 | `services.obtainable_items`、`/explore/symbols/<id>/items/<code>.svg`、`spotmap.js`(★マーカー・ポップアップ・一覧) | `test_within_radius` `test_preview_image` `test_secret_and_unrelated_items_are_404` | ✅ |
+| R36 | `Symbol.is_secret`、`static/img/secret.svg`、API でのマスク、スポット一覧の「？？？」 | `test_secret_is_masked`(名前・ヒント・アイテムを応答に含めない) `SecretSpotListTests` | ✅ |
 | R18 | `maps/`(Range 配信)、`maps/tiles/kyobashi.pmtiles`、`scripts/extract_tiles.py`、`static/js/spotmap.js`(Leaflet + protomaps-leaflet) | `maps/tests.py`(Range・416・パストラバーサル・ログイン必須・外部 API を CSP で許可していない)、ブラウザで外部への通信がないことを確認 | ✅ |
 
 ## 未達・残課題
 
 - 実機スマートフォンでのカメラ検出は未確認(PC ブラウザで写真読み取り経路のみ確認)。スマホから試すには HTTPS 化が必要
 - 画像シンボルの実写での検出率(照明・距離・角度別)は未計測(合成写真での結果は ADR 0005)。看板が画面の 1/6 未満・逆光・大きく遮られた状態は苦手
-- 地図の収録範囲は京橋付近のみ。管理画面でスポットの座標を地図から選ぶ機能は未実装(緯度経度を数値で入力)
+- 地図の収録範囲は京橋付近のみ(範囲外のスポットは緯度経度を数値で入力)
+- シンボル個別の位置は Django 管理画面で数値入力(地図で選ぶのはスポットのみ)。有効期限はスポット単位
+- GPS 判定は実機未確認(ブラウザで位置を模擬して確認)。屋内など精度が悪い場所では判定距離の調整が必要
 - スクリーンリーダーでの手動確認、axe による自動チェックは未実施
 - 画面文言の i18n 外部化(`{% translate %}`)は未対応(日本語のみ)
 - ディスク暗号化・バックアップ暗号化は OS / 運用側で要対応

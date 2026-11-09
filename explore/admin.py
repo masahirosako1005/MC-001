@@ -13,7 +13,7 @@ class SymbolInline(admin.TabularInline):
 
 @admin.register(Spot)
 class SpotAdmin(admin.ModelAdmin):
-    list_display = ("name", "area", "require_location", "radius_m", "is_active")
+    list_display = ("name", "area", "require_location", "radius_m", "is_active", "starts_at", "expires_at")
     list_filter = ("is_active", "require_location")
     prepopulated_fields = {"slug": ("name",)}
     inlines = [SymbolInline]
@@ -27,8 +27,8 @@ class DropInline(admin.TabularInline):
 
 @admin.register(Symbol)
 class SymbolAdmin(admin.ModelAdmin):
-    list_display = ("name", "spot", "kind", "cooldown_hours", "is_active", "symbol_image")
-    list_filter = ("kind", "spot", "is_active")
+    list_display = ("name", "spot", "kind", "is_secret", "cooldown_hours", "is_active", "symbol_image")
+    list_filter = ("kind", "spot", "is_active", "is_secret")
     readonly_fields = ("kind", "symbol_image")
     inlines = [DropInline]
 

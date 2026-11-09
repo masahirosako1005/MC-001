@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import datetime as dt
+from decimal import Decimal
 
 from django.core.management.base import BaseCommand
 from django.db import transaction
@@ -26,6 +27,9 @@ COUPONS = [
     ("cp-shrine-omamori", "授与所 ミニ絵馬プレゼント", "森の社 授与所", "ミニ絵馬を1枚プレゼント", "shrine", 60),
     ("cp-revisit-lunch", "再訪感謝 ランチ10%オフ", "港の食堂 しおさい", "ランチ代金 10%オフ", "retro", 45),
 ]
+
+# 地図上で「？」の画像だけを見せるシークレットシンボル
+SECRET_SYMBOLS = {"夜の灯籠"}
 
 # 名前・紹介文は架空。地図表示の確認用に、座標は収録タイル (大阪府 京橋付近) の範囲内に置いている。
 SPOTS = [
@@ -119,9 +123,18 @@ class Command(BaseCommand):
                 title=title, shop_name=shop, benefit=benefit, spot=spots[spot_slug], valid_days=days,
                 description="※デモ用の架空店舗です。お一人様1回限り。", is_active=True))
 
+        # シンボルはスポット中心から 20〜60m ほど離して置く (地図上で重ならないように)
+        offsets = [(0.0002, 0.0002), (-0.0003, 0.0001), (0.0001, -0.0004), (-0.0002, -0.0003), (0.0004, -0.0001)]
+        per_spot = {}
         for spot_slug, name, hint, cooldown, drops in SYMBOLS:
-            symbol, _ = Symbol.objects.update_or_create(spot=spots[spot_slug], name=name, defaults=dict(
-                hint=hint, cooldown_hours=cooldown, is_active=True))
+            spot = spots[spot_slug]
+            n = per_spot[spot_slug] = per_spot.get(spot_slug, -1) + 1
+            dlat, dlng = offsets[n % len(offsets)]
+            symbol, _ = Symbol.objects.update_or_create(spot=spot, name=name, defaults=dict(
+                hint=hint, cooldown_hours=cooldown, is_active=True,
+                is_secret=name in SECRET_SYMBOLS,
+                latitude=Decimal(str(spot.latitude)) + Decimal(str(dlat)),
+                longitude=Decimal(str(spot.longitude)) + Decimal(str(dlng))))
             symbol.drops.all().delete()
             for ref, weight, season, slot, min_visit in drops:
                 DropEntry.objects.create(

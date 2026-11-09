@@ -43,6 +43,27 @@
 
 既存の画像シンボルの角度を追加・撮り直し・削除する。項目: `angles`(保存する角度)と上表の角度ごとの項目、`delete`(カンマ区切りの削除する角度)。すべての角度を削除する操作は 400。
 
+## POST /explore/api/nearby(ログイン必須)
+
+現在地の周囲(サイト設定 `camera_radius_m`、既定 100m)にシンボルがあるか。カメラ起動の判定と地図表示に使う。位置は本文で受け取り、保存・ログ出力はしない。GET は 405。レート制限 30 回/分(超えると 429)。
+
+リクエスト: `{"lat": 34.6965, "lng": 135.534}`(範囲外・数値でない場合は 400)
+
+```json
+{"radius_m": 100, "has_nearby": true, "nearest": null,
+ "nearby": [{"id": 1, "lat": 34.6967, "lng": 135.5342, "distance_m": 38, "secret": false,
+             "spot": "京橋 ほたる広場", "name": "ほたるの看板", "hint": "…",
+             "items": [{"code": "hair-…", "name": "…", "rarity": 2, "category": "hair", "body_type": "any",
+                        "conditions": ["秋限定"], "now": true, "image": "/explore/symbols/1/items/hair-….svg"}]},
+            {"id": 2, "secret": true, "name": "？？？", "hint": "", "items": [], "...": "…"}]}
+```
+
+周囲にない場合は `has_nearby: false`、`nearest: {"spot", "distance_m"}`(いちばん近いスポット)。シークレットシンボルは名前・ヒント・アイテムを返さない。
+
+## GET /explore/symbols/<id>/items/<code>.svg(ログイン必須)
+
+そのシンボルで手に入るコーデのプレビュー画像(本人の肌・目の色で描画)。シークレット・公開期間外・ドロップに含まれないアイテムは 404。
+
 ## GET /maps/tiles/<name>.pmtiles(ログイン必須)
 
 ローカルの地図タイル(PMTiles)。`Range: bytes=start-end` に対応(`206 Partial Content`、1 回 8MB まで)。範囲が不正なら `416`。外部の地図 API は使わない。

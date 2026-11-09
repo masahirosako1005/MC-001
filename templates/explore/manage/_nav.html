@@ -1,0 +1,5 @@
+<nav class="subnav manage-nav" aria-label="運営メニュー">
+  <a href="{% url 'explore:manage_spots' %}" {% if active == "spots" %}aria-current="page"{% endif %}>スポット管理</a>
+  <a href="{% url 'explore:symbol_print' %}" {% if active == "symbols" %}aria-current="page"{% endif %}>シンボル一覧</a>
+  <a href="{% url 'explore:symbol_register' %}">画像シンボル登録</a>
+</nav>

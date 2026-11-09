@@ -20,7 +20,7 @@ from core.timeutil import local_now, season_of, slot_of
 from rewards.services import evaluate_achievements, issue_coupon
 from wardrobe.services import grant_item
 
-from .models import SYMBOL_PREFIX, Discovery, DropEntry, SpotVisit, Symbol
+from .models import SYMBOL_PREFIX, Discovery, DropEntry, SpotVisit, Symbol, spot_available_q
 
 TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
 TICKET_SALT = "mikke.scan-ticket"
@@ -67,7 +67,7 @@ def find_symbol(payload: str) -> Symbol:
     token = parse_payload(payload)
     symbol = (
         Symbol.objects.select_related("spot")
-        .filter(token=token, kind=Symbol.KIND_QR, is_active=True, spot__is_active=True).first()
+        .filter(spot_available_q("spot__"), token=token, kind=Symbol.KIND_QR, is_active=True).first()
         if token else None
     )
     if symbol is None:
@@ -96,7 +96,8 @@ def read_ticket(user, ticket: str) -> Symbol:
         raise InvalidTicket("読み取り情報が正しくありません。もう一度お試しください。") from exc
     if data.get("u") != user.pk:
         raise InvalidTicket("読み取り情報が正しくありません。もう一度お試しください。")
-    symbol = Symbol.objects.select_related("spot").filter(pk=data.get("s"), is_active=True, spot__is_active=True).first()
+    symbol = (Symbol.objects.select_related("spot")
+              .filter(spot_available_q("spot__"), pk=data.get("s"), is_active=True).first())
     if symbol is None:
         raise UnknownSymbol("このシンボルは現在お休み中です。")
     return symbol
@@ -136,7 +137,7 @@ def scan_image(user, symbol_id, patch_b64: str) -> dict:
         raise UnknownSymbol(NOT_READABLE) from exc
     symbol = (
         Symbol.objects.select_related("spot").prefetch_related("views")
-        .filter(pk=sid, kind=Symbol.KIND_IMAGE, is_active=True, spot__is_active=True).first()
+        .filter(spot_available_q("spot__"), pk=sid, kind=Symbol.KIND_IMAGE, is_active=True).first()
     )
     if symbol is None or not is_match(best_view_similarity(symbol, observed)):
         raise UnknownSymbol(NOT_READABLE)
@@ -148,8 +149,8 @@ def image_symbol_catalog() -> list[dict]:
     from .models import SymbolView
 
     rows = (
-        SymbolView.objects.filter(symbol__kind=Symbol.KIND_IMAGE, symbol__is_active=True,
-                                  symbol__spot__is_active=True)
+        SymbolView.objects.filter(spot_available_q("symbol__spot__"), symbol__kind=Symbol.KIND_IMAGE,
+                                  symbol__is_active=True)
         .only("symbol_id", "angle", "features").order_by("symbol_id", "angle")
     )
     return [{"id": v.symbol_id, "view": v.angle, **v.features} for v in rows]
@@ -210,14 +211,14 @@ def save_symbol_views(symbol: Symbol, uploads: dict[str, ViewUpload], delete: li
 
 @transaction.atomic
 def register_image_symbol(*, spot, name: str, hint: str, cooldown_hours: int, uploads: dict[str, ViewUpload],
-                          created_by) -> Symbol:
+                          created_by, is_secret: bool = False) -> Symbol:
     """スタッフが撮影した写真 (最大 9 角度) を画像シンボルとして登録する。"""
     from .image_symbols import ImageSymbolError
 
     if not uploads:
         raise ImageSymbolError("少なくとも 1 つの角度の写真を撮影してください。")
     symbol = Symbol.objects.create(spot=spot, kind=Symbol.KIND_IMAGE, name=name, hint=hint,
-                                   cooldown_hours=cooldown_hours)
+                                   cooldown_hours=cooldown_hours, is_secret=is_secret)
     return save_symbol_views(symbol, uploads, [], created_by)
 
 
@@ -239,6 +240,57 @@ def distance_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     dp, dl = p2 - p1, math.radians(lng2 - lng1)
     a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
     return 2 * r * math.asin(math.sqrt(a))
+
+
+# ------------------------------------------------------------------ 現在地の近くのシンボル
+
+def available_symbols(now=None):
+    """いま探せるシンボル (シンボルが公開中で、スポットも公開期間内)。"""
+    return Symbol.objects.select_related("spot").filter(spot_available_q("spot__", now), is_active=True)
+
+
+def nearby_symbols(lat: float, lng: float, radius_m: float, now=None):
+    """現在地から radius_m 以内のシンボル (近い順) と、いちばん近いシンボル (範囲外でも) を返す。"""
+    found: list[tuple[Symbol, float]] = []
+    nearest: tuple[Symbol, float] | None = None
+    for s in available_symbols(now):
+        loc = s.location
+        if loc is None:  # 位置が未設定のシンボルは距離で判定できない
+            continue
+        d = distance_m(lat, lng, loc[0], loc[1])
+        if nearest is None or d < nearest[1]:
+            nearest = (s, d)
+        if d <= radius_m:
+            found.append((s, d))
+    found.sort(key=lambda x: x[1])
+    return found, nearest
+
+
+def obtainable_items(symbol: Symbol, now=None) -> list[dict]:
+    """このシンボルで手に入るコーデ (アイテム)。季節・時間帯・再訪日数の条件と、いま出るかどうか付き。"""
+    from core.timeutil import SEASON_LABELS, SLOT_LABELS
+
+    local = local_now(now)
+    season, slot = season_of(local.date()), slot_of(local)
+    items: dict[str, dict] = {}
+    drops = (symbol.drops.select_related("item").filter(item__isnull=False, item__is_active=True)
+             .order_by("min_visit_days", "item__rarity", "item__code"))
+    for d in drops:
+        it = d.item
+        conds = []
+        if d.season != "any":
+            conds.append(f"{SEASON_LABELS[d.season]}限定")
+        if d.time_slot != "any":
+            conds.append(f"{SLOT_LABELS[d.time_slot]}だけ")
+        if d.min_visit_days > 1:
+            conds.append(f"{d.min_visit_days}日目の訪問から")
+        now_ok = d.season in ("any", season) and d.time_slot in ("any", slot)
+        prev = items.get(it.code)
+        if prev is None or (now_ok and not prev["now"]):
+            items[it.code] = {"code": it.code, "name": it.name, "rarity": it.rarity,
+                              "category": it.get_category_display(), "body_type": it.body_type,
+                              "conditions": conds, "now": now_ok}
+    return list(items.values())
 
 
 def check_location(symbol: Symbol, coords: tuple[float, float] | None) -> None:

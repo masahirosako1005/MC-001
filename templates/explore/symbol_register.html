@@ -24,6 +24,8 @@
     {% include "includes/field.html" with field=form.name %}
     {% include "includes/field.html" with field=form.hint %}
     {% include "includes/field.html" with field=form.cooldown_hours %}
+    <label class="staff-toggle">{{ form.is_secret }} {{ form.is_secret.label }}</label>
+    <p class="help">{{ form.is_secret.help_text }}</p>
   </section>
   {% endif %}
 

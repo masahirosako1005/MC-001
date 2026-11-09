@@ -3,6 +3,7 @@
 {% block body_class %}page-print{% endblock %}
 {% block content %}
 <h1>みっけシンボル</h1>
+<div class="no-print">{% include "explore/manage/_nav.html" with active="symbols" %}</div>
 <p class="no-print muted">運営スタッフ専用ページです。QR シンボルは印刷して各スポットに掲示してください。画像シンボルは現地の看板などそのものが目印になるため、掲示は不要です。</p>
 <p class="no-print"><a class="btn btn-primary" href="{% url 'explore:symbol_register' %}"><span aria-hidden="true">📷</span> 画像シンボルを撮影して登録</a></p>
 <div class="print-grid">

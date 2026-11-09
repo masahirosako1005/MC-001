@@ -26,7 +26,7 @@
       <span class="visually-hidden">いまの季節と時間帯:</span>{{ mikke_season_label }}・{{ mikke_slot_label }}
     </p>
     {% if user.is_staff %}
-    <a class="btn btn-ghost btn-small" href="{% url 'explore:symbol_print' %}" aria-label="シンボル管理(運営)">管理</a>
+    <a class="btn btn-ghost btn-small" href="{% url 'explore:manage_spots' %}" aria-label="スポット・シンボル管理(運営)">管理</a>
     {% endif %}
     {% if user.is_authenticated %}
     <form method="post" action="{% url 'accounts:logout' %}" class="logout-form">

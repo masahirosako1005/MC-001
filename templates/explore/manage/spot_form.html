@@ -1,0 +1,61 @@
+{% extends "base.html" %}{% load static %}
+{% block title %}{% if spot %}スポットを編集{% else %}スポットを追加{% endif %}{% endblock %}
+{% block head %}<link rel="stylesheet" href="{% static 'vendor/leaflet/leaflet.css' %}">{% endblock %}
+{% block content %}
+<p><a href="{% url 'explore:manage_spots' %}">← スポット管理</a></p>
+<h1>{% if spot %}「{{ spot.name }}」を編集{% else %}スポットを追加{% endif %}</h1>
+<form method="post" class="form spot-form" novalidate>
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="errors" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+  {% include "includes/field.html" with field=form.name %}
+  {% include "includes/field.html" with field=form.area %}
+  {% include "includes/field.html" with field=form.description %}
+
+  <fieldset class="option-group">
+    <legend>位置(地図をクリック / タップして設定)</legend>
+    <div id="picker-map" class="spot-map picker-map" role="application" aria-label="スポットの位置を選ぶ地図" data-tiles="{{ map_tiles_url }}"></div>
+    <div class="coord-row">
+      {% include "includes/field.html" with field=form.latitude %}
+      {% include "includes/field.html" with field=form.longitude %}
+      {% include "includes/field.html" with field=form.radius_m %}
+    </div>
+    <p class="help">地図の範囲は京橋付近です。緯度・経度を直接入力することもできます。</p>
+  </fieldset>
+
+  <fieldset class="option-group">
+    <legend>公開期間</legend>
+    {% include "includes/field.html" with field=form.starts_at %}
+    <label class="staff-toggle">{{ form.no_expiry }} {{ form.no_expiry.label }}</label>
+    <div id="expires-field">{% include "includes/field.html" with field=form.expires_at %}</div>
+  </fieldset>
+
+  <label class="staff-toggle">{{ form.is_active }} 公開する</label>
+  <label class="staff-toggle">{{ form.require_location }} {{ form.require_location.label }}</label>
+  <p class="help">{{ form.require_location.help_text }}</p>
+
+  <button type="submit" class="btn btn-primary btn-block btn-large">保存</button>
+</form>
+
+{% if spot %}
+<section aria-labelledby="sym-h">
+  <h2 id="sym-h">このスポットのシンボル</h2>
+  {% if symbols %}
+  <ul class="list">
+    {% for s in symbols %}
+    <li>{{ s.name }}({{ s.get_kind_display }}{% if s.is_secret %}・シークレット{% endif %}{% if not s.is_active %}・非公開{% endif %}{% if s.latitude is not None %}・個別の位置あり{% endif %})</li>
+    {% endfor %}
+  </ul>
+  <p class="help">シンボルの位置・シークレット設定・ドロップは管理画面の「シンボル」で編集できます。</p>
+  {% else %}
+  <p class="empty">まだシンボルがありません。<a href="{% url 'explore:symbol_register' %}">画像シンボルを登録</a></p>
+  {% endif %}
+  <p><a class="btn btn-ghost" href="{% url 'explore:manage_spot_delete' spot.pk %}">このスポットを削除…</a></p>
+</section>
+{% endif %}
+{{ map_config|json_script:"map-config" }}
+{% endblock %}
+{% block scripts %}
+<script src="{% static 'vendor/leaflet/leaflet.js' %}" defer></script>
+<script src="{% static 'vendor/protomaps-leaflet/protomaps-leaflet-5.1.0.js' %}" defer></script>
+<script src="{% static 'js/spotpicker.js' %}" defer></script>
+{% endblock %}

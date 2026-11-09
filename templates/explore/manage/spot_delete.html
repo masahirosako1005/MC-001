@@ -1,0 +1,23 @@
+{% extends "base.html" %}{% load static %}
+{% block title %}スポットの削除{% endblock %}
+{% block content %}
+<p><a href="{% url 'explore:manage_spot_edit' spot.pk %}">← 「{{ spot.name }}」の編集</a></p>
+<h1>「{{ spot.name }}」を削除</h1>
+{% if blockers %}
+<div class="message message-warning" role="alert">
+  <p><strong>このスポットは削除できません。</strong>削除すると利用者の記録が失われるためです。</p>
+  <ul>{% for r in blockers %}<li>{{ r }}</li>{% endfor %}</ul>
+  <p>代わりに「非公開にする」か「今すぐ期限切れにする」を選んでください。記録は残ったまま、カメラ・地図・一覧に出なくなります。</p>
+</div>
+{% else %}
+<p>削除すると、このスポットのシンボル {{ symbols|length }} 件(ドロップ設定・画像の見え方を含む)も一緒に削除され、<strong>元に戻せません</strong>。</p>
+{% if symbols %}<ul class="list">{% for s in symbols %}<li>{{ s.name }}</li>{% endfor %}</ul>{% endif %}
+{% endif %}
+<form method="post" class="ar-tools" data-confirm="この操作を実行しますか?">
+  {% csrf_token %}
+  {% if not blockers %}<button type="submit" name="action" value="delete" class="btn btn-primary btn-danger">完全に削除する</button>{% endif %}
+  <button type="submit" name="action" value="hide" class="btn btn-ghost">非公開にする</button>
+  <button type="submit" name="action" value="expire" class="btn btn-ghost">今すぐ期限切れにする</button>
+</form>
+{% endblock %}
+{% block scripts %}<script src="{% static 'js/confirm.js' %}" defer></script>{% endblock %}

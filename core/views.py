@@ -49,7 +49,7 @@ def home(request):
     theme = getattr(request, "ui_theme", None) or get_theme(None)
     if not request.user.is_authenticated:
         return render(request, _template("landing", theme.landing), {
-            "spots": Spot.objects.filter(is_active=True)[:6],
+            "spots": Spot.objects.available()[:6],
             "photos": PHOTOS,
         })
     user = request.user

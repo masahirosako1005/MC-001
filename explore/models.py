@@ -15,6 +15,19 @@ def new_symbol_token() -> str:
     return secrets.token_urlsafe(18)  # 24 文字・144bit: 推測不可能
 
 
+def spot_available_q(prefix: str = "", now=None) -> models.Q:
+    """公開中 (非公開でなく、公開開始後で、有効期限前) のスポットを表す条件。prefix は "spot__" など。"""
+    now = now or timezone.now()
+    return (models.Q(**{f"{prefix}is_active": True})
+            & (models.Q(**{f"{prefix}starts_at__isnull": True}) | models.Q(**{f"{prefix}starts_at__lte": now}))
+            & (models.Q(**{f"{prefix}expires_at__isnull": True}) | models.Q(**{f"{prefix}expires_at__gt": now})))
+
+
+class SpotQuerySet(models.QuerySet):
+    def available(self, now=None):
+        return self.filter(spot_available_q("", now))
+
+
 class Spot(models.Model):
     """観光スポット。"""
 
@@ -30,11 +43,20 @@ class Spot(models.Model):
         help_text="ON のとき、受け取り時に端末の位置情報がスポットの判定半径内か確認します",
     )
     is_active = models.BooleanField("公開", default=True)
+    starts_at = models.DateTimeField("公開開始", null=True, blank=True, help_text="空欄ならすぐに公開")
+    expires_at = models.DateTimeField("有効期限", null=True, blank=True, help_text="空欄なら無期限")
+
+    objects = SpotQuerySet.as_manager()
 
     class Meta:
         verbose_name = verbose_name_plural = "スポット"
         ordering = ["id"]
         constraints = [
+            models.CheckConstraint(
+                condition=models.Q(starts_at__isnull=True) | models.Q(expires_at__isnull=True)
+                | models.Q(expires_at__gt=models.F("starts_at")),
+                name="spot_period_valid",
+            ),
             models.CheckConstraint(
                 condition=models.Q(latitude__isnull=True) | models.Q(latitude__gte=-90, latitude__lte=90),
                 name="spot_lat_range",
@@ -53,6 +75,24 @@ class Spot(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+    def status(self, now=None) -> str:
+        """"active" (公開中) / "scheduled" (公開前) / "expired" (期限切れ) / "hidden" (非公開)。"""
+        now = now or timezone.now()
+        if not self.is_active:
+            return "hidden"
+        if self.starts_at and self.starts_at > now:
+            return "scheduled"
+        if self.expires_at and self.expires_at <= now:
+            return "expired"
+        return "active"
+
+    def is_available(self, now=None) -> bool:
+        return self.status(now) == "active"
+
+    @property
+    def status_label(self) -> str:
+        return {"active": "公開中", "scheduled": "公開前", "expired": "期限切れ", "hidden": "非公開"}[self.status()]
 
 
 class Symbol(models.Model):
@@ -75,6 +115,13 @@ class Symbol(models.Model):
         "再取得までの時間(時間)", default=20, help_text="同じ人が再びみっけできるまでの時間"
     )
     is_active = models.BooleanField("公開", default=True)
+    is_secret = models.BooleanField(
+        "シークレット", default=False,
+        help_text="ON のとき、名前・ヒント・手に入るアイテムを「？」で隠す (見つけてからのお楽しみ)",
+    )
+    latitude = models.DecimalField("緯度", max_digits=9, decimal_places=6, null=True, blank=True,
+                                   help_text="空欄ならスポットの位置を使う")
+    longitude = models.DecimalField("経度", max_digits=9, decimal_places=6, null=True, blank=True)
 
     class Meta:
         verbose_name = verbose_name_plural = "シンボル"
@@ -82,10 +129,25 @@ class Symbol(models.Model):
         constraints = [
             models.CheckConstraint(condition=models.Q(cooldown_hours__gte=1), name="symbol_cooldown_pos"),
             models.CheckConstraint(condition=models.Q(kind__in=["qr", "image"]), name="symbol_kind_valid"),
+            models.CheckConstraint(
+                condition=(models.Q(latitude__isnull=True, longitude__isnull=True)
+                           | models.Q(latitude__isnull=False, longitude__isnull=False,
+                                      latitude__gte=-90, latitude__lte=90, longitude__gte=-180, longitude__lte=180)),
+                name="symbol_coords_valid",
+            ),
         ]
 
     def __str__(self) -> str:
         return f"{self.spot.name} / {self.name}"
+
+    @property
+    def location(self) -> tuple[float, float] | None:
+        """シンボルの位置。未設定ならスポットの位置。"""
+        if self.latitude is not None and self.longitude is not None:
+            return float(self.latitude), float(self.longitude)
+        if self.spot.latitude is not None and self.spot.longitude is not None:
+            return float(self.spot.latitude), float(self.spot.longitude)
+        return None
 
     @property
     def payload(self) -> str:

@@ -6,6 +6,7 @@
 <section id="ar" class="ar"
          data-scan-url="{% url 'explore:api_scan' %}"
          data-image-symbols-url="{% url 'explore:api_image_symbols' %}"
+         data-nearby-url="{% url 'explore:api_nearby' %}"
          data-collect-url="{% url 'explore:api_collect' %}"
          data-wardrobe-url="{% url 'wardrobe:index' %}"
          data-item-svg-base="{% url 'wardrobe:index' %}items/"
@@ -16,11 +17,15 @@
     <div class="ar-start" id="ar-start">
       <p class="ar-start-lead">シンボルをカメラにうつしてね</p>
       <button type="button" class="btn btn-primary btn-large" id="btn-start"><span aria-hidden="true">📷</span> カメラをはじめる</button>
-      <p class="help">映像は端末の中だけで処理され、サーバーには送信されません。</p>
+      <p class="help">映像は端末の中だけで処理され、サーバーには送信されません。位置情報は近くにシンボルがあるかの確認だけに使い、保存しません。</p>
     </div>
   </div>
 
   <div class="ar-panel">
+    <p id="gps-gate" class="gps-gate" role="status" aria-live="polite">現在地から {{ radius_m }}m 以内にシンボルがあるときに、カメラを起動できます。</p>
+    {% if user.is_staff %}
+    <label class="staff-toggle"><input type="checkbox" id="gps-skip"> 位置の確認を省略する(管理者のテスト用)</label>
+    {% endif %}
     <p id="ar-status" class="ar-status" role="status" aria-live="polite">カメラを起動するとシンボルをさがします。</p>
     <button type="button" class="btn btn-accent btn-block btn-large" id="btn-collect" hidden>
       <span aria-hidden="true">✨</span> <span id="btn-collect-label">みっけ!</span>

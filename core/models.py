@@ -12,6 +12,10 @@ class SiteSetting(models.Model):
 
     ui_theme = models.CharField("UI テーマ", max_length=32, choices=THEME_CHOICES, default=DEFAULT_THEME,
                                 help_text="利用者全員に適用されます。管理者は URL に ?ui=テーマ名 を付けると自分だけ試せます")
+    camera_radius_m = models.PositiveIntegerField(
+        "カメラを起動できる距離 (m)", default=100,
+        help_text="現在地からこの距離以内にシンボルがあるときだけ、カメラを起動できます (10〜5000)",
+    )
     updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
                                    related_name="+", verbose_name="更新者")
     updated_at = models.DateTimeField("更新日時", auto_now=True)
@@ -23,6 +27,8 @@ class SiteSetting(models.Model):
         constraints = [
             models.CheckConstraint(condition=models.Q(ui_theme__in=[k for k, _ in THEME_CHOICES]),
                                    name="sitesetting_theme_valid"),
+            models.CheckConstraint(condition=models.Q(camera_radius_m__gte=10, camera_radius_m__lte=5000),
+                                   name="sitesetting_radius_range"),
         ]
 
     def __str__(self) -> str:

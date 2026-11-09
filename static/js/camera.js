@@ -482,10 +482,64 @@
 
   $("reward-close").addEventListener("click", () => dialog.close());
 
+  // ---------- 位置の確認 (近くにシンボルがあるときだけカメラを使える) ----------
+  const gateEl = $("gps-gate");
+  const skipEl = $("gps-skip"); // 管理者のテスト用
+  let gatePassedAt = 0;
+
+  function setGate(msg, state) {
+    if (!gateEl) return;
+    gateEl.textContent = msg;
+    gateEl.className = `gps-gate${state ? ` is-${state}` : ""}`;
+  }
+
+  const fmtDist = (m) => (m >= 1000 ? `${(m / 1000).toFixed(1)}km` : `${m}m`);
+
+  async function gpsGate() {
+    if (skipEl && skipEl.checked) return true;
+    if (Date.now() - gatePassedAt < 60000) return true; // 直前 1 分以内に確認済み
+    setGate("現在地を確認しています…", "");
+    let pos;
+    try {
+      pos = await getLocation();
+    } catch (_) {
+      setGate("位置情報を取得できませんでした。ブラウザの設定で位置情報の利用を許可してから、もう一度お試しください。", "none");
+      return false;
+    }
+    let res;
+    try {
+      res = await post(root.dataset.nearbyUrl, pos);
+    } catch (_) {
+      setGate("通信できませんでした。電波のよい場所でもう一度お試しください。", "none");
+      return false;
+    }
+    if (!res.ok) {
+      setGate(res.data.message || "近くのシンボルを確認できませんでした。", "none");
+      return false;
+    }
+    const d = res.data;
+    if (!d.has_nearby) {
+      const hint = d.nearest ? ` いちばん近いのは「${d.nearest.spot}」(約 ${fmtDist(d.nearest.distance_m)})です。` : "";
+      setGate(`ここにはなさそう・・・ (周囲 ${d.radius_m}m にシンボルが見つかりません)${hint}`, "none");
+      return false;
+    }
+    const s = d.nearby[0];
+    setGate(`近くにシンボルがあるよ!「${s.name}」まで約 ${fmtDist(s.distance_m)}${d.nearby.length > 1 ? ` ほか ${d.nearby.length - 1} 件` : ""}`, "ok");
+    gatePassedAt = Date.now();
+    return true;
+  }
+
   // ---------- カメラ / 写真 ----------
   async function startCamera() {
     if (typeof window.jsQR !== "function") {
       setStatus("読み取り機能を読み込めませんでした。ページを再読み込みしてください。");
+      return;
+    }
+    btnStart.disabled = true;
+    const ok = await gpsGate();
+    btnStart.disabled = false;
+    if (!ok) {
+      setStatus("近くにシンボルがないため、カメラは起動しません。地図でスポットを探してみよう。");
       return;
     }
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -569,10 +623,15 @@
   btnStart.addEventListener("click", startCamera);
   btnStop.addEventListener("click", () => stopCamera(true));
   btnCollect.addEventListener("click", collect);
-  fileInput.addEventListener("change", () => {
+  fileInput.addEventListener("change", async () => {
     const f = fileInput.files && fileInput.files[0];
-    if (f) loadStill(f);
     fileInput.value = "";
+    if (!f) return;
+    if (!(await gpsGate())) {
+      setStatus("近くにシンボルがないため、写真からの読み取りもできません。");
+      return;
+    }
+    loadStill(f);
   });
   canvas.addEventListener("pointerdown", (ev) => {
     if (!markHit) return;
