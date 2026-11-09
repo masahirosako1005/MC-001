@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}実績{% endblock %}
+{% block content %}
+<h1>ごほうび</h1>
+<nav class="subnav" aria-label="ごほうびの種類">
+  <a href="{% url 'rewards:coupons' %}">クーポン</a>
+  <a href="{% url 'rewards:achievements' %}" aria-current="page">実績</a>
+</nav>
+<p>達成 {{ achieved_count }} / {{ rows|length }}</p>
+<ul class="achievement-list">
+  {% for r in rows %}{% with a=r.achievement %}
+  <li class="achievement{% if r.achieved %} is-done{% endif %}">
+    <span class="achievement-icon" aria-hidden="true">{% if r.achieved %}{{ a.icon }}{% else %}🔒{% endif %}</span>
+    <div class="achievement-body">
+      <h2>{{ a.name }} {% if r.achieved %}<span class="badge badge-available">達成</span>{% endif %}</h2>
+      <p>{{ a.description }}</p>
+      <label class="progress-label">
+        <span class="visually-hidden">{{ a.name }}の進み具合</span>
+        <progress max="{{ a.threshold }}" value="{{ r.value }}"></progress>
+        <span>{{ r.value }} / {{ a.threshold }}</span>
+      </label>
+      {% if a.reward_item or a.reward_coupon %}
+      <p class="help">ごほうび: {% if a.reward_item %}アイテム「{{ a.reward_item.name }}」{% endif %}{% if a.reward_item and a.reward_coupon %}、{% endif %}{% if a.reward_coupon %}クーポン「{{ a.reward_coupon.title }}」{% endif %}</p>
+      {% endif %}
+      {% if r.achieved %}<p class="muted">{{ r.achieved.achieved_at|date:"Y年n月j日" }} 達成</p>{% endif %}
+    </div>
+  </li>
+  {% endwith %}{% endfor %}
+</ul>
+{% endblock %}

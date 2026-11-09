@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}シンボル印刷{% endblock %}
+{% block body_class %}page-print{% endblock %}
+{% block content %}
+<h1>みっけシンボル(掲示用)</h1>
+<p class="no-print muted">運営スタッフ専用ページです。印刷して各スポットに掲示してください。シンボルを差し替える場合は管理画面で新しいシンボルを作成し、古いものを非公開にしてください。</p>
+<div class="print-grid">
+  {% for s in symbols %}
+  <figure class="print-item">
+    <img src="{% url 'explore:symbol_svg' s.pk %}" alt="{{ s.spot.name }} {{ s.name }} のシンボル" width="360">
+    <figcaption>{{ s.spot.name }} / {{ s.name }} — <a class="no-print" href="{% url 'explore:symbol_svg' s.pk %}?download=1">SVG を保存</a></figcaption>
+  </figure>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,23 @@
+[project]
+name = "mikke"
+version = "0.1.0"
+description = "みっけ — 疑似ARで観光地の再訪を促す着せ替え探索Webアプリ"
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = ["*/migrations/*", ".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "DJ"]
+ignore = [
+  "S101",   # assert (テストで使用)
+  "S311",   # 擬似乱数: 抽選は secrets.SystemRandom を使用済み
+  "E501",   # 長い SVG テンプレート文字列
+  "S308",   # mark_safe 不使用 (format_html の誤検知回避)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"*/tests.py" = ["S105", "S106"]
+"scripts/*" = ["S603", "S607"]

@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}ログイン{% endblock %}
+{% block content %}
+<section class="narrow">
+  <h1>ログイン</h1>
+  <form method="post" novalidate class="form">
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="errors" role="alert">{% for e in form.non_field_errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+    {% for field in form %}{% include "includes/field.html" %}{% endfor %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <button type="submit" class="btn btn-primary btn-block">ログイン</button>
+  </form>
+  <p class="center">はじめての方は <a href="{% url 'accounts:signup' %}">アカウントをつくる</a></p>
+</section>
+{% endblock %}

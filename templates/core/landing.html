@@ -1,0 +1,39 @@
+{% extends "base.html" %}{% load static %}
+{% block title %}観光地で、また会おう{% endblock %}
+{% block content %}
+<section class="hero">
+  <h1>街にかくれた「みっけ」を<br>カメラでさがそう</h1>
+  <p class="lead">観光地のどこかにある <strong>みっけシンボル</strong> をカメラでのぞくと、画面に光るマークがあらわれます。タップして、アバターの服やお店のクーポンを手に入れよう。</p>
+  <div class="hero-actions">
+    <a class="btn btn-primary btn-large" href="{% url 'accounts:signup' %}">はじめる(無料)</a>
+    <a class="btn btn-ghost btn-large" href="{% url 'accounts:login' %}">ログイン</a>
+  </div>
+</section>
+
+<section class="card-grid" aria-labelledby="why">
+  <h2 id="why">スタンプラリーとのちがい</h2>
+  <article class="card">
+    <h3><span aria-hidden="true">🌸</span> 季節・時間で変わる</h3>
+    <p>春の朝と秋の夜では、出会えるアイテムがちがいます。同じ場所でも、来るたびに新しい発見。</p>
+  </article>
+  <article class="card">
+    <h3><span aria-hidden="true">🔁</span> 再訪するほど開く</h3>
+    <p>2日目、3日目の訪問でしか出ない「再訪限定」アイテムがあります。1回で終わらない旅に。</p>
+  </article>
+  <article class="card">
+    <h3><span aria-hidden="true">👘</span> 集めて、着せかえる</h3>
+    <p>手に入れた髪型や服で、自分だけのアバターをコーディネート。旅の思い出が「着られる」コレクションに。</p>
+  </article>
+  <article class="card">
+    <h3><span aria-hidden="true">🎟️</span> 地域のお店で使える</h3>
+    <p>探索やりこみで、地元のお店のクーポンがもらえます。</p>
+  </article>
+</section>
+
+{% if spots %}
+<section aria-labelledby="spots-h">
+  <h2 id="spots-h">いま探索できるスポット</h2>
+  <ul class="chip-list">{% for s in spots %}<li class="chip">{{ s.name }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+{% endblock %}

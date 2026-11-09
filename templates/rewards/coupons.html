@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}クーポン{% endblock %}
+{% block content %}
+<h1>ごほうび</h1>
+<nav class="subnav" aria-label="ごほうびの種類">
+  <a href="{% url 'rewards:coupons' %}" aria-current="page">クーポン</a>
+  <a href="{% url 'rewards:achievements' %}">実績</a>
+</nav>
+{% if coupons %}
+<ul class="coupon-list">
+  {% for c in coupons %}
+  <li class="coupon coupon-{{ c.status }}">
+    <a href="{% url 'rewards:coupon_detail' c.pk %}">
+      <span class="coupon-shop">{{ c.template.shop_name }}</span>
+      <span class="coupon-title">{{ c.template.title }}</span>
+      <span class="coupon-benefit">{{ c.template.benefit }}</span>
+      <span class="coupon-meta"><span class="badge badge-{{ c.status }}">{{ c.status_label }}</span>
+        {% if c.status == "available" %}{{ c.expires_at|date:"Y年n月j日" }}まで{% endif %}</span>
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="empty">まだクーポンはありません。シンボルをみっけたり、実績を達成するともらえます。</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,50 @@
+{% load static %}<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <title>{% block title %}みっけ{% endblock %} | みっけ</title>
+  <link rel="icon" href="{% static 'img/icon.svg' %}" type="image/svg+xml">
+  <link rel="stylesheet" href="{% static 'css/mikke.css' %}">
+  {% block head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  <a class="skip-link" href="#main">本文へスキップ</a>
+  <header class="site-header">
+    <a class="brand" href="{% url 'core:home' %}" aria-label="みっけ ホーム">
+      <img src="{% static 'img/icon.svg' %}" alt="" width="32" height="32"><span>みっけ</span>
+    </a>
+    <p class="now-badge" title="季節と時間帯で出会えるアイテムが変わります">
+      <span class="visually-hidden">いまの季節と時間帯:</span>{{ mikke_season_label }}・{{ mikke_slot_label }}
+    </p>
+    {% if user.is_authenticated %}
+    <form method="post" action="{% url 'accounts:logout' %}" class="logout-form">
+      {% csrf_token %}<button type="submit" class="btn btn-ghost btn-small">ログアウト</button>
+    </form>
+    {% endif %}
+  </header>
+
+  {% if messages %}
+  <div class="messages" role="status" aria-live="polite">
+    {% for m in messages %}<p class="message message-{{ m.tags }}">{{ m }}</p>{% endfor %}
+  </div>
+  {% endif %}
+
+  <main id="main" tabindex="-1">{% block content %}{% endblock %}</main>
+
+  {% if user.is_authenticated %}
+  <nav class="tabbar" aria-label="メインメニュー">
+    {% with p=request.path %}
+    <a href="{% url 'core:home' %}" {% if p == '/' %}aria-current="page"{% endif %}><span aria-hidden="true">🏠</span>ホーム</a>
+    <a href="{% url 'explore:spots' %}" {% if p == '/explore/' %}aria-current="page"{% endif %}><span aria-hidden="true">🗺️</span>スポット</a>
+    <a href="{% url 'explore:camera' %}" class="tab-camera" {% if 'camera' in p %}aria-current="page"{% endif %}><span aria-hidden="true">📷</span>みっけ</a>
+    <a href="{% url 'wardrobe:index' %}" {% if 'wardrobe' in p %}aria-current="page"{% endif %}><span aria-hidden="true">👕</span>きせかえ</a>
+    <a href="{% url 'rewards:coupons' %}" {% if 'rewards' in p %}aria-current="page"{% endif %}><span aria-hidden="true">🎁</span>ごほうび</a>
+    {% endwith %}
+  </nav>
+  {% endif %}
+  {% block scripts %}{% endblock %}
+</body>
+</html>

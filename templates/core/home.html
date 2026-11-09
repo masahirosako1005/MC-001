@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}ホーム{% endblock %}
+{% block content %}
+<section class="home-hero">
+  <div class="avatar-frame">
+    <img src="{% url 'wardrobe:avatar_svg' %}" alt="{{ user.nickname }}さんのアバター" width="160" height="216">
+  </div>
+  <div>
+    <h1>こんにちは、{{ user.nickname }}さん</h1>
+    <p>いまは <strong>{{ mikke_season_label }}の{{ mikke_slot_label }}</strong>。この時間だけのアイテムがあるかも?</p>
+    <a class="btn btn-primary btn-large" href="{% url 'explore:camera' %}"><span aria-hidden="true">📷</span> カメラでさがす</a>
+  </div>
+</section>
+
+<section aria-labelledby="stats-h">
+  <h2 id="stats-h">あなたの探索</h2>
+  <dl class="stats">
+    <div><dt>みっけ回数</dt><dd>{{ metrics.total_discoveries }}</dd></div>
+    <div><dt>訪れたスポット</dt><dd>{{ metrics.distinct_spots }}</dd></div>
+    <div><dt>集めたアイテム</dt><dd>{{ metrics.distinct_items }}</dd></div>
+    <div><dt>使えるクーポン</dt><dd>{{ coupon_count }}</dd></div>
+  </dl>
+  <p class="links-row">
+    <a href="{% url 'rewards:achievements' %}">実績を見る</a>
+    <a href="{% url 'explore:history' %}">みっけ履歴</a>
+  </p>
+</section>
+
+<section aria-labelledby="recent-h">
+  <h2 id="recent-h">最近のみっけ</h2>
+  {% if recent %}
+  <ul class="list">
+    {% for d in recent %}
+    <li><span class="muted">{{ d.found_at|date:"n/j H:i" }}</span> {{ d.symbol.spot.name }} —
+      {% if d.reward_kind == "none" %}なにもいなかった…{% else %}<strong>{{ d.reward_label }}</strong>{% endif %}</li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty">まだみっけがありません。<a href="{% url 'explore:spots' %}">スポット一覧</a>からヒントを見て、出かけてみましょう。</p>
+  {% endif %}
+</section>
+{% endblock %}

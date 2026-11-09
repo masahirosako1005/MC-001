@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}はじめる{% endblock %}
+{% block content %}
+<section class="narrow">
+  <h1>アカウントをつくる</h1>
+  <p class="muted">登録に必要なのはニックネームとメールアドレスだけ。性別や本名は聞きません。</p>
+  <form method="post" novalidate class="form">
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="errors" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+    {% for field in form %}{% include "includes/field.html" %}{% endfor %}
+    <button type="submit" class="btn btn-primary btn-block">登録してはじめる</button>
+  </form>
+  <p class="center">すでにアカウントがある方は <a href="{% url 'accounts:login' %}">ログイン</a></p>
+</section>
+{% endblock %}

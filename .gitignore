@@ -1,0 +1,32 @@
+# --- 秘密情報(絶対にコミットしない) ---
+.env
+.env.*
+!.env.example
+Password.txt*
+*.pw
+*.key
+*.pem
+
+# --- Python ---
+.venv/
+__pycache__/
+*.py[cod]
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --- Django ---
+/staticfiles/
+/media/
+*.log
+
+# --- 生成物 ---
+/symbols_out/
+/sbom.json
+
+# --- OS / Editor ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

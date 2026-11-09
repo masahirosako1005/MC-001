@@ -1,0 +1,33 @@
+{% extends "base.html" %}{% load static %}
+{% block title %}{{ coupon.template.title }}{% endblock %}
+{% block content %}
+<p><a href="{% url 'rewards:coupons' %}">← クーポン一覧</a></p>
+<article class="coupon-ticket coupon-{{ coupon.status }}">
+  <p class="coupon-shop">{{ coupon.template.shop_name }}</p>
+  <h1>{{ coupon.template.title }}</h1>
+  <p class="coupon-benefit-large">{{ coupon.template.benefit }}</p>
+  {% if coupon.template.description %}<p>{{ coupon.template.description|linebreaksbr }}</p>{% endif %}
+  <dl class="kv">
+    <div><dt>引換コード</dt><dd class="code">{{ coupon.redeem_code }}</dd></div>
+    <div><dt>入手</dt><dd>{{ coupon.source|default:"—" }}</dd></div>
+    <div><dt>有効期限</dt><dd>{{ coupon.expires_at|date:"Y年n月j日 H:i" }}</dd></div>
+    <div><dt>状態</dt><dd><span class="badge badge-{{ coupon.status }}">{{ coupon.status_label }}</span></dd></div>
+  </dl>
+
+  {% if coupon.status == "available" %}
+  <form method="post" action="{% url 'rewards:coupon_use' coupon.pk %}" data-confirm="お店の方の前で押してください。使用済みにすると元に戻せません。使用しますか?">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-primary btn-block btn-large">お店で使う</button>
+  </form>
+  <p class="help">お会計のときに、お店の方の前でボタンを押してください。</p>
+  {% elif coupon.status == "used" %}
+  <div class="used-stamp" role="status">
+    <span>使用済み</span>
+    <time datetime="{{ coupon.used_at|date:'c' }}">{{ coupon.used_at|date:"Y/n/j H:i" }}</time>
+  </div>
+  {% else %}
+  <p class="message message-warning">有効期限が切れています。</p>
+  {% endif %}
+</article>
+{% endblock %}
+{% block scripts %}<script src="{% static 'js/confirm.js' %}" defer></script>{% endblock %}

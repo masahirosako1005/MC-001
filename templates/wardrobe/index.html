@@ -1,0 +1,59 @@
+{% extends "base.html" %}{% load static %}
+{% block title %}きせかえ{% endblock %}
+{% block content %}
+<h1>きせかえ</h1>
+<p class="muted">集めたアイテム {{ owned_count }} / {{ total_count }} 種類。まだ見ぬアイテムは、季節や時間を変えて探してみよう。</p>
+
+<form method="post" class="wardrobe" id="wardrobe-form"
+      data-preview-url="{% url 'wardrobe:preview_svg' %}">
+  {% csrf_token %}
+  <input type="hidden" name="version" value="{{ config.version }}">
+  <div class="wardrobe-preview" aria-live="polite">
+    <img id="avatar-preview" src="{% url 'wardrobe:avatar_svg' %}?v={{ config.version }}" alt="現在のアバター" width="200" height="270">
+    <button type="submit" class="btn btn-primary btn-block">この服装で保存</button>
+  </div>
+
+  <div class="wardrobe-options">
+    <fieldset class="option-group">
+      <legend>肌の色</legend>
+      <div class="swatches">
+        {% for key, label in skin_choices %}
+        <label class="swatch-option">
+          <input type="radio" name="skin_tone" value="{{ key }}" {% if config.skin_tone == key %}checked{% endif %}>
+          <span class="swatch swatch-{{ key }}" aria-hidden="true"></span><span>{{ label }}</span>
+        </label>
+        {% endfor %}
+      </div>
+    </fieldset>
+
+    {% for g in groups %}
+    <fieldset class="option-group">
+      <legend>{{ g.label }}</legend>
+      <div class="item-grid">
+        {% if g.can_unequip %}
+        <label class="item-option">
+          <input type="radio" name="{{ g.key }}" value="none" {% if not g.equipped_id %}checked{% endif %}>
+          <span class="item-card"><span class="item-none" aria-hidden="true">✕</span><span class="item-name">なし</span></span>
+        </label>
+        {% endif %}
+        {% for ui in g.items %}
+        <label class="item-option">
+          <input type="radio" name="{{ g.key }}" value="{{ ui.item.pk }}" {% if g.equipped_id == ui.item.pk %}checked{% endif %}>
+          <span class="item-card">
+            <img src="{% url 'wardrobe:item_svg' ui.item.code %}" alt="" width="64" height="86" loading="lazy">
+            <span class="item-name">{{ ui.item.name }}</span>
+            <span class="rarity" aria-label="レア度 {{ ui.item.rarity }}">{{ ui.item.rarity_stars }}</span>
+          </span>
+        </label>
+        {% endfor %}
+        {% for _ in g.locked_slots %}
+        <span class="item-card item-locked" aria-hidden="true"><span class="item-none">?</span><span class="item-name">未発見</span></span>
+        {% endfor %}
+      </div>
+      {% if g.locked %}<p class="help">未発見の{{ g.label }}があと {{ g.locked }} 種類あります。</p>{% endif %}
+    </fieldset>
+    {% endfor %}
+  </div>
+</form>
+{% endblock %}
+{% block scripts %}<script src="{% static 'js/wardrobe.js' %}" defer></script>{% endblock %}
