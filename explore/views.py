@@ -18,7 +18,7 @@ from core import audit, ratelimit
 from core.models import SiteSetting
 from core.permissions import managed_spots, managed_symbols, manager_required
 
-from . import services
+from . import finders, services
 from .forms import ImageSymbolInfoForm, collect_view_uploads
 from .image_symbols import ImageSymbolError
 from .models import ANGLE_CHOICES, Discovery, Spot, SpotVisit, Symbol, SymbolView
@@ -233,7 +233,61 @@ def api_collect(request):
         return _error(exc, 400)
     if not result.replay:
         audit.record("explore.collect", request=request, kind=result.reward_kind, label=result.label)
-    return JsonResponse(result.as_dict())
+    payload = result.as_dict()
+    symbol = Symbol.objects.filter(pk=result.symbol_id).first()
+    payload["recent_finders"] = finders.recent_finders(symbol, request.user) if symbol else []
+    return JsonResponse(payload)
+
+
+# ---------------------------------------------------------------- こんな人が獲得しているよ
+def _finder_or_404(request, token: str):
+    if not ratelimit.hit(f"finder:{request.user.pk}", 120, 60):
+        raise Http404
+    try:
+        return finders.read_token(token, request.user)
+    except finders.FinderNotFound as exc:
+        raise Http404 from exc
+
+
+@require_GET
+@api_login_required
+def api_finder(request, token: str):
+    """みっけ仲間のコーデ (着ているアイテムと、どこで手に入れたか)。"""
+    target = _finder_or_404(request, token)
+    return JsonResponse(finders.finder_profile(target, request.user, token))
+
+
+@login_required
+@require_GET
+def finder_avatar_svg(request, token: str):
+    from wardrobe.services import config_svg, get_config
+
+    target = _finder_or_404(request, token)
+    svg = config_svg(get_config(target), label=f"{target.nickname}さんのコーデ")
+    return _sandboxed_svg(svg)
+
+
+@login_required
+@require_GET
+def finder_item_svg(request, token: str, code: str):
+    """みっけ仲間が今着ているアイテムの絵 (着ていないアイテムは 404)。"""
+    from wardrobe.models import CATEGORY_CHOICES
+    from wardrobe.services import get_config, item_zoom_svg
+
+    target = _finder_or_404(request, token)
+    config = get_config(target)
+    item = next((getattr(config, c) for c, _ in CATEGORY_CHOICES
+                 if getattr(config, c) is not None and getattr(config, c).code == code), None)
+    if item is None:
+        raise Http404
+    return _sandboxed_svg(item_zoom_svg(item, config.skin_tone, config.eye_color))
+
+
+def _sandboxed_svg(svg: str) -> HttpResponse:
+    resp = HttpResponse(svg, content_type="image/svg+xml; charset=utf-8")
+    resp.headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; sandbox"
+    resp.headers["Cache-Control"] = "private, max-age=120"
+    return resp
 
 
 @require_GET

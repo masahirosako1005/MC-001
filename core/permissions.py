@@ -58,3 +58,16 @@ def managed_symbols(user):
     from explore.models import Symbol
 
     return Symbol.objects.filter(spot__in=managed_spots(user))
+
+
+def managed_coupons(user):
+    """この人が設定できるクーポン。サイト運営者はすべて、管理者は自分が登録したもの・担当スポットのもの。"""
+    from django.db.models import Q
+
+    from rewards.models import CouponTemplate
+
+    if getattr(user, "is_operator", False):
+        return CouponTemplate.objects.all()
+    if getattr(user, "is_manager", False):
+        return CouponTemplate.objects.filter(Q(owner=user) | Q(spot__owner=user)).distinct()
+    return CouponTemplate.objects.none()

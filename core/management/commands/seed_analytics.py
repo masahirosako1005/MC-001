@@ -79,10 +79,16 @@ class Command(BaseCommand):
         parser.add_argument("--days", type=int, default=365, help="何日前までの行動を作るか")
         parser.add_argument("--reset", action="store_true", help="投入済みのデモのスポット・行動データを消してから作る")
         parser.add_argument("--delete", action="store_true", help="デモのスポット・管理者・行動データを削除する")
+        parser.add_argument("--recent", action="store_true",
+                            help="「こんな人が獲得しているよ」の確認用に、直近 30 分のみっけだけを追加する")
 
     def handle(self, *args, **opts):
         if not settings.DEBUG:
             raise CommandError("デモデータの投入はローカル開発環境 (DEBUG=True) でのみ実行できます。")
+        if opts["recent"]:
+            n = self._recent()
+            self.stdout.write(self.style.SUCCESS(f"直近 30 分のみっけを {n} 件追加しました(30 分たつと表示されなくなります)"))
+            return
         if opts["delete"] or opts["reset"]:
             self._delete(managers=opts["delete"])
             if opts["delete"]:
@@ -97,6 +103,26 @@ class Command(BaseCommand):
         n_visits, n_disc = self._behaviour(spots, users, opts["days"])
         audit.record("demo.analytics_seeded", spots=len(spots), users=len(users), visits=n_visits, discoveries=n_disc)
         self.stdout.write(self.style.SUCCESS(f"行動データ: 付近の来訪 {n_visits} 件 / みっけ {n_disc} 件"))
+
+    # ------------------------------------------------------------ 直近のみっけ (確認用)
+    @transaction.atomic
+    def _recent(self) -> int:
+        users = list(User.objects.filter(groups__name=DEMO_USER_GROUP, share_activity=True, is_active=True)
+                     .values_list("pk", flat=True))
+        if not users:
+            raise CommandError("デモ利用者がいません。先に seed_analytics を実行してください。")
+        now = timezone.now()
+        out = []
+        for sym in Symbol.objects.filter(is_active=True).prefetch_related("drops__item"):
+            drops = [d for d in sym.drops.all() if d.item_id]
+            for uid in _rng.sample(users, k=_rng.randrange(2, 7)):
+                d = _rng.choice(drops) if drops else None
+                out.append(Discovery(user_id=uid, symbol=sym, drop=d, reward_kind="item" if d else "none",
+                                     reward_label=d.item.name if d else "", reward_ref=d.item.code if d else "",
+                                     idempotency_key=uuid.uuid4(),
+                                     found_at=now - dt.timedelta(minutes=_rng.randrange(1, 28))))
+        Discovery.objects.bulk_create(out, batch_size=2000)
+        return len(out)
 
     # ------------------------------------------------------------ 削除
     @transaction.atomic

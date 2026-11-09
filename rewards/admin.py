@@ -5,9 +5,10 @@ from .models import Achievement, CouponTemplate, UserAchievement, UserCoupon
 
 @admin.register(CouponTemplate)
 class CouponTemplateAdmin(admin.ModelAdmin):
-    list_display = ("code", "shop_name", "title", "benefit", "spot", "valid_days", "is_active")
+    list_display = ("coupon_id", "code", "shop_name", "title", "benefit", "spot", "owner", "valid_days",
+                    "available_until", "is_active")
     list_filter = ("is_active", "spot")
-    search_fields = ("code", "title", "shop_name")
+    search_fields = ("coupon_id", "code", "title", "shop_name")
 
 
 @admin.register(UserCoupon)

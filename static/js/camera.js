@@ -520,11 +520,103 @@
       }
       list.appendChild(li);
     }
+    renderFinders(d.recent_finders || []);
+    showFinderView(false);
     if (typeof dialog.showModal === "function") dialog.showModal();
     else dialog.setAttribute("open", "");
   }
 
   $("reward-close").addEventListener("click", () => dialog.close());
+
+  // ---------- こんな人が獲得しているよ (直近 30 分に同じシンボルでみっけした人) ----------
+  const finderSection = $("reward-finders");
+  const finderList = $("finder-list");
+  const finderView = $("finder-view");
+  const rewardMain = $("reward-main");
+  const finderItems = $("finder-items");
+  const finderObtained = $("finder-obtained");
+  const finderAvatar = $("finder-avatar");
+  const finderUrl = (token, rest = "") => `${root.dataset.finderBase}${encodeURIComponent(token)}/${rest}`;
+  let finderOpener = null;
+
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  function renderFinders(list) {
+    finderList.replaceChildren();
+    finderSection.hidden = !list.length;
+    for (const f of list) {
+      const li = el("li");
+      const b = el("button", "finder-chip");
+      b.type = "button";
+      const img = el("img");
+      img.src = finderUrl(f.token, "avatar.svg");
+      img.alt = "";
+      img.width = 44;
+      img.height = 66;
+      img.loading = "lazy";
+      b.append(img, el("span", "finder-chip-name", f.nickname), el("span", "finder-chip-ago", f.ago));
+      b.setAttribute("aria-label", `${f.nickname}さん(${f.ago})のコーデを見る`);
+      b.addEventListener("click", () => openFinder(f, b));
+      li.appendChild(b);
+      finderList.appendChild(li);
+    }
+  }
+
+  function showFinderView(on) {
+    finderView.hidden = !on;
+    rewardMain.hidden = on;
+  }
+
+  async function openFinder(f, opener) {
+    finderOpener = opener;
+    showFinderView(true);
+    $("finder-name").textContent = `${f.nickname}さんのコーデ`;
+    finderAvatar.src = finderUrl(f.token, "avatar.svg");
+    finderAvatar.alt = `${f.nickname}さんのアバター`;
+    finderItems.replaceChildren();
+    finderObtained.textContent = "読み込んでいます…";
+    $("finder-back").focus();
+    let d;
+    try {
+      const res = await fetch(finderUrl(f.token), { credentials: "same-origin" });
+      if (!res.ok) throw new Error(String(res.status));
+      d = await res.json();
+    } catch (_) {
+      finderObtained.textContent = "この人のコーデは、いまは見られません(公開をやめたか、時間がたちました)。";
+      return;
+    }
+    finderObtained.textContent = "アイテムを押すと、どこで手に入れたかが見られます。";
+    for (const it of d.items) {
+      const li = el("li");
+      const b = el("button", "finder-item");
+      b.type = "button";
+      b.setAttribute("aria-pressed", "false");
+      const img = el("img");
+      img.src = it.image;
+      img.alt = "";
+      img.width = 64;
+      img.height = 64;
+      img.loading = "lazy";
+      b.append(img, el("span", "finder-item-cat", it.category), el("span", "finder-item-name", it.name));
+      b.addEventListener("click", () => {
+        for (const other of finderItems.querySelectorAll("button")) other.setAttribute("aria-pressed", "false");
+        b.setAttribute("aria-pressed", "true");
+        finderObtained.textContent = `「${it.name}」は、${it.obtained}`;
+      });
+      li.appendChild(b);
+      finderItems.appendChild(li);
+    }
+  }
+
+  $("finder-back").addEventListener("click", () => {
+    showFinderView(false);
+    if (finderOpener) finderOpener.focus();
+  });
 
   // ---------- 近くにシンボルがあるときだけカメラを使える ----------
   // ①現在地の取得 → ②シンボル検索 は nearby.js が行い、その結果でボタンを切り替える。

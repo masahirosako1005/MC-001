@@ -52,6 +52,9 @@
 | R44 | Must | ログイン画面は利用者・管理者共通、サイト運営者用は別に用意する |
 | R45 | Must | サイト運営者がスポットごとの付近来訪ユーザ・PV・カメラ起動・コーデ獲得・利用割合(獲得÷付近×100%)を棒グラフなどで分析できる。時間・季節ごとも見られる |
 | R46 | Must | スポット・シンボル約 100、仮想利用者約 1000 名と付近来訪・コーデ獲得のデータを投入する |
+| R47 | Must | シンボルを取得したとき、直近 30 分以内に取得したユーザを「こんな人が獲得しているよ」と 3〜6 名表示。名前でコーデ、コーデでどのスポットで取得したかを表示 |
+| R48 | Must | 管理者がクーポンを登録でき、有効期限と内容を設定できる |
+| R49 | Must | 配るクーポン 1 枚ごとにユニークな ID(他ユーザと重複しない・1 回だけ使える)、クーポンそのものにも ID |
 
 ## トレーサビリティ
 
@@ -102,6 +105,9 @@
 | R44 | `ThrottledLoginForm.allowed_roles`、`OperatorLoginForm`、`MIKKE_OPS_URL`、管理画面ログインの転送 | `LoginSeparationTests`、ブラウザで運営者が通常ログインで断られることを確認 | ✅ |
 | R45 | `explore.NearbyVisit`(座標なし)、`/explore/api/camera-start`、`ops/analytics.py`、`ops/charts.py`(SVG 棒グラフ)、`templates/ops/dashboard.html` | `AnalyticsTests` `TrackingTests`、ブラウザでグラフ表示を確認 | ✅ |
 | R46 | `core/management/commands/seed_analytics.py` | 投入結果: スポット 100・シンボル 133・管理者 12・仮想利用者 1,000・付近の来訪 7,612・みっけ 3,283 | ✅ |
+| R47 | `explore/finders.py`(直近 30 分・最大 6 人・署名付きトークン)、`/explore/finders/<token>/`、`User.share_activity`(既存利用者は OFF から)、`camera.js:renderFinders / openFinder` | `RecentFindersTests` `FinderProfileTests` `SharingSettingTests`、ブラウザで受け取り → 一覧 → コーデ → 取得スポットを確認 | ✅ |
+| R48 | `CouponTemplate.available_until / owner`、`CouponForm`、`/explore/manage/coupons/`、`managed_coupons` | `ManagerCouponTests` `test_expiry_caps_and_stops` `test_expired_coupon_not_dropped` | ✅ |
+| R49 | `CouponTemplate.coupon_id`(CP-)、`UserCoupon.redeem_hash`(一意制約)、`issue_coupon` の再試行、`use_coupon` の条件付き UPDATE | `CouponIdTests` | ✅ |
 | R18 | `maps/`(Range 配信)、`maps/tiles/kyobashi.pmtiles`、`scripts/extract_tiles.py`、`static/js/spotmap.js`(Leaflet + protomaps-leaflet) | `maps/tests.py`(Range・416・パストラバーサル・ログイン必須・外部 API を CSP で許可していない)、ブラウザで外部への通信がないことを確認 | ✅ |
 
 ## 未達・残課題

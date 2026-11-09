@@ -14,10 +14,10 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods
 
 from core import audit
-from core.permissions import managed_spots, managed_symbols, manager_required
-from rewards.models import CouponTemplate
+from core.permissions import managed_coupons, managed_spots, managed_symbols, manager_required
+from rewards.models import CouponTemplate, distributable_coupons_q
 
-from .forms import DropFormSet, SpotForm, SymbolSettingsForm
+from .forms import CouponForm, DropFormSet, SpotForm, SymbolSettingsForm
 from .models import Discovery, NearbyVisit, Spot, SpotVisit, Symbol
 from .views import _map_context
 
@@ -107,12 +107,17 @@ def spot_delete(request, pk: int):
 
 
 # ---------------------------------------------------------------- シンボルの設定
-def _coupons_for(user):
-    """ドロップに使えるクーポン。管理者は自分のスポットに紐づくクーポンだけ。"""
-    qs = CouponTemplate.objects.filter(is_active=True).order_by("shop_name", "title")
-    if not user.is_operator:
-        qs = qs.filter(spot__in=managed_spots(user))
-    return qs
+def _coupons_for(user, symbol: Symbol | None = None):
+    """ドロップに使えるクーポン。管理者は自分のクーポンだけ。配布停止・期限切れは新しくは選べない。
+
+    ただし、このシンボルのドロップにすでに設定されているクーポンは (配布停止・期限切れ・ほかの登録者の
+    ものでも) 選択肢に残す。残さないと既存の行が「正しく選択してください」になり、設定全体が保存できなくなる。
+    """
+    selectable = managed_coupons(user).filter(distributable_coupons_q()).values("pk")
+    cond = Q(pk__in=selectable)
+    if symbol is not None and symbol.pk:
+        cond |= Q(pk__in=symbol.drops.filter(coupon__isnull=False).values("coupon_id"))
+    return CouponTemplate.objects.filter(cond).order_by("shop_name", "title")
 
 
 def _symbol_form(request, symbol: Symbol | None, initial_spot: int | None = None):
@@ -120,7 +125,7 @@ def _symbol_form(request, symbol: Symbol | None, initial_spot: int | None = None
     form = SymbolSettingsForm(request.POST or None, instance=symbol, spots=spots,
                               initial={"spot": initial_spot} if initial_spot else None)
     drops = DropFormSet(request.POST or None, instance=symbol or Symbol(),
-                        form_kwargs={"coupons": _coupons_for(request.user)}, prefix="drops")
+                        form_kwargs={"coupons": _coupons_for(request.user, symbol)}, prefix="drops")
     if request.method == "POST" and form.is_valid() and drops.is_valid():
         created = symbol is None
         with transaction.atomic():
@@ -147,3 +152,46 @@ def symbol_create(request):
 @require_http_methods(["GET", "POST"])
 def symbol_edit(request, pk: int):
     return _symbol_form(request, get_object_or_404(managed_symbols(request.user).select_related("spot"), pk=pk))
+
+
+# ---------------------------------------------------------------- クーポンの登録
+@manager_required
+@require_GET
+def coupon_list(request):
+    coupons = managed_coupons(request.user).select_related("spot", "owner__manager_profile").annotate(
+        n_issued=Count("issued", distinct=True),
+        n_used=Count("issued", filter=Q(issued__used_at__isnull=False), distinct=True),
+        n_drops=Count("drop_entries", distinct=True),
+    ).order_by("-is_active", "-created_at")
+    return render(request, "explore/manage/coupon_list.html", {"coupons": coupons})
+
+
+def _coupon_form(request, coupon):
+    form = CouponForm(request.POST or None, instance=coupon, user=request.user, spots=managed_spots(request.user))
+    if request.method == "POST" and form.is_valid():
+        created = coupon is None
+        saved = form.save()
+        audit.record("coupon.create" if created else "coupon.update", request=request, target=saved,
+                     coupon_id=saved.coupon_id, available_until=saved.available_until.isoformat()
+                     if saved.available_until else None, active=saved.is_active)
+        messages.success(request, f"クーポン「{saved.title}」({saved.coupon_id})を{'登録' if created else '保存'}しました。"
+                         + ("シンボルの設定で「手に入るもの」に追加すると配布されます。" if created else ""))
+        return redirect("explore:manage_coupons")
+    stats = None
+    if coupon is not None:
+        issued = coupon.issued.all()
+        stats = {"issued": issued.count(), "used": issued.filter(used_at__isnull=False).count(),
+                 "drops": coupon.drop_entries.select_related("symbol__spot")}
+    return render(request, "explore/manage/coupon_form.html", {"form": form, "coupon": coupon, "stats": stats})
+
+
+@manager_required
+@require_http_methods(["GET", "POST"])
+def coupon_create(request):
+    return _coupon_form(request, None)
+
+
+@manager_required
+@require_http_methods(["GET", "POST"])
+def coupon_edit(request, pk: int):
+    return _coupon_form(request, get_object_or_404(managed_coupons(request.user), pk=pk))

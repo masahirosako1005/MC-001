@@ -9,6 +9,7 @@
   {% if coupon.template.description %}<p>{{ coupon.template.description|linebreaksbr }}</p>{% endif %}
   <dl class="kv">
     <div><dt>引換コード</dt><dd class="code">{{ coupon.redeem_code }}</dd></div>
+    <div><dt>クーポン ID</dt><dd><code>{{ coupon.template.coupon_id }}</code></dd></div>
     <div><dt>入手</dt><dd>{{ coupon.source|default:"—" }}</dd></div>
     <div><dt>有効期限</dt><dd>{{ coupon.expires_at|date:"Y年n月j日 H:i" }}</dd></div>
     <div><dt>状態</dt><dd><span class="badge badge-{{ coupon.status }}">{{ coupon.status_label }}</span></dd></div>

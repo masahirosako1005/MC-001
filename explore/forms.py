@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from django import forms
 
+from rewards.models import CouponTemplate
+
 from .image_symbols import MAX_FEATURES_BYTES, MAX_JPEG_BYTES, ImageSymbolError
 from .models import ANGLES, MAX_VIEWS, DropEntry, Spot, Symbol
 from .services import ViewUpload
@@ -94,6 +96,61 @@ class SpotForm(forms.ModelForm):
         if commit:
             spot.save()
         return spot
+
+
+class CouponForm(forms.ModelForm):
+    """クーポンの登録・編集 (管理者・サイト運営者)。クーポン ID は自動で付く。"""
+
+    no_expiry = forms.BooleanField(label="無期限にする", required=False, initial=True)
+
+    class Meta:
+        model = CouponTemplate
+        fields = ["title", "shop_name", "benefit", "description", "spot", "valid_days", "available_until", "is_active"]
+        widgets = {
+            "description": forms.Textarea(attrs={"rows": 3, "placeholder": "例: お一人様 1 回限り。ほかの割引との併用不可。"}),
+            "benefit": forms.TextInput(attrs={"placeholder": "例: ドリンク 50 円引き"}),
+            "available_until": forms.DateTimeInput(attrs=_DT, format="%Y-%m-%dT%H:%M"),
+        }
+
+    def __init__(self, *args, user=None, spots=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.user = user
+        self.fields["spot"].queryset = (spots if spots is not None else Spot.objects.none()).order_by("name")
+        self.fields["spot"].empty_label = "(指定しない)"
+        self.fields["spot"].required = False
+        self.fields["available_until"].input_formats = ["%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M"]
+        self.fields["valid_days"].widget.attrs.update(min=1, max=365)
+        if self.instance.pk:
+            self.fields["no_expiry"].initial = self.instance.available_until is None
+        elif user is not None and user.is_manager and hasattr(user, "manager_profile"):
+            self.fields["shop_name"].initial = user.manager_profile.display_name[:80]
+
+    def clean(self):
+        data = super().clean()
+        if data.get("no_expiry"):
+            data["available_until"] = None
+        until = data.get("available_until")
+        from django.utils import timezone
+
+        if until and until <= timezone.now() and "available_until" in self.changed_data:
+            self.add_error("available_until", "有効期限は、これから先の日時にしてください。")
+        days = data.get("valid_days")
+        if days is not None and not 1 <= days <= 365:
+            self.add_error("valid_days", "有効日数は 1〜365 日にしてください。")
+        return data
+
+    def save(self, commit=True):
+        import secrets as _secrets
+
+        tpl = super().save(commit=False)
+        tpl.available_until = self.cleaned_data.get("available_until")
+        if not tpl.code:
+            tpl.code = f"cp-{_secrets.token_hex(5)}"
+        if self.user is not None and self.user.is_manager and tpl.owner_id is None:
+            tpl.owner = self.user
+        if commit:
+            tpl.save()
+        return tpl
 
 
 class SymbolSettingsForm(forms.ModelForm):

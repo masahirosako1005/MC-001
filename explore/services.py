@@ -17,7 +17,7 @@ from django.db.models import F, Q
 from django.utils import timezone
 
 from core.timeutil import local_now, season_of, slot_of
-from rewards.services import evaluate_achievements, issue_coupon
+from rewards.services import CouponNotDistributable, evaluate_achievements, issue_coupon
 from wardrobe.services import grant_item
 
 from .models import SYMBOL_PREFIX, Discovery, DropEntry, NearbyVisit, SpotVisit, Symbol, spot_available_q
@@ -334,12 +334,15 @@ def check_location(symbol: Symbol, coords: tuple[float, float] | None) -> None:
         raise TooFar("スポットから離れているようです。現地でもう一度お試しください。")
 
 
-def candidate_drops(symbol: Symbol, *, season: str, slot: str, visit_days: int):
+def candidate_drops(symbol: Symbol, *, season: str, slot: str, visit_days: int, now=None):
+    from rewards.models import distributable_coupons_q
+
     return (
         DropEntry.objects.select_related("item", "coupon")
         .filter(symbol=symbol, season__in=["any", season], time_slot__in=["any", slot], min_visit_days__lte=visit_days)
         .filter(Q(item__isnull=True) | Q(item__is_active=True))
-        .filter(Q(coupon__isnull=True) | Q(coupon__is_active=True))
+        # 配布停止・有効期限切れのクーポンは出さない
+        .filter(Q(coupon__isnull=True) | distributable_coupons_q("coupon__", now))
     )
 
 
@@ -368,14 +371,17 @@ class CollectResult:
     achievements: list[dict] = field(default_factory=list)
     replay: bool = False
     symbol: dict | None = None
+    symbol_id: int | None = None  # 「こんな人が獲得しているよ」を探すため (応答には含めない)
 
     def as_dict(self) -> dict:
-        return self.__dict__.copy()
+        data = self.__dict__.copy()
+        data.pop("symbol_id", None)
+        return data
 
 
 def _result_from_discovery(d: Discovery) -> CollectResult:
     res = CollectResult(reward_kind=d.reward_kind, label=d.reward_label, is_new=d.is_new, replay=True,
-                        symbol={"name": d.symbol.name, "spot": d.symbol.spot.name})
+                        symbol={"name": d.symbol.name, "spot": d.symbol.spot.name}, symbol_id=d.symbol_id)
     if d.reward_kind == "item":
         res.item = {"code": d.reward_ref, "name": d.reward_label}
     elif d.reward_kind == "coupon":
@@ -416,10 +422,10 @@ def collect(user, ticket: str, idempotency_key: str, coords: tuple[float, float]
         )
         visit_days = SpotVisit.objects.filter(user=user, spot=symbol.spot).count()
 
-        drop = pick_weighted(list(candidate_drops(symbol, season=season, slot=slot, visit_days=visit_days)))
+        drop = pick_weighted(list(candidate_drops(symbol, season=season, slot=slot, visit_days=visit_days, now=now)))
         result = CollectResult(reward_kind="none", label="", visit_days=visit_days,
                                is_revisit_day=created_visit and visit_days > 1,
-                               symbol={"name": symbol.name, "spot": symbol.spot.name})
+                               symbol={"name": symbol.name, "spot": symbol.spot.name}, symbol_id=symbol.pk)
         ref = ""
         if drop and drop.item_id:
             _, is_new = grant_item(user, drop.item)
@@ -428,11 +434,16 @@ def collect(user, ticket: str, idempotency_key: str, coords: tuple[float, float]
                            "slot": drop.item.category, "rarity": drop.item.rarity, "new": is_new}
             ref = drop.item.code
         elif drop and drop.coupon_id:
-            c = issue_coupon(user, drop.coupon, source=f"{symbol.spot.name}でみっけ", now=now)
-            result.reward_kind, result.label, result.is_new = "coupon", drop.coupon.title, True
-            result.coupon = {"id": str(c.pk), "title": drop.coupon.title, "shop": drop.coupon.shop_name,
-                             "benefit": drop.coupon.benefit}
-            ref = str(c.pk)
+            try:
+                c = issue_coupon(user, drop.coupon, source=f"{symbol.spot.name}でみっけ", now=now)
+            except CouponNotDistributable:
+                # 抽選と発行のあいだに配布停止・期限切れになった場合は「何もなし」として記録する (500 にしない)
+                c, drop = None, None
+            if c is not None:
+                result.reward_kind, result.label, result.is_new = "coupon", c.template.title, True
+                result.coupon = {"id": str(c.pk), "title": c.template.title, "shop": c.template.shop_name,
+                                 "benefit": c.template.benefit}
+                ref = str(c.pk)
         try:
             with transaction.atomic():
                 Discovery.objects.create(

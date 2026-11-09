@@ -46,8 +46,9 @@ def account(request):
     form = NicknameForm(request.POST or None, instance=request.user)
     if request.method == "POST" and form.is_valid():
         form.save()
-        audit.record("account.nickname", request=request, target=request.user)
-        messages.success(request, "ニックネームを変更しました。")
+        audit.record("account.update", request=request, target=request.user,
+                     share_activity=request.user.share_activity)
+        messages.success(request, "アカウントの設定を保存しました。")
         return redirect("accounts:account")
     return render(request, "accounts/account.html", {"form": form})
 

@@ -9,6 +9,7 @@
          data-image-symbols-url="{% url 'explore:api_image_symbols' %}"
          data-collect-url="{% url 'explore:api_collect' %}"
          data-camera-start-url="{% url 'explore:api_camera_start' %}"
+         data-finder-base="{% url 'explore:mikke' %}finders/"
          data-wardrobe-url="{% url 'wardrobe:index' %}"
          data-item-svg-base="{% url 'wardrobe:index' %}items/"
          data-coupon-base="{% url 'rewards:coupons' %}"
@@ -66,20 +67,37 @@
 
 <dialog id="reward-dialog" class="reward-dialog" aria-labelledby="reward-title">
   <div class="reward-burst" aria-hidden="true"></div>
-  <h2 id="reward-title">みっけ!</h2>
-  <p id="reward-spot" class="muted"></p>
-  <div id="reward-art" class="reward-art" hidden>
-    <img id="reward-img" alt="" width="150" height="202">
-    <img id="reward-zoom" class="reward-zoom" alt="" width="84" height="84" hidden>
-    <span id="reward-new" class="reward-new" hidden>NEW</span>
-    <span id="reward-rarity" class="reward-rarity" aria-hidden="true"></span>
-  </div>
-  <p id="reward-text" class="reward-text"></p>
-  <p id="reward-extra" class="help"></p>
-  <ul id="reward-achievements" class="reward-achievements"></ul>
-  <div class="dialog-actions">
-    <a id="reward-link" class="btn btn-primary" href="{% url 'wardrobe:index' %}">着せかえる</a>
-    <button type="button" class="btn btn-ghost" id="reward-close">探索をつづける</button>
+  <div class="reward-scroll">
+    <div id="reward-main">
+      <h2 id="reward-title">みっけ!</h2>
+      <p id="reward-spot" class="muted"></p>
+      <div id="reward-art" class="reward-art" hidden>
+        <img id="reward-img" alt="" width="150" height="202">
+        <img id="reward-zoom" class="reward-zoom" alt="" width="84" height="84" hidden>
+        <span id="reward-new" class="reward-new" hidden>NEW</span>
+        <span id="reward-rarity" class="reward-rarity" aria-hidden="true"></span>
+      </div>
+      <p id="reward-text" class="reward-text"></p>
+      <p id="reward-extra" class="help"></p>
+      <ul id="reward-achievements" class="reward-achievements"></ul>
+      <div class="dialog-actions">
+        <a id="reward-link" class="btn btn-primary" href="{% url 'wardrobe:index' %}">着せかえる</a>
+        <button type="button" class="btn btn-ghost" id="reward-close">探索をつづける</button>
+      </div>
+      {# 直近 30 分に同じシンボルでみっけした人 (本人が「みっけ仲間に表示する」を ON にしている人だけ) #}
+      <section id="reward-finders" class="reward-finders" aria-labelledby="finders-h" hidden>
+        <h3 id="finders-h">こんな人が獲得しているよ</h3>
+        <ul id="finder-list" class="finder-list"></ul>
+        <p class="help">名前を押すと、その人のコーデが見られます。</p>
+      </section>
+    </div>
+    <div id="finder-view" class="finder-view" hidden>
+      <button type="button" class="btn btn-ghost btn-small" id="finder-back">← もどる</button>
+      <h2 id="finder-name"></h2>
+      <img id="finder-avatar" class="finder-avatar" alt="" width="150" height="225">
+      <p id="finder-obtained" class="finder-obtained" role="status" aria-live="polite"></p>
+      <ul id="finder-items" class="finder-items"></ul>
+    </div>
   </div>
 </dialog>
 {{ spot_points|json_script:"spot-data" }}

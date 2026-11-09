@@ -13,7 +13,7 @@ from .models import User, email_hash_of
 class SignupForm(forms.Form):
     nickname = forms.CharField(
         label="ニックネーム", max_length=30,
-        help_text="ほかの人には表示されません。あとから変更できます。",
+        help_text="あとから変更できます。下の「みっけ仲間に表示する」が ON のときだけ、ほかの利用者に表示されます。",
         widget=forms.TextInput(attrs={"autocomplete": "nickname"}),
     )
     email = forms.EmailField(
@@ -29,6 +29,11 @@ class SignupForm(forms.Form):
     password2 = forms.CharField(
         label="パスワード(確認)", strip=False,
         widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
+    )
+    share_activity = forms.BooleanField(
+        label="みっけ仲間に表示する", required=False, initial=True,
+        help_text="同じシンボルを 30 分以内にみっけした人に、ニックネームと今のコーデを表示します"
+                  "(場所や時刻のくわしい情報は出しません)。あとからアカウント画面で変えられます。",
     )
 
     def clean_email(self):
@@ -55,6 +60,7 @@ class SignupForm(forms.Form):
             email=self.cleaned_data["email"],
             password=self.cleaned_data["password1"],
             nickname=self.cleaned_data["nickname"],
+            share_activity=self.cleaned_data.get("share_activity", False),
         )
 
 
@@ -147,4 +153,4 @@ class WithdrawForm(forms.Form):
 class NicknameForm(forms.ModelForm):
     class Meta:
         model = User
-        fields = ["nickname"]
+        fields = ["nickname", "share_activity"]

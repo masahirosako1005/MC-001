@@ -64,6 +64,12 @@
 
 そのシンボルで手に入るコーデのプレビュー画像(本人の肌・目の色で描画)。シークレット・公開期間外・ドロップに含まれないアイテムは 404。
 
+## GET /explore/finders/<token>/(ログイン必須)
+
+「こんな人が獲得しているよ」の 1 人のコーデ。`token` は受け取り結果の `recent_finders[].token`(見る人に結び付いた署名付き、2 時間有効)。
+`{"nickname", "avatar": "<URL>", "items": [{"code", "name", "category", "rarity", "image": "<URL>", "obtained": "さくら坂喫茶でみっけ(冬)"}]}`。
+トークンが不正・期限切れ・別の人のもの・相手が表示を OFF にした場合は 404。`avatar.svg`・`items/<code>.svg`(今着ているアイテムだけ)も同じ条件。
+
 ## GET /maps/tiles/<name>.pmtiles(ログイン必須)
 
 ローカルの地図タイル(PMTiles)。`Range: bytes=start-end` に対応(`206 Partial Content`、1 回 8MB まで)。範囲が不正なら `416`。外部の地図 API は使わない。
@@ -85,6 +91,8 @@ AR マークをタップしたときに呼ぶ。レート制限: 20 回/分/利�
 | 404 | `unknown_symbol` |
 | 409 | `{"error": "cooldown", "next_available_at": RFC3339}` |
 | 429 | `rate_limited` |
+
+`recent_finders`: 直近 30 分に同じシンボル(少なければ同じスポット)でみっけした人、最大 6 人。`[{"token", "nickname", "ago": "さっき" | "15分前"}]`(「みっけ仲間に表示する」が ON の利用者だけ。利用者 ID は含めない)。
 
 `item` は `{"code", "name", "category"(表示名), "slot"(部位コード), "rarity", "new"}`。結果画面では次の絵を表示する:
 

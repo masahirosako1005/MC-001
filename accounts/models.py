@@ -61,6 +61,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     must_change_password = models.BooleanField(
         "次回ログイン時にパスワード変更", default=False,
         help_text="サイト運営者が発行した仮パスワードのアカウントは、最初にパスワードを変更してもらう")
+    # みっけしたとき「こんな人が獲得しているよ」に、ニックネームとアバターを出してよいか (本人が選ぶ)
+    share_activity = models.BooleanField(
+        "みっけ仲間に表示する", default=True,
+        help_text="ON のとき、同じシンボルを 30 分以内にみっけした人に、ニックネームと今のコーデが表示されます")
     date_joined = models.DateTimeField("登録日時", default=timezone.now)
 
     objects = UserManager()
