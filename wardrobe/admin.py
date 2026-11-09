@@ -14,14 +14,14 @@ class ItemForm(forms.ModelForm):
 
     class Meta:
         model = Item
-        fields = ["code", "name", "description", "category", "style", "color", "rarity", "is_starter", "is_active"]
+        fields = ["code", "name", "description", "body_type", "category", "style", "color", "rarity", "is_starter", "is_active"]
 
 
 @admin.register(Item)
 class ItemAdmin(admin.ModelAdmin):
     form = ItemForm
-    list_display = ("code", "name", "category", "style", "swatch", "rarity", "is_starter", "is_active")
-    list_filter = ("category", "rarity", "is_starter", "is_active")
+    list_display = ("code", "name", "body_type", "category", "style", "swatch", "rarity", "is_starter", "is_active")
+    list_filter = ("body_type", "category", "rarity", "is_starter", "is_active")
     search_fields = ("code", "name")
 
     @admin.display(description="色")
@@ -38,5 +38,5 @@ class UserItemAdmin(admin.ModelAdmin):
 
 @admin.register(AvatarConfig)
 class AvatarConfigAdmin(admin.ModelAdmin):
-    list_display = ("user", "skin_tone", "version", "updated_at")
+    list_display = ("user", "body_type", "skin_tone", "eye_color", "version", "updated_at")
     raw_id_fields = ("user",)

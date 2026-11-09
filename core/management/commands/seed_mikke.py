@@ -9,43 +9,11 @@ from __future__ import annotations
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
+from accounts.models import User
 from explore.models import DropEntry, Spot, Symbol
 from rewards.models import Achievement, CouponTemplate
-from wardrobe.models import Item
-
-ITEMS = [
-    # code, name, category, style, color, rarity, starter, description
-    ("hair-short-brown", "ショート(ブラウン)", "hair", "short", "#6B4226", 1, True, "はじまりの髪型"),
-    ("top-tshirt-white", "白Tシャツ", "top", "tshirt", "#F2F2F2", 1, True, "旅のはじまりの一枚"),
-    ("bottom-pants-denim", "デニムパンツ", "bottom", "pants", "#3B5B8C", 1, True, "どこへでも行ける"),
-    ("shoes-sneakers-gray", "グレーのスニーカー", "shoes", "sneakers", "#8A8F99", 1, True, "歩きやすい"),
-    ("hair-bob-black", "ボブ(黒)", "hair", "bob", "#222222", 1, False, "温泉街のそよ風"),
-    ("hair-long-chestnut", "ロング(栗色)", "hair", "long", "#8B4A2B", 2, False, "秋の参道の色"),
-    ("hair-spiky-blond", "ツンツン(金)", "hair", "spiky", "#E8C14A", 3, False, "港の夕日"),
-    ("hair-bun-black", "おだんご(黒)", "hair", "bun", "#2A2A2A", 2, False, "朝の神社で"),
-    ("hair-ponytail-sakura", "ポニーテール(さくら)", "hair", "ponytail", "#F2A7C3", 4, False, "春だけの色"),
-    ("hair-long-silver", "ロング(月光)", "hair", "long", "#C9CED8", 5, False, "夜の森でだけ出会える"),
-    ("top-happi-indigo", "藍の法被", "top", "happi", "#2D4A8A", 2, False, "祭りの名残"),
-    ("top-happi-red", "朱の法被", "top", "happi", "#C0392B", 3, False, "夏祭りの主役"),
-    ("top-hoodie-mint", "ミントのパーカー", "top", "hoodie", "#7FCFB5", 1, False, "朝の散歩に"),
-    ("top-jacket-navy", "ネイビージャケット", "top", "jacket", "#22325A", 2, False, "レトロ通りの喫茶店で"),
-    ("top-border-marine", "マリンボーダー", "top", "border", "#1E5AA8", 2, False, "港町の定番"),
-    ("top-hoodie-maple", "もみじパーカー", "top", "hoodie", "#D2552B", 4, False, "秋限定"),
-    ("bottom-hakama-purple", "紫の袴", "bottom", "hakama", "#5B3A7A", 3, False, "神社の正装"),
-    ("bottom-skirt-yellow", "菜の花スカート", "bottom", "skirt", "#F2C230", 2, False, "春の野原"),
-    ("bottom-shorts-khaki", "カーキのショートパンツ", "bottom", "shorts", "#A08C5B", 1, False, "夏の冒険に"),
-    ("bottom-pants-black", "黒のパンツ", "bottom", "pants", "#2B2B2B", 1, False, "夜の街歩き"),
-    ("shoes-geta-red", "赤鼻緒の下駄", "shoes", "geta", "#C0392B", 2, False, "温泉街をカランコロン"),
-    ("shoes-boots-brown", "ブラウンブーツ", "shoes", "boots", "#6E4B2A", 2, False, "森の小道に"),
-    ("shoes-sneakers-orange", "夕焼けスニーカー", "shoes", "sneakers", "#F08A24", 3, False, "港の夕方に"),
-    ("acc-foxmask-red", "きつねのお面", "accessory", "foxmask", "#C0392B", 4, False, "夜の神社のおまつり"),
-    ("acc-flower-sakura", "さくらのかんざし", "accessory", "flower", "#F2A7C3", 3, False, "春の再訪のしるし"),
-    ("acc-scarf-red", "赤いマフラー", "accessory", "scarf", "#B3262E", 2, False, "冬の湯けむり"),
-    ("acc-glasses-gold", "金縁メガネ", "accessory", "glasses", "#B8892B", 2, False, "レトロ喫茶の店主から"),
-    ("acc-cap-sea", "マリンキャップ", "accessory", "cap", "#1E5AA8", 2, False, "港のおみやげ"),
-    ("acc-flower-gold", "金の花かんざし", "accessory", "flower", "#E0B000", 5, False, "やりこみの証"),
-    ("top-happi-gold", "金の法被", "top", "happi", "#C9A227", 5, False, "すべての季節を巡った証"),
-]
+from wardrobe.models import Item, UserItem
+from wardrobe.sample_items import SAMPLE_ITEMS
 
 COUPONS = [
     ("cp-onsen-manju", "湯けむり饅頭 1個サービス", "湯の花茶屋", "お買い上げで饅頭1個プレゼント", "onsen", 30),
@@ -127,9 +95,9 @@ class Command(BaseCommand):
     @transaction.atomic
     def handle(self, *args, **opts):
         items = {}
-        for code, name, cat, style, color, rarity, starter, desc in ITEMS:
+        for code, name, cat, style, color, rarity, starter, desc, body in SAMPLE_ITEMS:
             item, _ = Item.objects.update_or_create(code=code, defaults=dict(
-                name=name, category=cat, style=style, color=color, rarity=rarity,
+                name=name, category=cat, style=style, color=color, rarity=rarity, body_type=body,
                 is_starter=starter, description=desc, is_active=True))
             item.full_clean()
             items[code] = item
@@ -155,6 +123,21 @@ class Command(BaseCommand):
                     symbol=symbol, item=items.get(ref), coupon=coupons.get(ref), weight=weight,
                     season=season, time_slot=slot, min_visit_days=min_visit)
 
+        # まだどのシンボルからも出ないパーツを、デモ用シンボルに順番に割り当てて探索で手に入るようにする
+        demo_symbols = [Symbol.objects.get(spot=spots[s], name=n) for s, n, *_ in SYMBOLS]
+        in_drops = set(DropEntry.objects.filter(item__isnull=False).values_list("item__code", flat=True))
+        reward_only = {a[6] for a in ACHIEVEMENTS if a[6]}
+        extra = [i for c, i in items.items() if not i.is_starter and c not in in_drops and c not in reward_only]
+        for n, item in enumerate(extra):
+            DropEntry.objects.create(symbol=demo_symbols[n % len(demo_symbols)], item=item,
+                                     weight=max(2, 12 - item.rarity * 2))
+
+        # 既存の利用者にも、女の子用・男の子用の初期アイテムを配る
+        starters = [i for i in items.values() if i.is_starter]
+        for user in User.objects.all():
+            for item in starters:
+                UserItem.objects.get_or_create(user=user, item=item)
+
         for code, name, desc, icon, kind, th, item_code, coupon_code, order in ACHIEVEMENTS:
             Achievement.objects.update_or_create(code=code, defaults=dict(
                 name=name, description=desc, icon=icon, kind=kind, threshold=th,
@@ -162,5 +145,7 @@ class Command(BaseCommand):
                 sort_order=order, is_active=True))
 
         self.stdout.write(self.style.SUCCESS(
-            f"投入完了: アイテム {len(items)} / スポット {len(spots)} / シンボル {len(SYMBOLS)} / "
+            f"投入完了: アイテム {len(items)} (女の子用 {sum(i.body_type == 'girl' for i in items.values())} / "
+            f"男の子用 {sum(i.body_type == 'boy' for i in items.values())}) / 追加ドロップ {len(extra)} / "
+            f"スポット {len(spots)} / シンボル {len(SYMBOLS)} / "
             f"クーポン {len(coupons)} / 実績 {len(ACHIEVEMENTS)}"))

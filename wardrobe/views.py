@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.contrib import messages
+from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.http import Http404, HttpResponse
 from django.shortcuts import redirect, render
@@ -8,11 +9,18 @@ from django.views.decorators.http import require_GET, require_http_methods
 
 from core import audit
 
-from .avatar import CATEGORY_CHOICES, SKIN_TONE_CHOICES
+from .avatar import BODY_TYPE_CHOICES, CATEGORY_CHOICES, EYE_COLOR_CHOICES, ITEM_BODY_CHOICES, SKIN_TONE_CHOICES
 from .models import Item, UserItem
-from .services import EquipError, VersionConflict, config_svg, equip, get_config, item_preview_svg
-
-SKIN_KEYS = {k for k, _ in SKIN_TONE_CHOICES}
+from .services import (
+    EquipError,
+    VersionConflict,
+    can_use_any_item,
+    config_svg,
+    equip,
+    get_config,
+    item_preview_svg,
+    selectable_items,
+)
 
 
 def _svg_response(svg: str, *, cacheable: bool = False) -> HttpResponse:
@@ -39,12 +47,11 @@ def index(request):
     config = get_config(request.user)
     if request.method == "POST":
         try:
-            skin = request.POST.get("skin_tone", "")
-            if skin not in SKIN_KEYS:
-                raise EquipError("肌の色の選択が正しくありません。")
             selections = {c: _parse_int(request.POST.get(c)) for c, _ in CATEGORY_CHOICES}
             expected = _parse_int(request.POST.get("version")) or 0
-            equip(request.user, expected_version=expected, skin_tone=skin, selections=selections)
+            equip(request.user, expected_version=expected, skin_tone=request.POST.get("skin_tone", ""),
+                  selections=selections, body_type=request.POST.get("body_type", ""),
+                  eye_color=request.POST.get("eye_color", ""))
         except VersionConflict as exc:
             messages.warning(request, str(exc))
         except EquipError as exc:
@@ -54,29 +61,37 @@ def index(request):
             messages.success(request, "着せ替えを保存しました。")
         return redirect("wardrobe:index")
 
-    owned = list(UserItem.objects.select_related("item").filter(user=request.user, item__is_active=True)
-                 .order_by("item__rarity", "item__code"))
-    total_by_cat = {c: Item.objects.filter(category=c, is_active=True).count() for c, _ in CATEGORY_CHOICES}
+    staff = can_use_any_item(request.user)
+    owned_ids = set(UserItem.objects.filter(user=request.user).values_list("item_id", flat=True))
+    items = list(selectable_items(request.user))
+    all_active = list(Item.objects.filter(is_active=True).values_list("category", "body_type"))
     equipped = config.equipped()
     groups = []
     for cat, label in CATEGORY_CHOICES:
-        items = [ui for ui in owned if ui.item.category == cat]
-        locked = max(total_by_cat[cat] - len(items), 0)
+        mine = [i for i in items if i.category == cat]
+        # 未発見のパーツ数 (体のタイプ別に表示を切り替える)
+        locked = {}
+        for bt, _ in BODY_TYPE_CHOICES:
+            total = sum(1 for c, b in all_active if c == cat and b in (bt, "any"))
+            have = sum(1 for i in mine if i.fits(bt) and i.pk in owned_ids)
+            locked[bt] = max(total - have, 0)
         groups.append({
             "key": cat,
             "label": label,
-            "items": items,
+            "items": [{"item": i, "owned": i.pk in owned_ids} for i in mine],
             "equipped_id": equipped[cat].pk if equipped[cat] else None,
             "locked": locked,
-            "locked_slots": range(min(locked, 6)),
-            "can_unequip": True,
+            "locked_slots": {bt: range(min(n, 6)) for bt, n in locked.items()},
         })
     return render(request, "wardrobe/index.html", {
         "config": config,
         "groups": groups,
         "skin_choices": SKIN_TONE_CHOICES,
-        "owned_count": len(owned),
-        "total_count": sum(total_by_cat.values()),
+        "body_choices": BODY_TYPE_CHOICES,
+        "eye_choices": EYE_COLOR_CHOICES,
+        "owned_count": len(owned_ids),
+        "total_count": len(all_active),
+        "staff": staff,
     })
 
 
@@ -89,21 +104,23 @@ def avatar_svg(request):
 @login_required
 @require_GET
 def preview_svg(request):
-    """着せ替え画面のライブプレビュー。所有アイテムだけを反映する (保存はしない)。"""
+    """着せ替え画面のライブプレビュー (保存はしない)。選べるアイテムだけを反映する。"""
     config = get_config(request.user)
-    skin = request.GET.get("skin_tone", config.skin_tone)
-    if skin in SKIN_KEYS:
-        config.skin_tone = skin
+    if request.GET.get("skin_tone") in {k for k, _ in SKIN_TONE_CHOICES}:
+        config.skin_tone = request.GET["skin_tone"]
+    if request.GET.get("body_type") in {k for k, _ in BODY_TYPE_CHOICES}:
+        config.body_type = request.GET["body_type"]
+    if request.GET.get("eye_color") in {k for k, _ in EYE_COLOR_CHOICES}:
+        config.eye_color = request.GET["eye_color"]
     ids = {}
     for cat, _ in CATEGORY_CHOICES:
         try:
             ids[cat] = _parse_int(request.GET.get(cat))
         except EquipError:
             ids[cat] = None
-    owned = {ui.item_id: ui.item for ui in UserItem.objects.select_related("item")
-             .filter(user=request.user, item_id__in=[v for v in ids.values() if v])}
+    usable = {i.pk: i for i in selectable_items(request.user).filter(pk__in=[v for v in ids.values() if v])}
     for cat, item_id in ids.items():
-        item = owned.get(item_id) if item_id else None
+        item = usable.get(item_id) if item_id else None
         setattr(config, cat, item if item and item.category == cat else None)
     return _svg_response(config_svg(config, label="プレビュー"))
 
@@ -111,10 +128,26 @@ def preview_svg(request):
 @login_required
 @require_GET
 def item_svg(request, code: str):
-    ui = UserItem.objects.select_related("item").filter(user=request.user, item__code=code).first()
-    if ui is None and not request.user.is_staff:
-        raise Http404
-    item = ui.item if ui else Item.objects.filter(code=code).first()
+    item = selectable_items(request.user).filter(code=code).first()
     if item is None:
         raise Http404
-    return _svg_response(item_preview_svg(item, get_config(request.user).skin_tone), cacheable=True)
+    cfg = get_config(request.user)
+    return _svg_response(item_preview_svg(item, cfg.skin_tone, cfg.eye_color), cacheable=True)
+
+
+@staff_member_required
+@require_GET
+def catalog(request):
+    """運営向け: 全パーツの一覧 (体のタイプ別・部位別)。"""
+    items = list(Item.objects.order_by("category", "rarity", "code"))
+    sections = []
+    for bt, bt_label in ITEM_BODY_CHOICES:
+        cats = []
+        for cat, label in CATEGORY_CHOICES:
+            rows = [i for i in items if i.body_type == bt and i.category == cat]
+            if rows:
+                cats.append({"label": label, "items": rows})
+        count = sum(len(c["items"]) for c in cats)
+        if count:
+            sections.append({"key": bt, "label": bt_label, "count": count, "cats": cats})
+    return render(request, "wardrobe/catalog.html", {"sections": sections, "total": len(items)})

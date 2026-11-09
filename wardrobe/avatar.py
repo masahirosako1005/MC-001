@@ -1,7 +1,11 @@
-"""アバター SVG の組み立て。
+"""アバター SVG の組み立て (ちびキャラ風)。
+
+デザイン: 頭身の約 1/3 が頭、きらきらした大きな瞳、前髪・後ろ髪・横髪を重ねた髪型。
+体のタイプは「女の子」「男の子」の 2 種類で、だれでも自由に選べる (登録者の性別とは無関係)。
 
 安全性: SVG に差し込むのは「固定の形テンプレート」と「#RRGGBB 形式に検証済みの色」だけ。
 DB の文字列を SVG/HTML に直接埋め込まないため、スクリプト注入 (XSS) の余地がない。
+座標系は viewBox="0 0 200 300"。
 """
 
 from __future__ import annotations
@@ -20,7 +24,10 @@ CATEGORY_CHOICES = [
 ]
 CATEGORY_LABELS = dict(CATEGORY_CHOICES)
 
-# 多様性への配慮: 現実の幅広い肌の色 + 非現実的な色も選べる。性別の選択は求めない。
+BODY_TYPE_CHOICES = [("girl", "女の子"), ("boy", "男の子")]
+ITEM_BODY_CHOICES = [("girl", "女の子用"), ("boy", "男の子用"), ("any", "共通")]
+
+# 多様性への配慮: 現実の幅広い肌の色 + 非現実的な色も選べる
 SKIN_TONE_CHOICES = [
     ("tone1", "とても明るい"),
     ("tone2", "明るい"),
@@ -32,8 +39,16 @@ SKIN_TONE_CHOICES = [
     ("lavender", "ラベンダー(ファンタジー)"),
 ]
 SKIN_TONES = {
-    "tone1": "#FBE3D3", "tone2": "#F3CDB0", "tone3": "#E6B48E", "tone4": "#C98F65",
-    "tone5": "#9A6643", "tone6": "#5E3C27", "mint": "#BFE8D6", "lavender": "#D9CCF2",
+    "tone1": "#FCE8DA", "tone2": "#F7D7C0", "tone3": "#EDBF9C", "tone4": "#D29C74",
+    "tone5": "#A26C48", "tone6": "#674330", "mint": "#C6EBDB", "lavender": "#DED2F4",
+}
+EYE_COLOR_CHOICES = [
+    ("brown", "ブラウン"), ("pink", "ピンク"), ("violet", "バイオレット"),
+    ("blue", "ブルー"), ("green", "グリーン"), ("amber", "アンバー"),
+]
+EYE_COLORS = {
+    "brown": "#8A5232", "pink": "#D2508E", "violet": "#8656D0",
+    "blue": "#3A74D0", "green": "#2F9A6A", "amber": "#C98A1E",
 }
 
 _HEX = re.compile(r"^#[0-9A-Fa-f]{6}$")
@@ -50,163 +65,268 @@ def shade(color: str, factor: float) -> str:
     if factor < 1:
         r, g, b = (int(v * factor) for v in (r, g, b))
     else:
-        r, g, b = (int(v + (255 - v) * (factor - 1)) for v in (r, g, b))
+        r, g, b = (min(255, int(v + (255 - v) * (factor - 1))) for v in (r, g, b))
     return f"#{r:02X}{g:02X}{b:02X}"
 
 
-# ---- 形テンプレート ----------------------------------------------------------------
-# {c}=色 {d}=暗い色 {l}=明るい色。座標系は viewBox="0 0 200 270"。
-# 髪は "back" (頭の後ろ) と "front" (前髪) の 2 レイヤー。
+# =====================================================================================
+# 形テンプレート  {c}=色 {d}=暗い色 {l}=明るい色 {w}=白に近い色
+# =====================================================================================
+
+_SHINE = '<path d="M72 54 Q86 46 100 46" fill="none" stroke="{l}" stroke-width="3.5" stroke-linecap="round" opacity="0.8"/>'
+_CAP = '<path d="M55 94 Q53 38 100 36 Q147 38 145 94 Z" fill="{c}"/>'
 
 HAIR = {
-    "short": {
-        "label": "ショート",
-        "back": "",
-        "front": '<path d="M63 74 Q60 32 100 30 Q140 32 137 74 Q130 50 100 48 Q70 50 63 74 Z" fill="{c}"/>',
-    },
+    # ---------------- 女の子向けに作った髪型 ----------------
     "bob": {
         "label": "ボブ",
-        "back": '<path d="M58 72 Q56 28 100 28 Q144 28 142 72 L142 112 L124 112 L124 78 L76 78 L76 112 L58 112 Z" fill="{c}"/>',
-        "front": '<path d="M63 68 Q64 34 100 32 Q136 34 137 68 Q120 54 100 56 Q80 54 63 68 Z" fill="{c}"/>',
+        "back": '<path d="M53 92 Q51 36 100 34 Q149 36 147 92 L149 136 Q146 145 133 141 L131 112 L69 112 L67 141 Q54 145 51 136 Z" fill="{c}"/>',
+        "front": '<path d="M56 98 Q55 40 100 38 Q145 40 144 98 Q140 78 131 70 Q128 85 117 87 Q119 74 113 66 Q107 81 97 84 Q99 71 93 63 Q85 80 73 84 Q75 73 69 70 Q60 80 56 98 Z" fill="{c}"/>'
+                 '<path d="M56 92 Q53 126 64 142 Q71 128 68 100 Z" fill="{c}"/><path d="M144 92 Q147 126 136 142 Q129 128 132 100 Z" fill="{c}"/>'
+                 '<path d="M93 63 Q90 74 86 80 M113 66 Q114 76 117 84" fill="none" stroke="{d}" stroke-width="1.2" opacity="0.6"/>' + _SHINE,
     },
     "long": {
-        "label": "ロング",
-        "back": '<path d="M58 72 Q56 26 100 26 Q144 26 142 72 L146 156 L122 156 L126 82 L74 82 L78 156 L54 156 Z" fill="{c}"/>',
-        "front": '<path d="M63 68 Q64 34 100 32 Q136 34 137 68 Q120 54 100 56 Q80 54 63 68 Z" fill="{c}"/>',
+        "label": "ロングストレート",
+        "back": '<path d="M53 92 Q51 34 100 32 Q149 34 147 92 L153 236 Q141 246 128 236 L126 134 L74 134 L72 236 Q59 246 47 236 Z" fill="{c}"/>'
+                '<path d="M60 150 L58 230 M140 150 L142 230" stroke="{d}" stroke-width="1.2" opacity="0.5"/>',
+        "front": '<path d="M56 100 Q57 40 100 38 Q143 40 144 100 Q136 76 120 66 Q112 75 102 71 L100 58 L98 71 Q88 75 80 66 Q64 76 56 100 Z" fill="{c}"/>'
+                 '<path d="M56 94 Q51 142 61 178 Q70 152 68 106 Z" fill="{c}"/><path d="M144 94 Q149 142 139 178 Q130 152 132 106 Z" fill="{c}"/>' + _SHINE,
     },
-    "spiky": {
-        "label": "ツンツン",
-        "back": "",
-        "front": '<path d="M63 72 L58 46 L73 52 L75 28 L90 43 L100 22 L110 43 L125 28 L127 52 L142 46 L137 72 Q122 54 100 54 Q78 54 63 72 Z" fill="{c}"/>',
-    },
-    "bun": {
-        "label": "おだんご",
-        "back": '<circle cx="100" cy="26" r="15" fill="{c}"/><circle cx="100" cy="26" r="15" fill="none" stroke="{d}" stroke-width="2"/>',
-        "front": '<path d="M63 72 Q60 34 100 34 Q140 34 137 72 Q128 52 100 52 Q72 52 63 72 Z" fill="{c}"/>',
+    "twintail": {
+        "label": "ツインテール",
+        "back": _CAP + '<path d="M64 60 Q26 68 28 130 Q30 182 20 230 Q46 220 50 180 Q56 130 62 102 Q66 84 74 70 Z" fill="{c}"/>'
+                '<path d="M136 60 Q174 68 172 130 Q170 182 180 230 Q154 220 150 180 Q144 130 138 102 Q134 84 126 70 Z" fill="{c}"/>'
+                '<path d="M40 100 Q36 150 30 210 M160 100 Q164 150 170 210" fill="none" stroke="{l}" stroke-width="2" opacity="0.7"/>',
+        "front": '<path d="M56 98 Q55 40 100 38 Q145 40 144 98 Q141 90 137 86 L135 79 Q118 84 100 81 Q82 84 65 79 L63 86 Q59 90 56 98 Z" fill="{c}"/>'
+                 '<path d="M57 92 Q55 118 61 132 Q67 118 66 96 Z" fill="{c}"/><path d="M143 92 Q145 118 139 132 Q133 118 134 96 Z" fill="{c}"/>' + _SHINE,
     },
     "ponytail": {
         "label": "ポニーテール",
-        "back": '<path d="M132 52 Q160 60 154 118 Q150 132 142 120 Q146 84 128 70 Z" fill="{c}"/>',
-        "front": '<path d="M63 72 Q60 32 100 30 Q140 32 137 72 Q130 50 100 50 Q70 50 63 72 Z" fill="{c}"/>',
+        "back": _CAP + '<path d="M118 44 Q170 42 168 110 Q166 162 180 200 Q146 190 142 142 Q140 98 124 70 Z" fill="{c}"/>'
+                '<path d="M150 70 Q156 130 168 186" fill="none" stroke="{l}" stroke-width="2" opacity="0.7"/>',
+        "front": '<path d="M56 98 Q55 40 100 38 Q145 40 144 98 Q138 74 120 62 Q104 77 80 81 Q65 83 56 98 Z" fill="{c}"/>'
+                 '<path d="M57 92 Q55 120 63 134 Q68 118 66 98 Z" fill="{c}"/><circle cx="124" cy="48" r="5" fill="{d}"/>' + _SHINE,
+    },
+    "bun": {
+        "label": "おだんご",
+        "back": _CAP + '<circle cx="100" cy="30" r="18" fill="{c}"/><path d="M88 28 Q100 18 112 30 Q104 40 92 34" fill="none" stroke="{d}" stroke-width="1.5" opacity="0.6"/>',
+        "front": '<path d="M56 98 Q55 40 100 38 Q145 40 144 98 Q140 82 132 76 Q124 86 114 84 Q110 74 100 72 Q90 74 86 84 Q76 86 68 76 Q60 82 56 98 Z" fill="{c}"/>'
+                 '<path d="M57 92 Q55 116 61 128 Q67 116 66 96 Z" fill="{c}"/><path d="M143 92 Q145 116 139 128 Q133 116 134 96 Z" fill="{c}"/>' + _SHINE,
+    },
+    "wavy": {
+        "label": "ゆるふわロング",
+        "back": '<path d="M53 92 Q51 34 100 32 Q149 34 147 92 Q160 120 149 150 Q162 182 147 212 Q152 234 132 232 Q139 204 128 182 Q137 152 126 132 L74 132 Q63 152 72 182 Q61 204 68 232 Q48 234 53 212 Q38 182 51 150 Q40 120 53 92 Z" fill="{c}"/>'
+                '<path d="M56 160 Q48 186 58 208 M144 160 Q152 186 142 208" fill="none" stroke="{l}" stroke-width="2" opacity="0.7"/>',
+        "front": '<path d="M56 100 Q55 40 100 38 Q145 40 144 100 Q140 80 128 72 Q124 82 112 80 Q108 70 98 70 Q90 72 86 82 Q74 84 70 74 Q60 82 56 100 Z" fill="{c}"/>'
+                 '<path d="M56 94 Q48 130 60 160 Q54 172 62 182 Q70 160 68 104 Z" fill="{c}"/><path d="M144 94 Q152 130 140 160 Q146 172 138 182 Q130 160 132 104 Z" fill="{c}"/>' + _SHINE,
+    },
+    # ---------------- 男の子向けに作った髪型 ----------------
+    "short": {
+        "label": "ショート",
+        "back": '<path d="M55 98 Q53 40 100 38 Q147 40 145 98 L143 118 L57 118 Z" fill="{c}"/>',
+        "front": '<path d="M56 96 Q54 42 100 40 Q146 42 144 96 Q139 83 131 79 L127 89 L119 77 L111 87 L103 75 L95 87 L87 77 L79 89 L73 79 Q62 85 56 96 Z" fill="{c}"/>'
+                 '<path d="M57 92 L59 112 L66 104 Z M143 92 L141 112 L134 104 Z" fill="{c}"/>' + _SHINE,
+    },
+    "spiky": {
+        "label": "ツンツン",
+        "back": '<path d="M55 98 Q53 40 100 38 Q147 40 145 98 L143 116 L57 116 Z" fill="{c}"/>',
+        "front": '<path d="M55 96 L48 64 L63 68 L60 40 L79 52 L85 26 L100 45 L115 26 L121 52 L140 40 L137 68 L152 64 L145 96 Q139 83 131 81 L125 91 L117 79 L109 89 L101 77 L93 89 L85 79 L77 91 L71 81 Q62 85 55 96 Z" fill="{c}"/>'
+                 '<path d="M85 26 L90 48 M115 26 L110 48" stroke="{l}" stroke-width="2" opacity="0.7"/>',
+    },
+    "mash": {
+        "label": "マッシュ",
+        "back": '<path d="M54 100 Q52 38 100 36 Q148 38 146 100 L144 120 L56 120 Z" fill="{c}"/>',
+        "front": '<path d="M54 98 Q53 38 100 36 Q147 38 146 98 Q143 92 138 89 Q130 92 122 88 Q112 92 100 87 Q88 92 78 88 Q70 92 62 89 Q57 92 54 98 Z" fill="{c}"/>'
+                 '<path d="M78 60 Q76 76 78 88 M100 56 L100 86 M122 60 Q124 76 122 88" fill="none" stroke="{d}" stroke-width="1.2" opacity="0.5"/>' + _SHINE,
+    },
+    "sidepart": {
+        "label": "七三わけ",
+        "back": '<path d="M55 98 Q53 40 100 38 Q147 40 145 98 L143 118 L57 118 Z" fill="{c}"/>',
+        "front": '<path d="M56 98 Q54 40 100 38 Q146 40 144 98 Q140 80 128 70 Q110 60 90 72 Q76 82 64 82 Q58 88 56 98 Z" fill="{c}"/>'
+                 '<path d="M118 44 Q110 58 112 66" fill="none" stroke="{d}" stroke-width="1.5" opacity="0.6"/>'
+                 '<path d="M57 92 L59 112 L66 104 Z M143 92 L141 112 L134 104 Z" fill="{c}"/>' + _SHINE,
+    },
+    "wolf": {
+        "label": "ウルフ",
+        "back": '<path d="M55 98 Q53 40 100 38 Q147 40 145 98 L149 134 L139 126 L141 148 L127 134 L73 134 L59 148 L61 126 L51 134 Z" fill="{c}"/>',
+        "front": '<path d="M55 98 Q54 40 100 38 Q146 40 145 98 Q140 84 133 80 L130 92 L122 78 L116 90 L108 76 L100 90 L92 76 L84 90 L78 78 L70 92 L67 80 Q60 86 55 98 Z" fill="{c}"/>'
+                 '<path d="M56 94 L55 124 L64 110 Z M144 94 L145 124 L136 110 Z" fill="{c}"/>' + _SHINE,
+    },
+    "curly": {
+        "label": "くせっ毛",
+        "back": '<path d="M54 100 Q46 76 58 62 Q54 42 74 40 Q82 28 98 32 Q112 24 124 36 Q144 36 144 56 Q156 70 146 100 L144 118 L56 118 Z" fill="{c}"/>',
+        "front": '<path d="M55 96 Q49 74 60 62 Q58 46 74 44 Q81 32 97 36 Q110 28 121 38 Q139 38 140 54 Q152 64 145 96 Q141 85 133 86 Q128 94 118 89 Q112 97 102 91 Q94 98 86 90 Q76 96 70 87 Q61 88 55 96 Z" fill="{c}"/>'
+                 '<path d="M72 54 Q78 48 84 54 M96 46 Q102 40 108 46 M120 52 Q126 46 132 54" fill="none" stroke="{l}" stroke-width="2" opacity="0.7"/>',
     },
 }
 
+# ---- トップス ----
+_TORSO = '<path d="M78 146 Q100 138 122 146 L125 202 L75 202 Z" fill="{c}" stroke="{d}" stroke-width="1.2"/>'
+_SLEEVE_S = ('<path d="M80 145 L71 149 L66 174 L78 177 L81 160 Z" fill="{c}" stroke="{d}" stroke-width="1.2"/>'
+             '<path d="M120 145 L129 149 L134 174 L122 177 L119 160 Z" fill="{c}" stroke="{d}" stroke-width="1.2"/>')
+_SLEEVE_L = ('<path d="M80 145 L71 149 L63 198 L76 201 L81 162 Z" fill="{c}" stroke="{d}" stroke-width="1.2"/>'
+             '<path d="M120 145 L129 149 L137 198 L124 201 L119 162 Z" fill="{c}" stroke="{d}" stroke-width="1.2"/>')
+_PUFF = ('<ellipse cx="74" cy="154" rx="10" ry="9" fill="{c}" stroke="{d}" stroke-width="1.2"/>'
+         '<ellipse cx="126" cy="154" rx="10" ry="9" fill="{c}" stroke="{d}" stroke-width="1.2"/>')
+
 TOP = {
-    "tshirt": {
-        "label": "Tシャツ",
-        "svg": '<path d="M66 118 Q100 110 134 118 L152 140 L138 150 L134 142 L134 178 L66 178 L66 142 L62 150 L48 140 Z" fill="{c}" stroke="{d}" stroke-width="2" stroke-linejoin="round"/>'
-               '<path d="M88 116 Q100 126 112 116" fill="none" stroke="{d}" stroke-width="2"/>',
-    },
+    "tshirt": {"label": "Tシャツ", "svg": _SLEEVE_S + _TORSO + '<path d="M91 143 Q100 151 109 143" fill="none" stroke="{d}" stroke-width="1.5"/>'},
     "hoodie": {
         "label": "パーカー",
-        "svg": '<rect x="48" y="118" width="20" height="60" rx="9" fill="{c}" stroke="{d}" stroke-width="2"/>'
-               '<rect x="132" y="118" width="20" height="60" rx="9" fill="{c}" stroke="{d}" stroke-width="2"/>'
-               '<rect x="64" y="114" width="72" height="66" rx="12" fill="{c}" stroke="{d}" stroke-width="2"/>'
-               '<path d="M78 114 Q100 134 122 114" fill="none" stroke="{d}" stroke-width="3"/>'
-               '<rect x="80" y="152" width="40" height="18" rx="5" fill="{d}" opacity="0.35"/>',
+        "svg": '<path d="M82 144 Q100 158 118 144 Q118 132 100 130 Q82 132 82 144 Z" fill="{d}"/>' + _SLEEVE_L + _TORSO
+               + '<path d="M86 180 L114 180 L117 198 L83 198 Z" fill="{d}" opacity="0.35"/>'
+               + '<path d="M95 148 L94 166 M105 148 L106 166" stroke="#FFFFFF" stroke-width="1.5"/>',
     },
     "happi": {
         "label": "法被",
-        "svg": '<path d="M64 116 L136 116 L156 124 L156 162 L136 162 L136 182 L64 182 L64 162 L44 162 L44 124 Z" fill="{c}" stroke="{d}" stroke-width="2" stroke-linejoin="round"/>'
-               '<path d="M92 116 L84 182 M108 116 L116 182" stroke="#FFFFFF" stroke-width="7"/>'
-               '<rect x="64" y="160" width="72" height="7" fill="{d}"/>'
-               '<path d="M44 150 L64 150 M136 150 L156 150" stroke="{l}" stroke-width="4"/>',
+        "svg": '<path d="M80 145 L60 150 L58 186 L77 186 L81 160 Z" fill="{c}" stroke="{d}" stroke-width="1.2"/>'
+               '<path d="M120 145 L140 150 L142 186 L123 186 L119 160 Z" fill="{c}" stroke="{d}" stroke-width="1.2"/>' + _TORSO
+               + '<path d="M93 141 L86 202 M107 141 L114 202" stroke="#FFFFFF" stroke-width="6"/>'
+               + '<rect x="75" y="186" width="50" height="6" fill="{d}"/><path d="M58 178 L77 178 M142 178 L123 178" stroke="{l}" stroke-width="3"/>',
     },
     "jacket": {
         "label": "ジャケット",
-        "svg": '<rect x="48" y="118" width="20" height="60" rx="8" fill="{c}" stroke="{d}" stroke-width="2"/>'
-               '<rect x="132" y="118" width="20" height="60" rx="8" fill="{c}" stroke="{d}" stroke-width="2"/>'
-               '<rect x="64" y="114" width="72" height="68" rx="10" fill="{c}" stroke="{d}" stroke-width="2"/>'
-               '<path d="M90 114 L100 146 L110 114 Z" fill="#FFFFFF"/>'
-               '<path d="M86 114 L98 150 M114 114 L102 150" stroke="{d}" stroke-width="3"/>'
-               '<circle cx="100" cy="160" r="3" fill="{d}"/><circle cx="100" cy="172" r="3" fill="{d}"/>',
+        "svg": _SLEEVE_L + _TORSO + '<path d="M92 142 L100 170 L108 142 Z" fill="#FFFFFF"/>'
+               + '<path d="M88 142 L98 174 M112 142 L102 174" stroke="{d}" stroke-width="2.5"/>'
+               + '<circle cx="100" cy="182" r="2.4" fill="{d}"/><circle cx="100" cy="192" r="2.4" fill="{d}"/>',
     },
     "border": {
         "label": "ボーダーシャツ",
-        "svg": '<path d="M66 118 Q100 110 134 118 L152 140 L138 150 L134 142 L134 178 L66 178 L66 142 L62 150 L48 140 Z" fill="#FFFFFF" stroke="{d}" stroke-width="2" stroke-linejoin="round"/>'
-               '<path d="M66 132 L134 132 M66 146 L134 146 M66 160 L134 160 M66 174 L134 174" stroke="{c}" stroke-width="6"/>',
+        "svg": _SLEEVE_S.replace("{c}", "#FFFFFF") + _TORSO.replace("{c}", "#FFFFFF")
+               + ''.join(f'<rect x="77" y="{y}" width="46" height="4" fill="{{c}}"/>' for y in (154, 164, 174, 184, 194))
+               + '<path d="M68 162 L79 164 M67 170 L78 172 M132 162 L121 164 M133 170 L122 172" stroke="{c}" stroke-width="3"/>',
+    },
+    "blouse": {
+        "label": "リボンブラウス",
+        "svg": _PUFF + _TORSO + '<ellipse cx="93" cy="145" rx="8" ry="5" fill="#FFFFFF"/><ellipse cx="107" cy="145" rx="8" ry="5" fill="#FFFFFF"/>'
+               + '<path d="M100 150 L89 144 L89 156 Z M100 150 L111 144 L111 156 Z" fill="{d}"/><circle cx="100" cy="150" r="3" fill="{d}"/>'
+               + '<path d="M100 153 L96 166 M100 153 L104 166" stroke="{d}" stroke-width="2.5"/>',
+    },
+    "idol": {
+        "label": "アイドル衣装",
+        "svg": _PUFF + _TORSO + '<path d="M95 146 L105 146 L106 202 L94 202 Z" fill="#FFFFFF"/>'
+               + '<circle cx="100" cy="166" r="2.3" fill="#F2C440"/><circle cx="100" cy="178" r="2.3" fill="#F2C440"/><circle cx="100" cy="190" r="2.3" fill="#F2C440"/>'
+               + '<path d="M100 148 L86 141 L87 157 Z M100 148 L114 141 L113 157 Z" fill="{d}"/><circle cx="100" cy="148" r="3.5" fill="{l}"/>'
+               + '<path d="M114 160 L116 164 L120 164 L117 167 L118 171 L114 169 L110 171 L111 167 L108 164 L112 164 Z" fill="#F2C440"/>'
+               + '<rect x="75" y="198" width="50" height="4" fill="#FFFFFF"/>'
+               + '<path d="M64 154 L84 154 M116 154 L136 154" stroke="#FFFFFF" stroke-width="2"/>',
+    },
+    "sailor": {
+        "label": "セーラー服",
+        "svg": _SLEEVE_L.replace("{c}", "#FFFFFF") + _TORSO.replace("{c}", "#FFFFFF")
+               + '<path d="M79 146 L92 141 L100 164 L108 141 L121 146 L119 160 L100 176 L81 160 Z" fill="{c}"/>'
+               + '<path d="M84 150 L100 170 L116 150" fill="none" stroke="#FFFFFF" stroke-width="1.5"/>'
+               + '<path d="M100 168 L90 162 L91 174 Z M100 168 L110 162 L109 174 Z" fill="#D6334A"/>'
+               + '<path d="M63 192 L76 195 M137 192 L124 195" stroke="{c}" stroke-width="5"/>',
+    },
+    "kimono": {
+        "label": "着物風トップス",
+        "svg": '<path d="M80 145 L62 150 L60 198 L78 198 L81 160 Z" fill="{c}" stroke="{d}" stroke-width="1.2"/>'
+               '<path d="M120 145 L138 150 L140 198 L122 198 L119 160 Z" fill="{c}" stroke="{d}" stroke-width="1.2"/>' + _TORSO
+               + '<path d="M92 141 L110 178 M108 141 L100 157" stroke="#FFFFFF" stroke-width="4"/>'
+               + '<rect x="75" y="182" width="50" height="14" fill="{d}"/><path d="M75 189 L125 189" stroke="{l}" stroke-width="2"/>'
+               + ''.join(f'<circle cx="{x}" cy="{y}" r="3" fill="{{l}}"/>' for x, y in ((84, 166), (116, 160), (68, 176), (132, 184), (70, 158)))
+    },
+    "shirt_tie": {
+        "label": "シャツとネクタイ",
+        "svg": _SLEEVE_L + _TORSO + '<path d="M90 141 L100 150 L93 156 Z M110 141 L100 150 L107 156 Z" fill="{l}" stroke="{d}" stroke-width="1"/>'
+               + '<path d="M97.5 150 L102.5 150 L104.5 180 L100 187 L95.5 180 Z" fill="#2B3A67"/>'
+               + '<path d="M66 192 L76 194 M134 192 L124 194" stroke="{l}" stroke-width="4"/>',
+    },
+    "sweater": {
+        "label": "ニット",
+        "svg": _SLEEVE_L + _TORSO + '<path d="M90 142 Q100 150 110 142" fill="none" stroke="{l}" stroke-width="4"/>'
+               + '<rect x="75" y="194" width="50" height="8" fill="{d}"/>'
+               + '<path d="M92 156 Q96 166 92 176 Q96 186 92 194 M108 156 Q104 166 108 176 Q104 186 108 194" fill="none" stroke="{l}" stroke-width="2"/>'
+               + '<path d="M63 194 L76 197 M137 194 L124 197" stroke="{d}" stroke-width="5"/>',
+    },
+    "parka": {
+        "label": "ブルゾン",
+        "svg": _SLEEVE_L + _TORSO + '<path d="M100 141 L100 202" stroke="{d}" stroke-width="2"/>'
+               + '<path d="M86 141 Q100 136 114 141 L112 148 Q100 144 88 148 Z" fill="{l}"/>'
+               + '<rect x="75" y="194" width="50" height="8" fill="{l}"/><rect x="83" y="172" width="10" height="8" rx="2" fill="{d}" opacity="0.5"/>'
+               + '<rect x="107" y="172" width="10" height="8" rx="2" fill="{d}" opacity="0.5"/>',
     },
 }
 
+# ---- ボトムス ----
 BOTTOM = {
-    "pants": {
-        "label": "パンツ",
-        "svg": '<rect x="74" y="168" width="52" height="22" rx="4" fill="{c}"/>'
-               '<rect x="74" y="178" width="24" height="64" rx="4" fill="{c}" stroke="{d}" stroke-width="2"/>'
-               '<rect x="102" y="178" width="24" height="64" rx="4" fill="{c}" stroke="{d}" stroke-width="2"/>',
-    },
-    "shorts": {
-        "label": "ショートパンツ",
-        "svg": '<rect x="74" y="168" width="52" height="22" rx="4" fill="{c}"/>'
-               '<rect x="74" y="178" width="24" height="28" rx="4" fill="{c}" stroke="{d}" stroke-width="2"/>'
-               '<rect x="102" y="178" width="24" height="28" rx="4" fill="{c}" stroke="{d}" stroke-width="2"/>',
-    },
-    "skirt": {
-        "label": "スカート",
-        "svg": '<path d="M74 168 L126 168 L138 216 L62 216 Z" fill="{c}" stroke="{d}" stroke-width="2" stroke-linejoin="round"/>'
-               '<path d="M88 172 L82 214 M100 172 L100 214 M112 172 L118 214" stroke="{d}" stroke-width="1.5" opacity="0.6"/>',
-    },
-    "hakama": {
-        "label": "袴",
-        "svg": '<path d="M72 166 L128 166 L142 244 L58 244 Z" fill="{c}" stroke="{d}" stroke-width="2" stroke-linejoin="round"/>'
-               '<path d="M86 170 L78 244 M100 170 L100 244 M114 170 L122 244" stroke="{d}" stroke-width="2" opacity="0.6"/>'
-               '<rect x="72" y="164" width="56" height="6" fill="{l}"/>',
-    },
+    "pants": {"label": "パンツ", "svg": '<path d="M76 196 L124 196 L121 268 L103 268 L100 214 L97 268 L79 268 Z" fill="{c}" stroke="{d}" stroke-width="1.2"/>'
+              '<path d="M100 200 L100 214" stroke="{d}" stroke-width="1"/>'},
+    "jeans": {"label": "ジーンズ", "svg": '<path d="M76 196 L124 196 L121 266 L103 266 L100 214 L97 266 L79 266 Z" fill="{c}" stroke="{d}" stroke-width="1.2"/>'
+              '<rect x="78" y="260" width="20" height="6" fill="{l}"/><rect x="102" y="260" width="20" height="6" fill="{l}"/>'
+              '<path d="M82 200 Q86 208 92 204 M118 200 Q114 208 108 204" fill="none" stroke="#E2B04A" stroke-width="1"/>'},
+    "shorts": {"label": "ショートパンツ", "svg": '<path d="M76 196 L124 196 L124 230 L102 230 L100 214 L98 230 L76 230 Z" fill="{c}" stroke="{d}" stroke-width="1.2"/>'},
+    "cropped": {"label": "クロップドパンツ", "svg": '<path d="M76 196 L124 196 L122 248 L103 248 L100 214 L97 248 L78 248 Z" fill="{c}" stroke="{d}" stroke-width="1.2"/>'
+                '<rect x="78" y="242" width="19" height="6" fill="{l}"/><rect x="103" y="242" width="19" height="6" fill="{l}"/>'},
+    "hakama": {"label": "袴", "svg": '<path d="M74 194 L126 194 L142 268 L58 268 Z" fill="{c}" stroke="{d}" stroke-width="1.2"/>'
+               '<path d="M88 198 L80 268 M100 198 L100 268 M112 198 L120 268" stroke="{d}" stroke-width="1.5" opacity="0.6"/>'
+               '<rect x="74" y="192" width="52" height="6" fill="{l}"/>'},
+    "skirt": {"label": "フレアスカート", "svg": '<path d="M78 196 L122 196 L142 244 Q100 254 58 244 Z" fill="{c}" stroke="{d}" stroke-width="1.2"/>'
+              + ''.join(f'<path d="M{x} 236 L{x + 4} 240 L{x} 244 L{x - 4} 240 Z" fill="{{l}}"/>' for x in range(66, 138, 9))},
+    "pleated": {"label": "チェックプリーツ", "svg": '<path d="M78 196 L122 196 L140 240 L60 240 Z" fill="{c}" stroke="{d}" stroke-width="1.2"/>'
+                '<path d="M88 196 L78 240 M100 196 L100 240 M112 196 L122 240" stroke="{d}" stroke-width="1.5"/>'
+                '<path d="M70 214 L130 214 M64 228 L136 228" stroke="{l}" stroke-width="2.5" opacity="0.8"/>'
+                '<path d="M94 196 L89 240 M106 196 L111 240" stroke="{l}" stroke-width="1.5" opacity="0.7"/>'},
+    "frill": {"label": "フリルスカート", "svg": '<path d="M78 196 L122 196 L138 232 L62 232 Z" fill="{c}" stroke="{d}" stroke-width="1.2"/>'
+              + ''.join(f'<circle cx="{x}" cy="234" r="5" fill="#FFFFFF" stroke="{{l}}" stroke-width="0.8"/>' for x in range(62, 140, 8))
+              + '<rect x="77" y="194" width="46" height="5" fill="{d}"/>'},
+    "jumper": {"label": "ジャンパースカート", "svg": '<path d="M80 150 L86 150 L88 196 L112 196 L114 150 L120 150 L122 196 L140 246 Q100 256 60 246 L78 196 Z" fill="{c}" stroke="{d}" stroke-width="1.2"/>'
+               '<circle cx="86" cy="154" r="2" fill="{l}"/><circle cx="114" cy="154" r="2" fill="{l}"/>'},
 }
 
+# ---- くつ (足の位置: 左 x≈90 / 右 x≈110, y≈272〜284) ----
 SHOES = {
-    "sneakers": {
-        "label": "スニーカー",
-        "svg": '<rect x="70" y="238" width="30" height="14" rx="6" fill="{c}" stroke="{d}" stroke-width="2"/>'
-               '<rect x="100" y="238" width="30" height="14" rx="6" fill="{c}" stroke="{d}" stroke-width="2"/>'
-               '<rect x="70" y="248" width="30" height="4" fill="#FFFFFF"/><rect x="100" y="248" width="30" height="4" fill="#FFFFFF"/>',
-    },
-    "geta": {
-        "label": "下駄",
-        "svg": '<rect x="72" y="246" width="26" height="5" fill="#B07A45"/><rect x="102" y="246" width="26" height="5" fill="#B07A45"/>'
-               '<rect x="75" y="251" width="5" height="6" fill="#8A5A2E"/><rect x="90" y="251" width="5" height="6" fill="#8A5A2E"/>'
-               '<rect x="105" y="251" width="5" height="6" fill="#8A5A2E"/><rect x="120" y="251" width="5" height="6" fill="#8A5A2E"/>'
-               '<path d="M78 246 L86 238 L94 246 M108 246 L116 238 L124 246" fill="none" stroke="{c}" stroke-width="3"/>',
-    },
-    "boots": {
-        "label": "ブーツ",
-        "svg": '<path d="M76 220 L98 220 L98 252 L68 252 Q68 242 76 240 Z" fill="{c}" stroke="{d}" stroke-width="2"/>'
-               '<path d="M102 220 L124 220 L124 240 Q132 242 132 252 L102 252 Z" fill="{c}" stroke="{d}" stroke-width="2"/>',
-    },
+    "sneakers": {"label": "スニーカー", "svg": '<rect x="81" y="268" width="17" height="13" rx="6" fill="{c}" stroke="{d}" stroke-width="1"/>'
+                 '<rect x="102" y="268" width="17" height="13" rx="6" fill="{c}" stroke="{d}" stroke-width="1"/>'
+                 '<rect x="81" y="278" width="17" height="4" rx="2" fill="#FFFFFF"/><rect x="102" y="278" width="17" height="4" rx="2" fill="#FFFFFF"/>'},
+    "loafers": {"label": "ローファー", "svg": '<path d="M82 272 Q82 266 90 266 Q98 266 98 274 L98 281 L82 281 Z" fill="{c}"/>'
+                '<path d="M102 274 Q102 266 110 266 Q118 266 118 272 L118 281 L102 281 Z" fill="{c}"/>'
+                '<circle cx="90" cy="272" r="1.8" fill="#F2C440"/><circle cx="110" cy="272" r="1.8" fill="#F2C440"/>'},
+    "boots": {"label": "ブーツ", "svg": '<path d="M85 242 L98 242 L98 282 L80 282 Q80 272 86 270 Z" fill="{c}" stroke="{d}" stroke-width="1"/>'
+              '<path d="M102 242 L115 242 L114 270 Q120 272 120 282 L102 282 Z" fill="{c}" stroke="{d}" stroke-width="1"/>'
+              '<rect x="85" y="242" width="13" height="4" fill="{l}"/><rect x="102" y="242" width="13" height="4" fill="{l}"/>'},
+    "sandals": {"label": "サンダル", "svg": '<ellipse cx="90" cy="281" rx="8.5" ry="2.8" fill="{d}"/><ellipse cx="110" cy="281" rx="8.5" ry="2.8" fill="{d}"/>'
+                '<path d="M84 276 Q90 272 96 276 M104 276 Q110 272 116 276" fill="none" stroke="{c}" stroke-width="2.5"/>'
+                '<path d="M86 266 Q90 270 96 266 M104 266 Q110 270 114 266" fill="none" stroke="{c}" stroke-width="2"/>'
+                '<circle cx="96" cy="266" r="1.8" fill="#F2C440"/><circle cx="104" cy="266" r="1.8" fill="#F2C440"/>'},
+    "geta": {"label": "下駄", "svg": '<rect x="82" y="279" width="17" height="4" fill="#B07A45"/><rect x="101" y="279" width="17" height="4" fill="#B07A45"/>'
+             '<rect x="84" y="283" width="4" height="4" fill="#8A5A2E"/><rect x="93" y="283" width="4" height="4" fill="#8A5A2E"/>'
+             '<rect x="103" y="283" width="4" height="4" fill="#8A5A2E"/><rect x="112" y="283" width="4" height="4" fill="#8A5A2E"/>'
+             '<path d="M84 279 L90 271 L97 279 M103 279 L110 271 L116 279" fill="none" stroke="{c}" stroke-width="2.5"/>'},
+    "highsocks": {"label": "ハイソックス", "svg": '<rect x="86" y="230" width="12" height="44" rx="5" fill="{c}"/><rect x="102" y="230" width="12" height="44" rx="5" fill="{c}"/>'
+                  '<rect x="86" y="232" width="12" height="3" fill="#FFFFFF"/><rect x="102" y="232" width="12" height="3" fill="#FFFFFF"/>'
+                  '<path d="M82 274 Q82 268 90 268 Q98 268 98 275 L98 282 L82 282 Z" fill="#7A4A2A"/>'
+                  '<path d="M102 275 Q102 268 110 268 Q118 268 118 274 L118 282 L102 282 Z" fill="#7A4A2A"/>'},
 }
 
+# ---- こもの (髪の上に描く) ----
 ACCESSORY = {
-    "cap": {
-        "label": "キャップ",
-        "svg": '<path d="M62 58 Q64 26 100 26 Q136 26 138 58 Z" fill="{c}" stroke="{d}" stroke-width="2"/>'
-               '<path d="M98 56 L152 58 Q152 66 138 66 L98 62 Z" fill="{d}"/>',
-    },
-    "glasses": {
-        "label": "メガネ",
-        "svg": '<circle cx="86" cy="76" r="10" fill="none" stroke="{c}" stroke-width="3"/>'
-               '<circle cx="114" cy="76" r="10" fill="none" stroke="{c}" stroke-width="3"/>'
-               '<path d="M96 76 L104 76" stroke="{c}" stroke-width="3"/>',
-    },
-    "flower": {
-        "label": "花のかんざし",
-        "svg": '<g transform="translate(128 46)">'
-               '<circle cx="0" cy="-8" r="6" fill="{c}"/><circle cx="8" cy="0" r="6" fill="{c}"/>'
-               '<circle cx="0" cy="8" r="6" fill="{c}"/><circle cx="-8" cy="0" r="6" fill="{c}"/>'
-               '<circle cx="0" cy="0" r="4" fill="#FFD84D"/></g>',
-    },
-    "scarf": {
-        "label": "マフラー",
-        "svg": '<path d="M78 106 Q100 122 122 106 L124 118 Q100 134 76 118 Z" fill="{c}" stroke="{d}" stroke-width="2"/>'
-               '<rect x="110" y="118" width="12" height="30" rx="3" fill="{c}" stroke="{d}" stroke-width="2"/>',
-    },
-    "foxmask": {
-        "label": "きつねのお面",
-        "svg": '<g transform="translate(132 44) rotate(18)">'
-               '<path d="M-16 -10 L-12 -24 L-4 -12 L4 -12 L12 -24 L16 -10 Q18 10 0 16 Q-18 10 -16 -10 Z" fill="#FFFFFF" stroke="#999999" stroke-width="1.5"/>'
-               '<path d="M-10 -2 L-4 0 M10 -2 L4 0" stroke="{c}" stroke-width="2.5"/>'
-               '<path d="M-12 -18 L-8 -12 M12 -18 L8 -12" stroke="{c}" stroke-width="2.5"/>'
-               '<circle cx="0" cy="8" r="2" fill="{c}"/></g>',
-    },
+    "cap": {"label": "キャップ", "svg": '<path d="M56 68 Q58 32 100 30 Q142 32 144 68 Z" fill="{c}" stroke="{d}" stroke-width="1.2"/>'
+            '<path d="M98 64 L158 66 Q158 75 142 75 L98 71 Z" fill="{d}"/><circle cx="100" cy="31" r="3" fill="{d}"/>'},
+    "beret": {"label": "ベレー帽", "svg": '<path d="M54 70 Q54 34 102 30 Q148 32 150 58 Q126 50 104 56 Q76 60 54 70 Z" fill="{c}" stroke="{d}" stroke-width="1.2"/>'
+              '<path d="M104 30 L106 22" stroke="{d}" stroke-width="3" stroke-linecap="round"/>'},
+    "glasses": {"label": "メガネ", "svg": '<rect x="66" y="90" width="30" height="27" rx="11" fill="none" stroke="{c}" stroke-width="2.6"/>'
+                '<rect x="104" y="90" width="30" height="27" rx="11" fill="none" stroke="{c}" stroke-width="2.6"/><path d="M96 100 L104 100" stroke="{c}" stroke-width="2.6"/>'},
+    "headphones": {"label": "ヘッドホン", "svg": '<path d="M56 92 Q54 30 100 30 Q146 30 144 92" fill="none" stroke="{c}" stroke-width="5"/>'
+                   '<rect x="48" y="84" width="13" height="24" rx="6" fill="{c}" stroke="{d}" stroke-width="1.2"/>'
+                   '<rect x="139" y="84" width="13" height="24" rx="6" fill="{c}" stroke="{d}" stroke-width="1.2"/>'},
+    "ribbon": {"label": "大きなリボン", "svg": '<g transform="translate(128 46) rotate(15)"><path d="M0 0 L-20 -12 L-18 12 Z M0 0 L20 -12 L18 12 Z" fill="{c}" stroke="{d}" stroke-width="1.2"/>'
+               '<circle cx="0" cy="0" r="5" fill="{d}"/><path d="M-3 4 L-8 18 M3 4 L8 18" stroke="{c}" stroke-width="3"/></g>'},
+    "flower": {"label": "花かざり", "svg": '<g transform="translate(130 48)">'
+               + ''.join(f'<circle cx="{x}" cy="{y}" r="6.5" fill="{{c}}" stroke="{{d}}" stroke-width="0.8"/>' for x, y in ((0, -8), (8, -2), (5, 7), (-5, 7), (-8, -2)))
+               + '<circle cx="0" cy="0" r="4" fill="#FFE07A"/><path d="M-12 8 L-18 14 M10 10 L16 16" stroke="#6AAE5A" stroke-width="3"/></g>'},
+    "star": {"label": "星のヘアピン", "svg": '<g transform="translate(124 60)"><path d="M0 -9 L2.6 -3 L9 -2.8 L4 1.4 L5.6 8 L0 4.4 L-5.6 8 L-4 1.4 L-9 -2.8 L-2.6 -3 Z" fill="{c}" stroke="{d}" stroke-width="1"/></g>'
+             '<g transform="translate(138 74) scale(0.6)"><path d="M0 -9 L2.6 -3 L9 -2.8 L4 1.4 L5.6 8 L0 4.4 L-5.6 8 L-4 1.4 L-9 -2.8 L-2.6 -3 Z" fill="{l}"/></g>'},
+    "scarf": {"label": "マフラー", "svg": '<path d="M80 136 Q100 152 120 136 L122 150 Q100 166 78 150 Z" fill="{c}" stroke="{d}" stroke-width="1.2"/>'
+              '<rect x="108" y="150" width="12" height="30" rx="3" fill="{c}" stroke="{d}" stroke-width="1.2"/>'
+              '<path d="M110 176 L110 182 M114 176 L114 182 M118 176 L118 182" stroke="{d}" stroke-width="1.5"/>'},
+    "foxmask": {"label": "きつねのお面", "svg": '<g transform="translate(136 50) rotate(18)">'
+                '<path d="M-16 -10 L-12 -24 L-4 -12 L4 -12 L12 -24 L16 -10 Q18 10 0 16 Q-18 10 -16 -10 Z" fill="#FFFFFF" stroke="#999999" stroke-width="1.5"/>'
+                '<path d="M-10 -2 L-4 0 M10 -2 L4 0" stroke="{c}" stroke-width="2.5"/><path d="M-12 -18 L-8 -12 M12 -18 L8 -12" stroke="{c}" stroke-width="2.5"/>'
+                '<circle cx="0" cy="8" r="2" fill="{c}"/></g>'},
+    "crown": {"label": "ティアラ", "svg": '<path d="M76 50 L82 36 L90 46 L100 30 L110 46 L118 36 L124 50 Q100 44 76 50 Z" fill="{c}" stroke="{d}" stroke-width="1.2"/>'
+              '<circle cx="100" cy="40" r="3" fill="#E8508A"/><circle cx="84" cy="44" r="2" fill="#6AC0E8"/><circle cx="116" cy="44" r="2" fill="#6AC0E8"/>'},
 }
 
 STYLES = {"hair": HAIR, "top": TOP, "bottom": BOTTOM, "shoes": SHOES, "accessory": ACCESSORY}
@@ -228,41 +348,96 @@ class Part:
 
 def _fmt(template: str, color: str) -> str:
     c = safe_color(color)
-    return template.format(c=c, d=shade(c, 0.7), l=shade(c, 1.45))
+    return template.format(c=c, d=shade(c, 0.68), l=shade(c, 1.45))
 
 
-def _base_body(skin: str) -> str:
-    s, sd = skin, shade(skin, 0.8)
+# =====================================================================================
+# 体・顔
+# =====================================================================================
+
+def _body(skin: str) -> str:
+    s, sd = skin, shade(skin, 0.85)
     return (
-        # 腕・手・首・脚 (服の下に描く)
-        f'<rect x="52" y="120" width="14" height="56" rx="7" fill="{s}"/>'
-        f'<rect x="134" y="120" width="14" height="56" rx="7" fill="{s}"/>'
-        f'<circle cx="59" cy="180" r="7" fill="{s}"/><circle cx="141" cy="180" r="7" fill="{s}"/>'
-        f'<rect x="78" y="170" width="18" height="72" rx="6" fill="{s}"/>'
-        f'<rect x="104" y="170" width="18" height="72" rx="6" fill="{s}"/>'
-        f'<rect x="92" y="102" width="16" height="16" fill="{sd}"/>'
+        # 脚・足
+        f'<path d="M93 200 L92 274 M107 200 L108 274" stroke="{s}" stroke-width="10.5" stroke-linecap="round"/>'
+        f'<ellipse cx="90" cy="278" rx="7" ry="4.5" fill="{s}"/><ellipse cx="110" cy="278" rx="7" ry="4.5" fill="{s}"/>'
         # 肌着 (服を着ていないときの既定)
-        '<rect x="66" y="116" width="68" height="62" rx="10" fill="#F4F1EC" stroke="#CFC8BD" stroke-width="2"/>'
-        '<rect x="74" y="168" width="52" height="24" rx="5" fill="#B9B4AC"/>'
+        '<path d="M78 146 Q100 138 122 146 L124 202 L76 202 Z" fill="#F4F1EC" stroke="#D8D1C6" stroke-width="1.2"/>'
+        '<rect x="77" y="196" width="46" height="16" rx="4" fill="#C9C3BA"/>'
+        # 腕・手
+        f'<path d="M80 152 L70 200 M120 152 L130 200" stroke="{s}" stroke-width="9" stroke-linecap="round"/>'
+        f'<circle cx="69" cy="203" r="5.5" fill="{s}"/><circle cx="131" cy="203" r="5.5" fill="{s}"/>'
+        f'<rect x="94.5" y="126" width="11" height="20" rx="4" fill="{sd}"/>'
     )
 
 
 def _head(skin: str) -> str:
-    s = skin
+    s, sd = skin, shade(skin, 0.88)
     return (
-        f'<circle cx="100" cy="72" r="36" fill="{s}"/>'
-        f'<circle cx="64" cy="76" r="6" fill="{s}"/><circle cx="136" cy="76" r="6" fill="{s}"/>'
-        '<circle cx="88" cy="78" r="3.6" fill="#2B2B2B"/><circle cx="112" cy="78" r="3.6" fill="#2B2B2B"/>'
-        '<circle cx="89.2" cy="76.8" r="1.1" fill="#FFFFFF"/><circle cx="113.2" cy="76.8" r="1.1" fill="#FFFFFF"/>'
-        '<path d="M92 91 Q100 98 108 91" fill="none" stroke="#7A3B2E" stroke-width="2.4" stroke-linecap="round"/>'
-        '<circle cx="80" cy="89" r="5" fill="#F28B8B" opacity="0.45"/><circle cx="120" cy="89" r="5" fill="#F28B8B" opacity="0.45"/>'
+        f'<ellipse cx="59" cy="100" rx="5.5" ry="8" fill="{sd}"/><ellipse cx="141" cy="100" rx="5.5" ry="8" fill="{sd}"/>'
+        f'<path d="M59 88 Q59 50 100 48 Q141 50 141 88 Q141 118 123 130 Q111 138 100 138 Q89 138 77 130 Q59 118 59 88 Z" fill="{s}"/>'
     )
 
 
-def render_svg(skin_tone: str, parts: dict[str, Part | None], *, label: str = "アバター",
-               size: int | None = None, background: bool = True) -> str:
+def _eye(cx: float, cy: float, iris: str, girl: bool, outer: int) -> str:
+    """大きくてきらきらした瞳。outer は目尻の向き (-1 = 左目, 1 = 右目)。"""
+    rx, ry = (12.5, 15) if girl else (11, 13)
+    lid = "#3B2A2A"
+    lid_top = cy - ry - 5 if girl else cy - ry - 3
+    lash = (f'<path d="M{cx + outer * (rx + 0.5)} {cy - 7} L{cx + outer * (rx + 5)} {cy - 12}" stroke="{lid}" stroke-width="2.6" stroke-linecap="round"/>'
+            f'<path d="M{cx + outer * (rx - 2)} {cy - 11} L{cx + outer * (rx + 2)} {cy - 16}" stroke="{lid}" stroke-width="1.8" stroke-linecap="round"/>'
+            if girl else "")
+    return (
+        f'<ellipse cx="{cx}" cy="{cy}" rx="{rx}" ry="{ry}" fill="#FFFFFF"/>'
+        f'<ellipse cx="{cx}" cy="{cy + 1}" rx="{rx - 1.8}" ry="{ry - 1.2}" fill="url(#iris-{iris[1:]})"/>'
+        f'<ellipse cx="{cx}" cy="{cy + 6}" rx="{rx - 4}" ry="{ry * 0.42}" fill="{shade(iris, 1.7)}" opacity="0.45"/>'
+        f'<ellipse cx="{cx}" cy="{cy + 1.5}" rx="4.2" ry="6.2" fill="{shade(iris, 0.28)}"/>'
+        f'<ellipse cx="{cx + 4}" cy="{cy - 5.5}" rx="4.2" ry="4.6" fill="#FFFFFF"/>'
+        f'<circle cx="{cx - 4.2}" cy="{cy + 6.5}" r="2.1" fill="#FFFFFF" opacity="0.9"/>'
+        f'<circle cx="{cx + 5}" cy="{cy + 6}" r="1.2" fill="#FFFFFF" opacity="0.85"/>'
+        f'<path d="M{cx - rx - 1.5} {cy - 5} Q{cx} {lid_top} {cx + rx + 1.5} {cy - 6}" fill="none" stroke="{lid}" stroke-width="{3.8 if girl else 3.2}" stroke-linecap="round"/>'
+        + lash
+        + f'<path d="M{cx - 7} {cy + ry - 0.5} Q{cx} {cy + ry + 2} {cx + 7} {cy + ry - 0.5}" fill="none" stroke="#B07A6A" stroke-width="1.1" opacity="0.6"/>'
+    )
+
+
+def _face(body_type: str, eye_color: str, brow: str) -> str:
+    girl = body_type == "girl"
+    iris = EYE_COLORS.get(eye_color, EYE_COLORS["brown"])
+    bw = 1.8 if girl else 2.6
+    brows = (f'<path d="M73 79 Q81 75 89 78" fill="none" stroke="{brow}" stroke-width="{bw}" stroke-linecap="round"/>'
+             f'<path d="M111 78 Q119 75 127 79" fill="none" stroke="{brow}" stroke-width="{bw}" stroke-linecap="round"/>')
+    mouth = ('<path d="M95.5 126 Q97.8 129 100 126.5 Q102.2 129 104.5 126" fill="none" stroke="#C25A5A" stroke-width="1.6" stroke-linecap="round"/>'
+             if girl else
+             '<path d="M95 125.5 Q100 130 105 125.5" fill="none" stroke="#B5524E" stroke-width="1.8" stroke-linecap="round"/>')
+    return (
+        brows
+        + _eye(81, 103, iris, girl, -1) + _eye(119, 103, iris, girl, 1)
+        + '<path d="M99.4 119 L100.4 120.2" stroke="#C99280" stroke-width="1.2" stroke-linecap="round"/>'
+        + mouth
+        + '<ellipse cx="70" cy="120" rx="7.5" ry="3.8" fill="#FF8FA3" opacity="0.42"/>'
+        + '<ellipse cx="130" cy="120" rx="7.5" ry="3.8" fill="#FF8FA3" opacity="0.42"/>'
+    )
+
+
+def _defs(eye_color: str) -> str:
+    iris = EYE_COLORS.get(eye_color, EYE_COLORS["brown"])
+    return (
+        # id は色ごとに変える (1 つの HTML に複数のアバターを直接埋め込んでも混ざらないように)
+        f'<defs><linearGradient id="iris-{iris[1:]}" x1="0" y1="0" x2="0" y2="1">'
+        f'<stop offset="0" stop-color="{shade(iris, 0.42)}"/><stop offset="0.55" stop-color="{iris}"/>'
+        f'<stop offset="1" stop-color="{shade(iris, 1.55)}"/></linearGradient>'
+        '<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFF7EA"/>'
+        '<stop offset="1" stop-color="#FDE7D2"/></linearGradient></defs>'
+    )
+
+
+def render_svg(skin_tone: str, parts: dict[str, Part | None], *, body_type: str = "girl", eye_color: str = "brown",
+               label: str = "アバター", size: int | None = None, background: bool = True) -> str:
     """アバター全体の SVG 文字列を返す。"""
     skin = SKIN_TONES.get(skin_tone, SKIN_TONES["tone3"])
+    body_type = body_type if body_type in dict(BODY_TYPE_CHOICES) else "girl"
+    eye_color = eye_color if eye_color in EYE_COLORS else "brown"
 
     def layer(category: str, key: str = "svg") -> str:
         p = parts.get(category)
@@ -270,22 +445,27 @@ def render_svg(skin_tone: str, parts: dict[str, Part | None], *, label: str = "�
             return ""
         return _fmt(STYLES[category][p.style].get(key, ""), p.color)
 
+    hair = parts.get("hair")
+    brow = shade(safe_color(hair.color), 0.7) if hair else "#6B4A3A"
     described = [f"{CATEGORY_LABELS[c]}: {p.name}" for c, p in parts.items() if p is not None and p.name]
     aria = escape(label + (" (" + "、".join(described) + ")" if described else ""))
-    dims = f' width="{int(size)}" height="{int(size * 270 / 200)}"' if size else ""
-    bg = '<rect x="0" y="0" width="200" height="270" rx="18" fill="#FFF6E5"/><ellipse cx="100" cy="256" rx="58" ry="8" fill="#000000" opacity="0.08"/>' if background else ""
+    dims = f' width="{int(size)}" height="{int(size * 300 / 200)}"' if size else ""
+    bg = ('<rect x="0" y="0" width="200" height="300" rx="18" fill="url(#bg)"/>'
+          '<ellipse cx="100" cy="286" rx="48" ry="6" fill="#000000" opacity="0.08"/>') if background else ""
     body = "".join([
+        _defs(eye_color),
         bg,
         layer("hair", "back"),
-        _base_body(skin),
+        _body(skin),
         layer("shoes"),
         layer("bottom"),
         layer("top"),
         _head(skin),
+        _face(body_type, eye_color, brow),
         layer("hair", "front"),
         layer("accessory"),
     ])
     return (
-        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 270"{dims} role="img" aria-label="{aria}">'
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 300"{dims} role="img" aria-label="{aria}">'
         f"<title>{aria}</title>{body}</svg>"
     )

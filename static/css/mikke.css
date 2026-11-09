@@ -81,6 +81,8 @@ main { max-width: 960px; margin: 0 auto; padding: 0 16px; outline: none; }
 .brand { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 1.25rem; color: var(--text); text-decoration: none; }
 .now-badge { margin: 0 0 0 auto; font-size: 0.85rem; background: var(--surface-2); padding: 2px 10px; border-radius: 999px; }
 .logout-form { margin: 0; }
+.site-header .brand, .site-header .btn, .now-badge { white-space: nowrap; }
+@media (max-width: 400px) { .site-header { gap: 6px; padding: 8px 10px; } .now-badge { padding: 2px 6px; } }
 .tabbar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
   display: grid; grid-template-columns: repeat(5, 1fr);
@@ -202,6 +204,17 @@ main { max-width: 960px; margin: 0 auto; padding: 0 16px; outline: none; }
 .swatch-tone1 { background: #fbe3d3; } .swatch-tone2 { background: #f3cdb0; } .swatch-tone3 { background: #e6b48e; }
 .swatch-tone4 { background: #c98f65; } .swatch-tone5 { background: #9a6643; } .swatch-tone6 { background: #5e3c27; }
 .swatch-mint { background: #bfe8d6; } .swatch-lavender { background: #d9ccf2; }
+.swatch-eye-brown { background: #8a5232; } .swatch-eye-pink { background: #d2508e; } .swatch-eye-violet { background: #8656d0; }
+.swatch-eye-blue { background: #3a74d0; } .swatch-eye-green { background: #2f9a6a; } .swatch-eye-amber { background: #c98a1e; }
+.item-card.is-unowned { border-style: dashed; }
+.item-card .badge { font-size: 0.65rem; }
+.staff-note { border-color: var(--focus); }
+.staff-toggle { display: inline-flex; gap: 6px; align-items: center; min-height: 44px; font-size: 0.9rem; }
+.catalog-grid { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+.catalog-item { display: grid; justify-items: center; gap: 2px; padding: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; text-align: center; font-size: 0.8rem; }
+.catalog-item img { width: 96px; height: auto; border-radius: 8px; }
+.catalog-item code { font-size: 0.65rem; color: var(--muted); word-break: break-all; }
+.catalog-item.is-inactive { opacity: 0.5; }
 
 /* ---- クーポン / 実績 ---- */
 .coupon-list { list-style: none; padding: 0; display: grid; gap: 10px; }

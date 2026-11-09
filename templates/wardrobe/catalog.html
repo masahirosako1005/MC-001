@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}パーツ一覧{% endblock %}
+{% block content %}
+<p><a href="{% url 'wardrobe:index' %}">← きせかえ</a></p>
+<h1>パーツ一覧(管理者)</h1>
+<p class="muted">全 {{ total }} 種類。追加・編集は管理画面の「アイテム」から行えます。新しいパーツは、ドロップ設定に入れると探索で手に入るようになります。</p>
+<nav class="subnav" aria-label="体のタイプ">
+  {% for s in sections %}<a href="#type-{{ s.key }}">{{ s.label }}({{ s.count }})</a>{% endfor %}
+</nav>
+{% for s in sections %}
+<section id="type-{{ s.key }}" aria-labelledby="h-{{ s.key }}">
+  <h2 id="h-{{ s.key }}">{{ s.label }} — {{ s.count }} 種類</h2>
+  {% for c in s.cats %}
+  <h3>{{ c.label }}({{ c.items|length }})</h3>
+  <ul class="catalog-grid">
+    {% for i in c.items %}
+    <li class="catalog-item{% if not i.is_active %} is-inactive{% endif %}">
+      <img src="{% url 'wardrobe:item_svg' i.code %}" alt="" width="96" height="144" loading="lazy">
+      <strong>{{ i.name }}</strong>
+      <span class="rarity">{{ i.rarity_stars }}</span>
+      <code>{{ i.code }}</code>
+      {% if i.is_starter %}<span class="badge">初期</span>{% endif %}{% if not i.is_active %}<span class="badge">無効</span>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% endfor %}
+</section>
+{% endfor %}
+{% endblock %}

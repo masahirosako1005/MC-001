@@ -24,6 +24,10 @@
 | R16 | Must | 判定しない部分をマウスで塗りつぶして除外できる |
 | R17 | Must | 1 つのシンボルを最大 9 角度(正面を含む)で登録できる |
 | R18 | Must | Protomaps を実装する。API は使わず、京橋付近のタイルデータでローカル動作させる |
+| R19 | Must | アバターを参考画像のようなかわいいデザインにする |
+| R20 | Must | 女性だけでなく男性のアバターも用意する |
+| R21 | Must | サンプルパーツを男女別に 50 種類ずつ用意する |
+| R22 | Must | 管理者は(パーツを)自由に選択できる |
 
 ## トレーサビリティ
 
@@ -46,6 +50,10 @@
 | R15 | `image_symbols.similarity`(16×16・位置ずれ ±1 マス・最大 NCC)、`MIKKE_IMAGE_SIMILARITY_THRESHOLD=0.65`、端末側の照合条件の緩和 | `SimilarityTests`(位置ずれ許容・無関係は 65% 未満・しきい値変更)、ブラウザで距離・角度を変えた 44 回の検証(ADR 0005) | ✅ |
 | R16 | `symbol_register.js`(ブラシ・消しゴム・全消去)、`imagematch.js:extractReference / packMask32`、`SymbolView.verify_mask` | `test_masked_area_is_ignored` `test_too_much_masked` `test_register_multi_angle_with_mask`、ブラウザで塗った部分の特徴点が消えることを確認 | ✅ |
 | R17 | `SymbolView`(9 角度・一意制約)、`save_symbol_views`、`/explore/symbols/<id>/views/` | `test_nine_angles_max` `test_save_views_add_replace_delete` `test_cannot_delete_last_view` `test_edit_views` `test_scan_matches_any_registered_angle` | ✅ |
+| R19 | `wardrobe/avatar.py`(ちびキャラ風テンプレート・大きな瞳・目の色) | `AvatarRenderTests` `BodyTypeRenderTests`、ブラウザで 100 パーツ全部の見た目を確認 | ✅(見た目は🔶) |
+| R20 | `AvatarConfig.body_type`、`Item.body_type`、着せ替え画面のタイプ切り替え | `test_user_can_switch_body_type_freely` `test_user_cannot_wear_other_type_item` `test_starter_kit_matches_body_type` | ✅ |
+| R21 | `wardrobe/sample_items.py`(女の子用 50・男の子用 50)、`seed_mikke` | `test_fifty_each_and_valid` | ✅ |
+| R22 | `services.can_use_any_item / selectable_items / equip`、`/wardrobe/catalog/` | `test_staff_can_choose_any_item` `test_wardrobe_page_lists_by_role` `test_staff_preview_and_item_svg_for_unowned` `test_catalog_staff_only`、ブラウザで未所持・別タイプのパーツを管理者で保存 | ✅ |
 | R18 | `maps/`(Range 配信)、`maps/tiles/kyobashi.pmtiles`、`scripts/extract_tiles.py`、`static/js/spotmap.js`(Leaflet + protomaps-leaflet) | `maps/tests.py`(Range・416・パストラバーサル・ログイン必須・外部 API を CSP で許可していない)、ブラウザで外部への通信がないことを確認 | ✅ |
 
 ## 未達・残課題

@@ -1,0 +1,125 @@
+"""サンプルパーツ (女の子用 50 種類・男の子用 50 種類)。
+
+seed_mikke コマンドが投入する。各行: (コード, 名前, 部位, 形, 色, レア度, 初期アイテム, 説明)
+既存データとの互換のため、最初期のコード (hair-short-brown など) はそのまま使っている。
+"""
+
+from __future__ import annotations
+
+GIRL_ITEMS = [
+    # ---- 髪 (12) ----
+    ("g-hair-bob-cocoa", "ボブ(ココア)", "hair", "bob", "#6B4226", 1, True, "はじまりの髪型"),
+    ("hair-bob-black", "ボブ(黒)", "hair", "bob", "#222222", 1, False, "温泉街のそよ風"),
+    ("g-hair-ponytail-brown", "ポニーテール(栗)", "hair", "ponytail", "#7A4A2A", 1, False, "元気に歩こう"),
+    ("hair-long-chestnut", "ロング(栗色)", "hair", "long", "#8B4A2B", 2, False, "秋の参道の色"),
+    ("hair-bun-black", "おだんご(黒)", "hair", "bun", "#2A2A2A", 2, False, "朝の神社で"),
+    ("g-hair-wavy-milk", "ゆるふわ(ミルクティー)", "hair", "wavy", "#CDA27A", 2, False, "カフェ帰りに"),
+    ("g-hair-twin-honey", "ツインテール(はちみつ)", "hair", "twintail", "#F6D27A", 3, False, "ステージの主役"),
+    ("g-hair-long-indigo", "ロング(藍)", "hair", "long", "#1F3A5C", 3, False, "川面の夜景"),
+    ("hair-ponytail-sakura", "ポニーテール(さくら)", "hair", "ponytail", "#F2A7C3", 4, False, "春だけの色"),
+    ("g-hair-twin-pink", "ツインテール(いちご)", "hair", "twintail", "#F49AC1", 4, False, "甘い季節に"),
+    ("g-hair-wavy-lavender", "ゆるふわ(ラベンダー)", "hair", "wavy", "#B79AE0", 4, False, "夕暮れの空"),
+    ("hair-long-silver", "ロング(月光)", "hair", "long", "#C9CED8", 5, False, "夜の森でだけ出会える"),
+    # ---- トップス (12) ----
+    ("g-top-tshirt-white", "白Tシャツ(ガール)", "top", "tshirt", "#F2F2F2", 1, True, "旅のはじまりの一枚"),
+    ("top-hoodie-mint", "ミントのパーカー", "top", "hoodie", "#7FCFB5", 1, False, "朝の散歩に"),
+    ("g-top-blouse-pink", "リボンブラウス(ピンク)", "top", "blouse", "#F7C6D6", 2, False, "おでかけの日に"),
+    ("g-top-blouse-sky", "リボンブラウス(そら)", "top", "blouse", "#CFE6F7", 2, False, "晴れた日の水辺"),
+    ("g-top-sweater-cream", "クリームニット", "top", "sweater", "#F3E2C3", 2, False, "ほっこり冬じたく"),
+    ("top-happi-red", "朱の法被", "top", "happi", "#C0392B", 3, False, "夏祭りの主役"),
+    ("g-top-sailor-navy", "セーラー(紺)", "top", "sailor", "#263B6E", 3, False, "港町の風"),
+    ("g-top-kimono-green", "着物トップス(若葉)", "top", "kimono", "#4E9A4A", 3, False, "新緑の境内"),
+    ("g-top-idol-red", "アイドル衣装(レッド)", "top", "idol", "#D93A3A", 4, False, "きらきらステージ"),
+    ("g-top-idol-blue", "アイドル衣装(ブルー)", "top", "idol", "#3A5BD9", 4, False, "クールなステージ"),
+    ("g-top-kimono-plum", "着物トップス(梅)", "top", "kimono", "#A8436E", 4, False, "早春の梅林"),
+    ("top-hoodie-maple", "もみじパーカー", "top", "hoodie", "#D2552B", 4, False, "秋限定"),
+    # ---- ボトムス (10) ----
+    ("g-bottom-skirt-blue", "フレアスカート(青)", "bottom", "skirt", "#2F6DB5", 1, True, "はじまりのスカート"),
+    ("g-bottom-shorts-denim", "デニムショート", "bottom", "shorts", "#4A6FA5", 1, False, "夏の冒険に"),
+    ("bottom-skirt-yellow", "菜の花スカート", "bottom", "skirt", "#F2C230", 2, False, "春の野原"),
+    ("g-bottom-pleated-navy", "チェックプリーツ(紺)", "bottom", "pleated", "#2B3A8C", 2, False, "学園の思い出"),
+    ("g-bottom-cropped-beige", "クロップドパンツ(ベージュ)", "bottom", "cropped", "#CDB892", 2, False, "街歩きの相棒"),
+    ("g-bottom-pleated-red", "チェックプリーツ(赤)", "bottom", "pleated", "#B8323C", 3, False, "冬のおでかけ"),
+    ("g-bottom-frill-navy", "フリルスカート(紺)", "bottom", "frill", "#2B3A8C", 3, False, "ステージ衣装に"),
+    ("g-bottom-frill-pink", "フリルスカート(ピンク)", "bottom", "frill", "#F08FB4", 3, False, "ふんわりかわいく"),
+    ("g-bottom-jumper-black", "ジャンパースカート(黒)", "bottom", "jumper", "#2B2B33", 3, False, "レトロ喫茶で"),
+    ("bottom-hakama-purple", "紫の袴", "bottom", "hakama", "#5B3A7A", 3, False, "神社の正装"),
+    # ---- くつ (8) ----
+    ("g-shoes-sandals-beige", "サンダル(ベージュ)", "shoes", "sandals", "#C9B79A", 1, True, "はじまりのサンダル"),
+    ("g-shoes-sneakers-pink", "スニーカー(ピンク)", "shoes", "sneakers", "#F49AC1", 2, False, "たくさん歩ける"),
+    ("g-shoes-loafers-brown", "ローファー(茶)", "shoes", "loafers", "#6A3E26", 2, False, "きちんとおでかけ"),
+    ("g-shoes-highsocks-white", "ハイソックス(白)", "shoes", "highsocks", "#F4F4F4", 2, False, "定番コーデ"),
+    ("shoes-geta-red", "赤鼻緒の下駄", "shoes", "geta", "#C0392B", 2, False, "温泉街をカランコロン"),
+    ("shoes-boots-brown", "ブラウンブーツ", "shoes", "boots", "#6E4B2A", 2, False, "森の小道に"),
+    ("g-shoes-highsocks-red", "ハイソックス(赤)", "shoes", "highsocks", "#D93A3A", 3, False, "ステージの足もと"),
+    ("g-shoes-boots-white", "ショートブーツ(白)", "shoes", "boots", "#F2EFE8", 3, False, "冬の湯けむり"),
+    # ---- こもの (8) ----
+    ("acc-scarf-red", "赤いマフラー", "accessory", "scarf", "#B3262E", 2, False, "冬の湯けむり"),
+    ("g-acc-ribbon-navy", "大きなリボン(紺)", "accessory", "ribbon", "#2B3A8C", 2, False, "ツインテールに"),
+    ("g-acc-star-gold", "星のヘアピン", "accessory", "star", "#F2C440", 2, False, "夜空のかけら"),
+    ("acc-flower-sakura", "さくらのかんざし", "accessory", "flower", "#F2A7C3", 3, False, "春の再訪のしるし"),
+    ("g-acc-ribbon-red", "大きなリボン(赤)", "accessory", "ribbon", "#D93A3A", 3, False, "アイドルの必需品"),
+    ("g-acc-beret-red", "ベレー帽(ボルドー)", "accessory", "beret", "#B8323C", 3, False, "画家気分で"),
+    ("acc-flower-gold", "金の花かんざし", "accessory", "flower", "#E0B000", 5, False, "やりこみの証"),
+    ("g-acc-crown-silver", "ティアラ", "accessory", "crown", "#D9DDE6", 5, False, "みっけの姫"),
+]
+
+BOY_ITEMS = [
+    # ---- 髪 (12) ----
+    ("hair-short-brown", "ショート(ブラウン)", "hair", "short", "#6B4226", 1, True, "はじまりの髪型"),
+    ("b-hair-short-black", "ショート(黒)", "hair", "short", "#2A2A2A", 1, False, "さっぱり短め"),
+    ("b-hair-mash-black", "マッシュ(黒)", "hair", "mash", "#2A2A2A", 1, False, "まるいシルエット"),
+    ("b-hair-sidepart-brown", "七三わけ(ブラウン)", "hair", "sidepart", "#5A3A24", 2, False, "きちんと感"),
+    ("b-hair-wolf-black", "ウルフ(黒)", "hair", "wolf", "#222222", 2, False, "風を切って"),
+    ("b-hair-curly-choco", "くせっ毛(チョコ)", "hair", "curly", "#4A3020", 2, False, "ふわふわ天然"),
+    ("hair-spiky-blond", "ツンツン(金)", "hair", "spiky", "#E8C14A", 3, False, "港の夕日"),
+    ("b-hair-spiky-red", "ツンツン(赤)", "hair", "spiky", "#C0392B", 3, False, "燃える闘志"),
+    ("b-hair-mash-ash", "マッシュ(アッシュ)", "hair", "mash", "#8E8E86", 3, False, "おしゃれ上級者"),
+    ("b-hair-sidepart-navy", "七三わけ(ネイビー)", "hair", "sidepart", "#2B3A67", 3, False, "夜の街に"),
+    ("b-hair-wolf-silver", "ウルフ(シルバー)", "hair", "wolf", "#C9CED8", 4, False, "月夜の旅人"),
+    ("b-hair-curly-mint", "くせっ毛(ミント)", "hair", "curly", "#7FCFB5", 4, False, "さわやか夏色"),
+    # ---- トップス (12) ----
+    ("top-tshirt-white", "白Tシャツ", "top", "tshirt", "#F2F2F2", 1, True, "旅のはじまりの一枚"),
+    ("b-top-hoodie-gray", "パーカー(グレー)", "top", "hoodie", "#9AA3AE", 1, False, "いつもの一枚"),
+    ("top-happi-indigo", "藍の法被", "top", "happi", "#2D4A8A", 2, False, "祭りの名残"),
+    ("top-jacket-navy", "ネイビージャケット", "top", "jacket", "#22325A", 2, False, "レトロ通りの喫茶店で"),
+    ("top-border-marine", "マリンボーダー", "top", "border", "#1E5AA8", 2, False, "港町の定番"),
+    ("b-top-hoodie-orange", "パーカー(オレンジ)", "top", "hoodie", "#F08A24", 2, False, "夕焼けの川べり"),
+    ("b-top-shirt-white", "シャツとネクタイ", "top", "shirt_tie", "#EAF1FB", 2, False, "ビジネス街で"),
+    ("b-top-sweater-navy", "ネイビーニット", "top", "sweater", "#2B3A67", 2, False, "冬の散歩に"),
+    ("b-top-parka-khaki", "ブルゾン(カーキ)", "top", "parka", "#8C8A5B", 3, False, "城跡めぐり"),
+    ("b-top-kimono-indigo", "着物トップス(藍)", "top", "kimono", "#2D4A8A", 3, False, "粋な旅人"),
+    ("b-top-jacket-black", "ブラックジャケット", "top", "jacket", "#2B2B33", 4, False, "夜のレトロ通り"),
+    ("top-happi-gold", "金の法被", "top", "happi", "#C9A227", 5, False, "すべての季節を巡った証"),
+    # ---- ボトムス (10) ----
+    ("bottom-pants-denim", "デニムパンツ", "bottom", "pants", "#3B5B8C", 1, True, "どこへでも行ける"),
+    ("bottom-shorts-khaki", "カーキのショートパンツ", "bottom", "shorts", "#A08C5B", 1, False, "夏の冒険に"),
+    ("bottom-pants-black", "黒のパンツ", "bottom", "pants", "#2B2B2B", 1, False, "夜の街歩き"),
+    ("b-bottom-jeans-indigo", "ジーンズ(インディゴ)", "bottom", "jeans", "#3B5B8C", 1, False, "ロールアップで"),
+    ("b-bottom-shorts-navy", "ショートパンツ(紺)", "bottom", "shorts", "#2B3A67", 1, False, "川辺で遊ぼう"),
+    ("b-bottom-pants-gray", "グレーのパンツ", "bottom", "pants", "#7A7F8A", 1, False, "きれいめ"),
+    ("b-bottom-jeans-black", "ブラックジーンズ", "bottom", "jeans", "#2E2E36", 2, False, "シックに"),
+    ("b-bottom-cropped-beige", "クロップドパンツ(ベージュ)", "bottom", "cropped", "#CDB892", 2, False, "身軽に"),
+    ("b-bottom-cropped-olive", "クロップドパンツ(オリーブ)", "bottom", "cropped", "#6B7A3A", 2, False, "公園さんぽ"),
+    ("b-bottom-hakama-navy", "紺の袴", "bottom", "hakama", "#2B3A67", 3, False, "城下町の正装"),
+    # ---- くつ (8) ----
+    ("shoes-sneakers-gray", "グレーのスニーカー", "shoes", "sneakers", "#8A8F99", 1, True, "歩きやすい"),
+    ("b-shoes-sneakers-black", "スニーカー(黒)", "shoes", "sneakers", "#2B2B33", 1, False, "どんな服にも"),
+    ("b-shoes-loafers-black", "ローファー(黒)", "shoes", "loafers", "#2B2222", 2, False, "きちんとおでかけ"),
+    ("b-shoes-boots-brown", "ワークブーツ", "shoes", "boots", "#6E4B2A", 2, False, "どこまでも"),
+    ("b-shoes-sneakers-red", "スニーカー(赤)", "shoes", "sneakers", "#C0392B", 2, False, "足もとにアクセント"),
+    ("shoes-sneakers-orange", "夕焼けスニーカー", "shoes", "sneakers", "#F08A24", 3, False, "港の夕方に"),
+    ("b-shoes-geta-navy", "紺鼻緒の下駄", "shoes", "geta", "#2B3A67", 3, False, "夏祭りの夜"),
+    ("b-shoes-boots-black", "ブラックブーツ", "shoes", "boots", "#2B2B33", 3, False, "冬の城跡"),
+    # ---- こもの (8) ----
+    ("b-acc-glasses-black", "黒ぶちメガネ", "accessory", "glasses", "#2B2B33", 1, False, "知的に見える"),
+    ("acc-glasses-gold", "金縁メガネ", "accessory", "glasses", "#B8892B", 2, False, "レトロ喫茶の店主から"),
+    ("acc-cap-sea", "マリンキャップ", "accessory", "cap", "#1E5AA8", 2, False, "港のおみやげ"),
+    ("b-acc-cap-red", "キャップ(赤)", "accessory", "cap", "#C0392B", 2, False, "スタジアム帰り"),
+    ("b-acc-headphones-black", "ヘッドホン(黒)", "accessory", "headphones", "#2B2B33", 2, False, "旅のBGM"),
+    ("b-acc-scarf-navy", "紺のマフラー", "accessory", "scarf", "#2B3A67", 2, False, "冬の川風に"),
+    ("b-acc-headphones-white", "ヘッドホン(白)", "accessory", "headphones", "#EDEDED", 3, False, "お気に入りの一曲"),
+    ("acc-foxmask-red", "きつねのお面", "accessory", "foxmask", "#C0392B", 4, False, "夜の神社のおまつり"),
+]
+
+SAMPLE_ITEMS = [(*row, "girl") for row in GIRL_ITEMS] + [(*row, "boy") for row in BOY_ITEMS]
