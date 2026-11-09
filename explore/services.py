@@ -66,7 +66,8 @@ def parse_payload(payload: str) -> str | None:
 def find_symbol(payload: str) -> Symbol:
     token = parse_payload(payload)
     symbol = (
-        Symbol.objects.select_related("spot").filter(token=token, is_active=True, spot__is_active=True).first()
+        Symbol.objects.select_related("spot")
+        .filter(token=token, kind=Symbol.KIND_QR, is_active=True, spot__is_active=True).first()
         if token else None
     )
     if symbol is None:
@@ -102,8 +103,125 @@ def read_ticket(user, ticket: str) -> Symbol:
 
 
 def scan(user, payload: str) -> dict:
-    """カメラがシンボルを検知したときの判定。AR マークの種類と受け取り用チケットを返す。"""
-    symbol = find_symbol(payload)
+    """カメラが QR シンボルを検知したときの判定。AR マークの種類と受け取り用チケットを返す。"""
+    return _scan_result(user, find_symbol(payload))
+
+
+NOT_READABLE = "うまく読み取れませんでした。シンボル全体が写るようにしてください。"
+
+
+def best_view_similarity(symbol: Symbol, observed: bytes) -> float:
+    """登録されているすべての見え方のうち、最も近いものとの類似度 (0〜1)。"""
+    from .image_symbols import similarity
+
+    return max(
+        (similarity(bytes(v.verify_patch), bytes(v.verify_mask), observed) for v in symbol.views.all()),
+        default=0.0,
+    )
+
+
+def scan_image(user, symbol_id, patch_b64: str) -> dict:
+    """カメラが画像シンボルを検知したときの判定。
+
+    端末が映像から切り出した 32x32 パッチを、サーバーだけが持つ照合用パッチ (最大 9 角度) と比べ、
+    類似度が設定値 (既定 65%) 以上なら一致とする。
+    一致しなければ「シンボルではない」と同じ扱いにし、類似度の値は返さない (総当たりの手がかりを与えない)。
+    """
+    from .image_symbols import ImageSymbolError, decode_patch, is_match
+
+    try:
+        sid = int(symbol_id)
+        observed = decode_patch(patch_b64)
+    except (TypeError, ValueError, ImageSymbolError) as exc:
+        raise UnknownSymbol(NOT_READABLE) from exc
+    symbol = (
+        Symbol.objects.select_related("spot").prefetch_related("views")
+        .filter(pk=sid, kind=Symbol.KIND_IMAGE, is_active=True, spot__is_active=True).first()
+    )
+    if symbol is None or not is_match(best_view_similarity(symbol, observed)):
+        raise UnknownSymbol(NOT_READABLE)
+    return _scan_result(user, symbol)
+
+
+def image_symbol_catalog() -> list[dict]:
+    """利用者の端末に配る画像シンボルの特徴量 (見え方ごと)。参照写真・照合用パッチ・マスクは含めない。"""
+    from .models import SymbolView
+
+    rows = (
+        SymbolView.objects.filter(symbol__kind=Symbol.KIND_IMAGE, symbol__is_active=True,
+                                  symbol__spot__is_active=True)
+        .only("symbol_id", "angle", "features").order_by("symbol_id", "angle")
+    )
+    return [{"id": v.symbol_id, "view": v.angle, **v.features} for v in rows]
+
+
+@dataclass
+class ViewUpload:
+    """1 つの見え方の登録データ (スタッフの端末が作って送る)。"""
+
+    jpeg: bytes
+    features_raw: bytes
+    patch_b64: str
+    mask_b64: str | None = None
+
+
+def _validated_view(angle: str, up: ViewUpload) -> dict:
+    from .image_symbols import (
+        ImageSymbolError,
+        decode_mask,
+        decode_patch,
+        parse_features,
+        validate_jpeg,
+        validate_reference,
+    )
+    from .models import ANGLE_CHOICES
+
+    label = dict(ANGLE_CHOICES)[angle]
+    try:
+        width, height = validate_jpeg(up.jpeg)
+        features = parse_features(up.features_raw)
+        patch = decode_patch(up.patch_b64)
+        mask = decode_mask(up.mask_b64)
+        validate_reference(patch, mask)
+    except ImageSymbolError as exc:
+        raise ImageSymbolError(f"【{label}】{exc}") from exc
+    return dict(jpeg=up.jpeg, width=width, height=height, features=features,
+                keypoint_count=len(features["kp"]), verify_patch=patch, verify_mask=mask)
+
+
+@transaction.atomic
+def save_symbol_views(symbol: Symbol, uploads: dict[str, ViewUpload], delete: list[str], created_by) -> Symbol:
+    """画像シンボルの見え方を追加・置き換え・削除する。すべて検証してから一括で保存する。"""
+    from .image_symbols import ImageSymbolError
+    from .models import ANGLES, SymbolView
+
+    unknown = [a for a in [*uploads, *delete] if a not in ANGLES]
+    if unknown:
+        raise ImageSymbolError("撮影角度の指定が正しくありません。")
+    validated = {angle: _validated_view(angle, up) for angle, up in uploads.items()}
+    SymbolView.objects.filter(symbol=symbol, angle__in=[a for a in delete if a not in uploads]).delete()
+    for angle, data in validated.items():
+        SymbolView.objects.update_or_create(symbol=symbol, angle=angle,
+                                            defaults={**data, "created_by": created_by})
+    if not SymbolView.objects.filter(symbol=symbol).exists():
+        raise ImageSymbolError("少なくとも 1 つの角度の写真が必要です。")
+    return symbol
+
+
+@transaction.atomic
+def register_image_symbol(*, spot, name: str, hint: str, cooldown_hours: int, uploads: dict[str, ViewUpload],
+                          created_by) -> Symbol:
+    """スタッフが撮影した写真 (最大 9 角度) を画像シンボルとして登録する。"""
+    from .image_symbols import ImageSymbolError
+
+    if not uploads:
+        raise ImageSymbolError("少なくとも 1 つの角度の写真を撮影してください。")
+    symbol = Symbol.objects.create(spot=spot, kind=Symbol.KIND_IMAGE, name=name, hint=hint,
+                                   cooldown_hours=cooldown_hours)
+    return save_symbol_views(symbol, uploads, [], created_by)
+
+
+def _scan_result(user, symbol: Symbol) -> dict:
     nxt = next_available_at(user, symbol)
     return {
         "status": "cooldown" if nxt else "ready",

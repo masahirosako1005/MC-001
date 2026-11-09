@@ -12,4 +12,5 @@ urlpatterns = [
     path("explore/", include("explore.urls")),
     path("wardrobe/", include("wardrobe.urls")),
     path("rewards/", include("rewards.urls")),
+    path("maps/", include("maps.urls")),
 ]

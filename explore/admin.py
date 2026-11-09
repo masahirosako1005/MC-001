@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.urls import reverse
 from django.utils.html import format_html
 
-from .models import Discovery, DropEntry, Spot, SpotVisit, Symbol
+from .models import Discovery, DropEntry, Spot, SpotVisit, Symbol, SymbolView
 
 
 class SymbolInline(admin.TabularInline):
@@ -27,16 +27,32 @@ class DropInline(admin.TabularInline):
 
 @admin.register(Symbol)
 class SymbolAdmin(admin.ModelAdmin):
-    list_display = ("name", "spot", "cooldown_hours", "is_active", "symbol_image")
-    list_filter = ("spot", "is_active")
+    list_display = ("name", "spot", "kind", "cooldown_hours", "is_active", "symbol_image")
+    list_filter = ("kind", "spot", "is_active")
+    readonly_fields = ("kind", "symbol_image")
     inlines = [DropInline]
 
     @admin.display(description="シンボル画像")
     def symbol_image(self, obj):
         if obj.pk is None:
-            return "-"
+            return format_html('画像シンボルは <a href="{}">撮影して登録</a> から追加してください。',
+                               reverse("explore:symbol_register"))
+        if obj.kind == Symbol.KIND_IMAGE:
+            return format_html('<a href="{}">撮影角度の管理 ({} 角度)</a>',
+                               reverse("explore:symbol_views", args=[obj.pk]), obj.views.count())
         url = reverse("explore:symbol_svg", args=[obj.pk])
         return format_html('<a href="{}" target="_blank" rel="noopener">表示</a> / <a href="{}?download=1">保存</a>', url, url)
+
+
+@admin.register(SymbolView)
+class SymbolViewAdmin(admin.ModelAdmin):
+    list_display = ("symbol", "angle", "width", "height", "keypoint_count", "created_by", "created_at")
+    list_filter = ("angle",)
+    fields = ("symbol", "angle", "width", "height", "keypoint_count", "created_by", "created_at")
+    readonly_fields = fields
+
+    def has_add_permission(self, request):
+        return False
 
 
 @admin.register(SpotVisit)

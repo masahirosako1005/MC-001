@@ -56,9 +56,18 @@ class Spot(models.Model):
 
 
 class Symbol(models.Model):
-    """現地に掲示する「みっけシンボル」。カメラで検知すると AR マークが現れる。"""
+    """「みっけシンボル」。カメラで検知すると AR マークが現れる。
+
+    - kind="qr":    印刷して掲示する QR 型シンボル
+    - kind="image": スタッフが撮影した看板・像などの写真そのもの (SymbolImage に特徴量を保持)
+    """
+
+    KIND_QR = "qr"
+    KIND_IMAGE = "image"
+    KIND_CHOICES = [(KIND_QR, "QR シンボル"), (KIND_IMAGE, "画像シンボル")]
 
     spot = models.ForeignKey(Spot, on_delete=models.PROTECT, related_name="symbols", verbose_name="スポット")
+    kind = models.CharField("種類", max_length=8, choices=KIND_CHOICES, default=KIND_QR, editable=False)
     name = models.CharField("名前", max_length=80)
     hint = models.CharField("探すときのヒント", max_length=200, blank=True)
     token = models.CharField("識別トークン", max_length=64, unique=True, default=new_symbol_token, editable=False)
@@ -70,7 +79,10 @@ class Symbol(models.Model):
     class Meta:
         verbose_name = verbose_name_plural = "シンボル"
         ordering = ["spot_id", "id"]
-        constraints = [models.CheckConstraint(condition=models.Q(cooldown_hours__gte=1), name="symbol_cooldown_pos")]
+        constraints = [
+            models.CheckConstraint(condition=models.Q(cooldown_hours__gte=1), name="symbol_cooldown_pos"),
+            models.CheckConstraint(condition=models.Q(kind__in=["qr", "image"]), name="symbol_kind_valid"),
+        ]
 
     def __str__(self) -> str:
         return f"{self.spot.name} / {self.name}"
@@ -78,6 +90,50 @@ class Symbol(models.Model):
     @property
     def payload(self) -> str:
         return f"{SYMBOL_PREFIX}{self.token}"
+
+
+ANGLE_CHOICES = [
+    ("up_left", "左上から"), ("up", "上から"), ("up_right", "右上から"),
+    ("left", "左から"), ("front", "正面"), ("right", "右から"),
+    ("down_left", "左下から"), ("down", "下から"), ("down_right", "右下から"),
+]
+ANGLES = [a for a, _ in ANGLE_CHOICES]
+MAX_VIEWS = len(ANGLES)  # 9 (正面を含む)
+
+
+class SymbolView(models.Model):
+    """画像シンボルの「1 つの見え方」(撮影角度ごとの参照データ)。1 シンボルにつき最大 9 角度。
+
+    - jpeg: 四角形で切り抜き・正面補正した参照写真 (スタッフのみ閲覧可。EXIF なし)
+    - features: ORB 特徴量 (塗りつぶした除外部分の点は含まない。利用者の端末に配布)
+    - verify_patch / verify_mask: 32x32 の照合用パッチと除外マスク (サーバー内だけで使い、配布しない)
+    """
+
+    symbol = models.ForeignKey(Symbol, on_delete=models.CASCADE, related_name="views")
+    angle = models.CharField("撮影角度", max_length=12, choices=ANGLE_CHOICES)
+    jpeg = models.BinaryField("参照写真 (JPEG)")
+    width = models.PositiveIntegerField("幅")
+    height = models.PositiveIntegerField("高さ")
+    features = models.JSONField("特徴量")
+    keypoint_count = models.PositiveIntegerField("特徴点の数")
+    verify_patch = models.BinaryField("照合用パッチ")
+    verify_mask = models.BinaryField("除外マスク", help_text="32x32 のビット列。1 = 判定しない部分")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+                                   related_name="+", verbose_name="登録者")
+    created_at = models.DateTimeField("登録日時", default=timezone.now)
+
+    class Meta:
+        verbose_name = verbose_name_plural = "画像シンボルの見え方"
+        ordering = ["symbol_id", "angle"]
+        constraints = [
+            models.UniqueConstraint(fields=["symbol", "angle"], name="symbolview_unique_angle"),
+            models.CheckConstraint(condition=models.Q(angle__in=ANGLES), name="symbolview_angle_valid"),
+            models.CheckConstraint(condition=models.Q(width__gte=64, height__gte=64), name="symbolview_min_size"),
+            models.CheckConstraint(condition=models.Q(keypoint_count__gte=30), name="symbolview_min_keypoints"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.symbol} / {self.get_angle_display()} ({self.keypoint_count} 点)"
 
 
 class DropEntry(models.Model):

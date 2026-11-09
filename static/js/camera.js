@@ -43,6 +43,14 @@
   let markHit = null;
   let busy = false;
   const scanCache = new Map();
+  // 画像シンボル (写真そのものがシンボル) の特徴量
+  let imageRefs = [];
+  let imageRefsPromise = null;
+  let imageRR = 0;
+  // 近距離用 640px と遠距離用 960px を交互に使う (遠くの小さなシンボルも見つけやすくする)
+  const IMAGE_SCAN_EDGES = [640, 960];
+  let imageTick = 0;
+  const IMAGE_CANDIDATES_PER_TICK = 3;
 
   const setStatus = (msg) => { statusEl.textContent = msg; };
 
@@ -96,9 +104,11 @@
     ctx.drawImage(src, fit.dx, fit.dy, sw * fit.s, sh * fit.s);
     if (still) {
       if (target && target.fit !== fit.s) relocateStill(fit);
-    } else if (ts - lastScanAt > SCAN_INTERVAL_MS) {
+    } else if (ts - lastScanAt > (imageRefs.length ? SCAN_INTERVAL_MS + 60 : SCAN_INTERVAL_MS)) {
       lastScanAt = ts;
-      detect(src, sw, sh, fit, 640, "dontInvert");
+      if (!detect(src, sw, sh, fit, 640, "dontInvert")) {
+        detectImage(src, sw, sh, fit, IMAGE_SCAN_EDGES[imageTick++ % IMAGE_SCAN_EDGES.length]);
+      }
     }
     updateLost(ts);
     drawMark(ts);
@@ -122,6 +132,50 @@
     return true;
   }
 
+  function ensureImageRefs() {
+    if (imageRefsPromise) return imageRefsPromise;
+    if (!window.MikkeImage || !root.dataset.imageSymbolsUrl) return Promise.resolve([]);
+    imageRefsPromise = fetch(root.dataset.imageSymbolsUrl, { credentials: "same-origin" })
+      .then((r) => (r.ok ? r.json() : { symbols: [] }))
+      .then((d) => {
+        imageRefs = (d.symbols || []).map((s) => window.MikkeImage.prepareReference(s));
+        return imageRefs;
+      })
+      .catch(() => {
+        imageRefsPromise = null; // 次の起動時に再取得
+        return [];
+      });
+    return imageRefsPromise;
+  }
+
+  /** 画像シンボルを探す。負荷を抑えるため 1 回に数件ずつ順番に照合する */
+  function detectImage(src, sw, sh, fit, maxEdge) {
+    if (!imageRefs.length || !window.MikkeImage) return false;
+    const k = Math.min(1, maxEdge / Math.max(sw, sh));
+    const w = Math.round(sw * k);
+    const h = Math.round(sh * k);
+    const frameF = window.MikkeImage.frameFeatures(window.MikkeImage.rasterize(src, w, h), maxEdge > 700 ? 600 : 420);
+    // 追跡中のシンボルは全角度を優先し、それ以外は数件ずつ順番に照合する
+    const candidates = target && target.imageId ? imageRefs.filter((r) => r.id === target.imageId) : [];
+    const n = Math.min(imageRefs.length, still ? imageRefs.length : IMAGE_CANDIDATES_PER_TICK);
+    for (let i = 0; i < n; i++) {
+      const r = imageRefs[(imageRR + i) % imageRefs.length];
+      if (!candidates.includes(r)) candidates.push(r);
+    }
+    imageRR = (imageRR + n) % imageRefs.length;
+    for (const ref of candidates) {
+      const m = window.MikkeImage.match(frameF, ref);
+      if (!m) continue;
+      const raw = m.corners.map((p) => ({ x: p.x / k, y: p.y / k }));
+      onDetected(`img:${ref.id}`, raw, fit, {
+        imageId: ref.id,
+        patch: () => window.MikkeImage.toBase64(window.MikkeImage.patchFromGray(frameF.gray, m.H, ref.w, ref.h)),
+      });
+      return true;
+    }
+    return false;
+  }
+
   const toDisplay = (raw, fit) => raw.map((p) => ({ x: p.x * fit.s + fit.dx, y: p.y * fit.s + fit.dy }));
 
   function relocateStill(fit) {
@@ -129,11 +183,12 @@
     target.fit = fit.s;
   }
 
-  function onDetected(payload, raw, fit) {
+  function onDetected(payload, raw, fit, extra = null) {
     const now = performance.now();
     const pts = toDisplay(raw, fit);
     if (!target || target.payload !== payload) {
-      target = { payload, raw, pts, fit: fit.s, lastSeen: now, bornAt: now, state: "checking", info: null, idemKey: null };
+      target = { payload, raw, pts, fit: fit.s, lastSeen: now, bornAt: now, state: "checking", info: null, idemKey: null,
+        imageId: extra ? extra.imageId : null, patch: extra ? extra.patch() : null };
       requestScan(target);
     } else {
       // 手ぶれでマークが震えないように平滑化
@@ -265,8 +320,9 @@
     }
     setStatus("シンボルを確認しています…");
     let res;
+    const body = t.imageId ? { image_symbol: t.imageId, patch: t.patch } : { payload: t.payload };
     try {
-      res = await post(root.dataset.scanUrl, { payload: t.payload });
+      res = await post(root.dataset.scanUrl, body);
     } catch (_) {
       setStatus("通信できませんでした。電波のよい場所でもう一度うつしてください。");
       if (target === t) clearTarget();
@@ -278,7 +334,8 @@
       if (target === t) clearTarget();
       return;
     }
-    scanCache.set(t.payload, { at: performance.now(), res });
+    // 画像シンボルの照合失敗は写り具合の問題なのでキャッシュせず、少し待って撮り直す
+    if (res.ok || !t.imageId) scanCache.set(t.payload, { at: performance.now(), res });
     applyScan(t, res);
   }
 
@@ -287,6 +344,7 @@
     if (!res.ok) {
       t.state = "unknown";
       setStatus(res.data.message || "このコードはみっけシンボルではないようです。");
+      if (t.imageId) setTimeout(() => { if (target === t && !still) clearTarget(); }, 1500);
       return;
     }
     t.info = res.data;
@@ -436,6 +494,7 @@
     }
     btnStart.disabled = true;
     setStatus("カメラを起動しています…");
+    ensureImageRefs();
     try {
       stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
@@ -484,16 +543,24 @@
     stopCamera(false);
     const url = URL.createObjectURL(file);
     const img = new Image();
-    img.onload = () => {
+    img.onload = async () => {
       still = img;
       startOverlay.hidden = true;
       clearTarget();
       resizeCanvas();
+      setStatus("写真からシンボルをさがしています…");
+      if (!rafId) rafId = requestAnimationFrame(frame);
       const [sw, sh] = sourceSize(img);
       const fit = fitRect(sw, sh, canvas.width, canvas.height, false);
-      const found = detect(img, sw, sh, fit, 1400, "attemptBoth");
-      if (!found) setStatus("シンボルが見つかりませんでした。シンボル全体が明るく写った写真を選んでください。");
-      if (!rafId) rafId = requestAnimationFrame(frame);
+      let found = detect(img, sw, sh, fit, 1400, "attemptBoth");
+      if (!found) {
+        await ensureImageRefs();
+        for (const edge of IMAGE_SCAN_EDGES) {
+          if (found || still !== img) break;
+          found = detectImage(img, sw, sh, fit, edge);
+        }
+      }
+      if (!found && still === img) setStatus("シンボルが見つかりませんでした。シンボル全体が明るく写った写真を選んでください。");
     };
     img.onerror = () => setStatus("画像を読み込めませんでした。別の画像をお試しください。");
     img.src = url;

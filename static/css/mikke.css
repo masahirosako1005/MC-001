@@ -272,6 +272,67 @@ progress { flex: 1; height: 12px; accent-color: var(--primary); }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ---- 地図 ---- */
+.spot-map { height: 360px; border-radius: var(--radius); border: 1px solid var(--border); overflow: hidden; z-index: 0; }
+.spot-card:focus { outline: 3px solid var(--focus); outline-offset: 2px; }
+.map-locate {
+  min-height: 36px; padding: 4px 10px; font: inherit; font-size: 0.85rem; font-weight: 700; cursor: pointer;
+  background: #fff; color: #1f2a44; border: 2px solid rgba(0, 0, 0, 0.2); border-radius: 6px;
+}
+.leaflet-container { font: inherit; }
+@media (min-width: 720px) { .spot-map { height: 440px; } }
+
+/* ---- 画像シンボル登録 ---- */
+.tips { padding-left: 1.2em; color: var(--muted); }
+.capture-stage {
+  position: relative; background: #101820; border-radius: var(--radius); overflow: hidden;
+  min-height: 240px; display: grid; place-items: center; padding: 8px;
+}
+/* 座標変換がずれないよう、object-fit は使わず縦横比のまま縮める */
+.capture-stage video, .capture-stage canvas { display: block; max-width: 100%; max-height: 70vh; width: auto; height: auto; }
+.capture-stage canvas.is-painting { cursor: crosshair; touch-action: none; }
+.quad-handles { position: absolute; inset: 0; pointer-events: none; }
+.quad-handle {
+  position: absolute; width: 30px; height: 30px; margin: -15px 0 0 -15px; padding: 0; pointer-events: auto;
+  border-radius: 50%; background: #FFD84D; border: 3px solid #1f2a44; cursor: grab; touch-action: none;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.6);
+}
+.quad-handle:active { cursor: grabbing; }
+.quad-handle:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+
+.angle-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-width: 520px; }
+.angle-cell {
+  display: grid; justify-items: center; gap: 2px; min-height: 96px; padding: 6px; cursor: pointer;
+  font: inherit; color: var(--text); background: var(--surface); border: 2px dashed var(--border); border-radius: 12px;
+}
+.angle-cell.is-set { border-style: solid; border-color: var(--ok); }
+.angle-cell.is-deleted { opacity: 0.6; text-decoration: line-through; }
+.angle-cell.is-current { box-shadow: 0 0 0 3px var(--primary); }
+.angle-thumb { width: 72px; height: 54px; object-fit: cover; border-radius: 6px; }
+.angle-label { font-weight: 800; font-size: 0.9rem; }
+.angle-state { font-size: 0.75rem; color: var(--muted); }
+.editor { border: 2px solid var(--primary); border-radius: var(--radius); padding: 12px; background: var(--surface); }
+.editor h2 { margin-top: 0; }
+.steps { display: flex; gap: 6px; padding: 0; list-style: none; counter-reset: step; flex-wrap: wrap; }
+.steps li { counter-increment: step; padding: 2px 10px; border-radius: 999px; background: var(--surface-2); font-size: 0.85rem; color: var(--muted); }
+.steps li::before { content: counter(step) ". "; }
+.steps li.is-active { background: var(--primary); color: #fff; font-weight: 700; }
+.mask-tools { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 8px 0; }
+.seg { display: inline-flex; gap: 4px; border: 0; padding: 0; margin: 0; }
+.seg label { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 4px 12px; border: 2px solid var(--border); border-radius: 999px; cursor: pointer; }
+.seg label:has(input:checked) { border-color: var(--primary); background: var(--surface-2); font-weight: 700; }
+.brush-size { display: inline-flex; align-items: center; gap: 6px; }
+.view-thumbs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.view-thumbs img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 6px; }
+.capture-empty { color: #d5dbe6; margin: 0; }
+.capture .ar-tools { margin-top: 10px; }
+.quality { margin: 8px 0 0; font-weight: 700; padding: 8px 12px; border-radius: 10px; }
+.quality:empty { display: none; }
+.quality-info { background: var(--surface-2); }
+.quality-good { background: var(--surface-2); border-left: 5px solid var(--ok); }
+.quality-warn { background: var(--surface-2); border-left: 5px solid var(--warn); }
+.quality-bad { background: var(--surface-2); border-left: 5px solid var(--error); color: var(--error); }
+
 /* ---- 印刷 ---- */
 .print-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
 .print-item { margin: 0; text-align: center; break-inside: avoid; }

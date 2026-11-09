@@ -1,10 +1,20 @@
-{% extends "base.html" %}
+{% extends "base.html" %}{% load static %}
 {% block title %}スポット{% endblock %}
+{% block head %}<link rel="stylesheet" href="{% static 'vendor/leaflet/leaflet.css' %}">{% endblock %}
 {% block content %}
 <h1>スポット</h1>
 <p class="muted">シンボルは季節({{ mikke_season_label }})や時間帯({{ mikke_slot_label }})、訪れた日数によって出てくるものが変わります。</p>
+
+<section aria-labelledby="map-h" class="map-section">
+  <h2 id="map-h" class="visually-hidden">スポットの地図</h2>
+  <div id="spot-map" class="spot-map" role="application" aria-label="スポットの地図(京橋付近)"
+       data-tiles="{{ map_tiles_url }}"></div>
+  <p class="help">地図データは端末とこのサーバーの中だけで表示しています(外部の地図サービスは使っていません)。地図の操作が難しい場合は、下の一覧からも同じ情報を確認できます。</p>
+</section>
+{{ spot_points|json_script:"spot-data" }}
+{{ map_config|json_script:"map-config" }}
 {% for r in rows %}
-<article class="spot-card">
+<article class="spot-card" id="spot-{{ r.spot.pk }}" tabindex="-1">
   <header>
     <h2>{{ r.spot.name }}</h2>
     {% if r.spot.area %}<p class="muted">{{ r.spot.area }}</p>{% endif %}
@@ -28,4 +38,9 @@
 {% empty %}
 <p class="empty">公開中のスポットはまだありません。</p>
 {% endfor %}
+{% endblock %}
+{% block scripts %}
+<script src="{% static 'vendor/leaflet/leaflet.js' %}" defer></script>
+<script src="{% static 'vendor/protomaps-leaflet/protomaps-leaflet-5.1.0.js' %}" defer></script>
+<script src="{% static 'js/spotmap.js' %}" defer></script>
 {% endblock %}

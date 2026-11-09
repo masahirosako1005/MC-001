@@ -1,0 +1,116 @@
+{% extends "base.html" %}{% load static %}
+{% block title %}{% if mode == "edit" %}撮影角度の管理{% else %}画像シンボルを登録{% endif %}{% endblock %}
+{% block content %}
+<p><a href="{% url 'explore:symbol_print' %}">← シンボル一覧</a></p>
+{% if mode == "edit" %}
+<h1>「{{ symbol.name }}」の撮影角度</h1>
+<p class="muted">{{ symbol.spot.name }} ・ 角度を追加したり、撮り直したり、削除したりできます。</p>
+{% else %}
+<h1>画像シンボルを撮影して登録</h1>
+<p class="muted">看板・像・壁画・のれんなど、現地にある「動かない平らなもの」をシンボルにできます。利用者がカメラでそれを写すと、光るマークが現れます(登録した見え方と 65% 以上似ていれば一致)。</p>
+{% endif %}
+<ul class="tips">
+  <li>写真の中の<strong>四角形で囲んだ部分だけ</strong>がシンボルになります。四隅を合わせると、斜めから撮った看板もまっすぐに補正されます。</li>
+  <li>人・車・空・植物など<strong>判定に使いたくない部分は、マウスや指で塗りつぶして</strong>除外できます。</li>
+  <li>見る方向が変わると見え方も変わるため、<strong>正面のほか、右から・左から・斜め上からなど最大 9 角度</strong>を登録できます。</li>
+</ul>
+
+<form id="reg-form" class="form" novalidate data-api="{{ api }}" data-mode="{{ mode }}">
+  {% csrf_token %}
+  {% if mode == "new" %}
+  <section aria-labelledby="info-h">
+    <h2 id="info-h">1. シンボルの情報</h2>
+    {% include "includes/field.html" with field=form.spot %}
+    {% include "includes/field.html" with field=form.name %}
+    {% include "includes/field.html" with field=form.hint %}
+    {% include "includes/field.html" with field=form.cooldown_hours %}
+  </section>
+  {% endif %}
+
+  <section aria-labelledby="angle-h">
+    <h2 id="angle-h">{% if mode == "new" %}2. {% endif %}撮影角度(最大 9)</h2>
+    <p class="help">マスを選んで、その方向から見た写真を登録します。まず「正面」から始めるのがおすすめです。</p>
+    <div class="angle-grid" role="group" aria-labelledby="angle-h">
+      {% for a in angles %}
+      <button type="button" class="angle-cell" data-angle="{{ a.key }}" data-label="{{ a.label }}"
+              {% if a.view %}data-existing="1" data-thumb="{% url 'explore:symbol_view_image' symbol.pk a.key %}" data-kp="{{ a.view.keypoint_count }}"{% endif %}>
+        <img class="angle-thumb" alt="" hidden>
+        <span class="angle-label">{{ a.label }}</span>
+        <span class="angle-state">未登録</span>
+      </button>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section id="editor" class="editor" hidden aria-labelledby="editor-h">
+    <h2 id="editor-h" tabindex="-1">「<span id="editor-angle"></span>」の写真</h2>
+    <ol class="steps" aria-label="手順">
+      <li data-step="capture">撮影</li>
+      <li data-step="crop">四角形で切り抜き</li>
+      <li data-step="mask">除外部分を塗る</li>
+    </ol>
+    <div class="capture-stage" id="stage">
+      <video id="reg-video" playsinline muted hidden></video>
+      <canvas id="stage-canvas" hidden></canvas>
+      <div id="quad-handles" class="quad-handles" hidden>
+        <button type="button" class="quad-handle" data-i="0" aria-label="左上の角(矢印キーで移動)"></button>
+        <button type="button" class="quad-handle" data-i="1" aria-label="右上の角(矢印キーで移動)"></button>
+        <button type="button" class="quad-handle" data-i="2" aria-label="右下の角(矢印キーで移動)"></button>
+        <button type="button" class="quad-handle" data-i="3" aria-label="左下の角(矢印キーで移動)"></button>
+      </div>
+      <p id="reg-empty" class="capture-empty">カメラを起動するか、写真を選んでください</p>
+    </div>
+
+    <div class="ar-tools" id="tools-capture">
+      <button type="button" class="btn btn-primary" id="btn-cam"><span aria-hidden="true">📷</span> カメラを起動</button>
+      <button type="button" class="btn btn-accent" id="btn-shutter" hidden><span aria-hidden="true">⭕</span> 撮影する</button>
+      <label class="btn btn-ghost file-btn"><span aria-hidden="true">🖼️</span> 写真を選ぶ
+        <input type="file" id="reg-file" accept="image/*" class="visually-hidden">
+      </label>
+    </div>
+
+    <div id="tools-crop" hidden>
+      <p class="help">四隅の ● をドラッグして、シンボルにする部分を囲んでください(● を選んで矢印キーでも動かせます。Shift で大きく移動)。</p>
+      <div class="ar-tools">
+        <button type="button" class="btn btn-primary" id="btn-crop">この四角形で切り抜く</button>
+        <button type="button" class="btn btn-ghost" id="btn-quad-reset">全体を囲む</button>
+        <button type="button" class="btn btn-ghost" id="btn-recapture">撮り直す</button>
+      </div>
+    </div>
+
+    <div id="tools-mask" hidden>
+      <p class="help">判定に使いたくない部分(人・車・空・植物・反射など)を塗りつぶしてください。塗らなくても登録できます。黄色の点が判定に使う「特徴点」です。</p>
+      <div class="mask-tools">
+        <fieldset class="seg">
+          <legend class="visually-hidden">ブラシ</legend>
+          <label><input type="radio" name="brush-mode" value="paint" checked> 塗る</label>
+          <label><input type="radio" name="brush-mode" value="erase"> 消す</label>
+        </fieldset>
+        <label class="brush-size">ブラシの大きさ <input type="range" id="brush-size" min="8" max="80" value="28"></label>
+        <button type="button" class="btn btn-ghost btn-small" id="btn-mask-clear">塗りを全部消す</button>
+      </div>
+      <div class="ar-tools">
+        <button type="button" class="btn btn-primary" id="btn-angle-done">この角度で決定</button>
+        <button type="button" class="btn btn-ghost" id="btn-back-crop">切り抜きに戻る</button>
+      </div>
+    </div>
+
+    <p id="reg-quality" class="quality" role="status" aria-live="polite"></p>
+    <div class="ar-tools">
+      <button type="button" class="btn btn-ghost btn-small" id="btn-editor-close">この角度の編集を閉じる</button>
+      <button type="button" class="btn btn-ghost btn-small" id="btn-angle-delete" hidden>この角度を削除</button>
+    </div>
+  </section>
+
+  <div id="reg-errors" class="errors" role="alert"></div>
+  <button type="submit" class="btn btn-primary btn-block btn-large" id="btn-submit" disabled>
+    {% if mode == "edit" %}変更を保存{% else %}画像シンボルを登録{% endif %}
+  </button>
+  <p class="help">登録後、管理画面の「シンボル」でドロップ(出てくるアイテムやクーポン)を設定してください。写真は端末で切り抜き・再圧縮されるため、撮影場所などの位置情報(EXIF)は送信されません。</p>
+</form>
+{% endblock %}
+{% block scripts %}
+<script src="{% static 'vendor/jsfeat/jsfeat-0.0.8.min.js' %}" defer></script>
+<script src="{% static 'js/imagematch.js' %}" defer></script>
+<script src="{% static 'js/symbol_register.js' %}" defer></script>
+{% endblock %}

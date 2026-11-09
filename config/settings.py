@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     "wardrobe",
     "rewards",
     "explore",
+    "maps",
 ]
 
 MIDDLEWARE = [
@@ -199,3 +200,16 @@ LOGGING = {
 
 # ---- ゲームバランス ----
 MIKKE_SCAN_TICKET_MAX_AGE = 300  # 秒: スキャンから受け取りまでの有効時間
+# 画像シンボル: 映像から切り出した画像と登録画像の類似度 (0〜1) がこの値以上なら「写っている」と判定
+MIKKE_IMAGE_SIMILARITY_THRESHOLD = float(env("MIKKE_IMAGE_SIMILARITY_THRESHOLD", "0.65"))
+
+# ---- 地図 (Protomaps / PMTiles をローカル配信。外部 API は使わない) ----
+MIKKE_TILES_DIR = BASE_DIR / "maps" / "tiles"
+MIKKE_MAP = {
+    "tiles": "kyobashi",
+    # 大阪府 京橋付近 (scripts/extract_tiles.py で切り出した範囲)
+    "bounds": [[34.6800, 135.5150], [34.7080, 135.5500]],
+    "center": [34.6950, 135.5330],
+    "zoom": 15,
+    "max_data_zoom": 15,
+}
