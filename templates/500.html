@@ -1,0 +1,18 @@
+{% load static %}<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>エラーが起きました | みっけ</title>
+  <link rel="stylesheet" href="{% static 'css/mikke.css' %}">
+</head>
+<body>
+  {# 500 のときはデータベースやログイン情報が使えないことがあるため、base.html を使わない単独のページにする #}
+  <main id="main" class="narrow error-page">
+    <p class="error-code" aria-hidden="true">500</p>
+    <h1>エラーが起きました</h1>
+    <p>ご不便をおかけしています。少し時間をおいてから、もう一度お試しください。</p>
+    <p><a class="btn btn-primary" href="/">ホームへもどる</a></p>
+  </main>
+</body>
+</html>

@@ -6,6 +6,7 @@ def keep_existing_private(apps, schema_editor):
     既存の利用者は「表示しない」から始める (本人がアカウント画面で ON にできる)。
     動作確認用のデモ利用者だけは表示する。"""
     User = apps.get_model("accounts", "User")
+    # core.demo.DEMO_USER_GROUP と同じ値。マイグレーションは後からコードを変えても動きが変わらないよう値を直接書く
     User.objects.exclude(groups__name="デモ利用者").update(share_activity=False)
 
 

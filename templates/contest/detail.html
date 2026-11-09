@@ -7,8 +7,8 @@
 <p class="help">期間: {{ contest.starts_at|date:"Y/n/j H:i" }} 〜 {{ contest.ends_at|date:"Y/n/j H:i" }} ・ 参加 {{ real_count }} 人</p>
 
 <ol class="contest-steps">
-  <li class="{% if entry %}is-done{% else %}is-current{% endif %}"><span aria-hidden="true">①</span> 今のアバターでエントリー</li>
-  <li class="{% if entry and answered < contest.rounds %}is-current{% elif answered >= contest.rounds %}is-done{% endif %}"><span aria-hidden="true">②</span> ほかの人を評価({{ contest.per_round }} 体 × {{ contest.rounds }} 回、各回 1 体まで高評価)</li>
+  <li class="{% if entry %}is-done{% else %}is-current{% endif %}"><span aria-hidden="true">{% if entry %}✓{% else %}①{% endif %}</span> 今のアバターでエントリー{% if entry %} <span class="done-tag">済み</span>{% endif %}</li>
+  <li class="{% if entry and answered < contest.rounds %}is-current{% elif answered >= contest.rounds %}is-done{% endif %}"><span aria-hidden="true">{% if answered >= contest.rounds %}✓{% else %}②{% endif %}</span> ほかの人を評価({{ contest.per_round }} 体 × {{ contest.rounds }} 回、各回 1 体まで高評価){% if answered >= contest.rounds %} <span class="done-tag">済み</span>{% endif %}</li>
   <li><span aria-hidden="true">③</span> ランキングを見る</li>
 </ol>
 

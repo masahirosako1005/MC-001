@@ -54,7 +54,7 @@ h2 { display: inline-block; padding: 2px 16px; border-radius: 999px; background:
 .title-thumbs { list-style: none; padding: 0; margin: 20px 0 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
 .title-thumbs li { position: relative; border-radius: 10px; overflow: hidden; border: 2px solid #FFFFFF; box-shadow: var(--shadow); }
 .title-thumbs img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; }
-.title-thumbs span { position: absolute; left: 0; right: 0; bottom: 0; font-size: 0.6rem; color: #FFFFFF; background: rgba(0, 0, 0, 0.5); padding: 2px; }
+.title-thumbs span { position: absolute; left: 0; right: 0; bottom: 0; font-size: 0.75rem; color: #FFFFFF; background: rgba(0, 0, 0, 0.5); padding: 2px; }
 .title-note { color: #55607A; }
 
 /* ---------------------------------------------------- ログイン後: 1 画面ホーム */
@@ -77,7 +77,27 @@ body:has(.ui-preview-bar) { --preview-h: 48px; }
 .gh > .gh-top { top: 8px; left: 8px; right: 8px; display: flex; gap: 6px; align-items: flex-start; z-index: 20; }
 .gh-rank { display: grid; justify-items: center; width: 72px; padding: 4px 0 6px; text-decoration: none; color: #FFFFFF;
   background: radial-gradient(circle at 50% 30%, #6BC6FF, #1F6FD0); border: 3px solid #FFFFFF; border-radius: 16px; box-shadow: var(--shadow); }
-.gh-rank-label { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.1em; }
+.gh-rank-label { font-size: 0.75rem; font-weight: 800; letter-spacing: 0.05em; }
+.gh-rank-wrap { position: relative; flex: none; }
+.gh-rank-wrap > summary { list-style: none; cursor: pointer; }
+.gh-rank-wrap > summary::-webkit-details-marker { display: none; }
+.gh-rank-panel { position: absolute; left: 0; top: calc(100% + 6px); z-index: 50; width: min(78vw, 280px); padding: 12px 14px;
+  background: #FFFFFF; color: var(--text); border-radius: 14px; box-shadow: var(--shadow); font-size: 0.9rem; }
+.gh-rank-panel p { margin: 0 0 6px; }
+.gh-rank-table { display: flex; flex-wrap: wrap; gap: 4px; list-style: none; padding: 0; margin: 6px 0; }
+.gh-rank-table li { padding: 2px 8px; border-radius: 999px; background: #EEF4FB; font-size: 0.8rem; }
+.gh-rank-table li.is-current { background: #1F6FD0; color: #FFFFFF; font-weight: 800; }
+.gh-rank-panel a { display: inline-flex; align-items: center; min-height: 44px; font-weight: 800; }
+.gh-info { display: grid; justify-items: center; align-content: center; gap: 2px; min-height: 92px; padding: 6px 4px; border-radius: 18px;
+  background: linear-gradient(180deg, #FFFFFF, #E6F3FF); color: var(--text); text-decoration: none; text-align: center;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.18); border: 2px solid #FFFFFF; }
+.gh-info-title { font-size: 0.8rem; font-weight: 900; }
+.gh-info-sub { font-size: 0.75rem; color: var(--muted); line-height: 1.3; }
+.gh-info-big { font-size: 0.85rem; font-weight: 800; }
+.gh-info-big strong { font-size: 1.6rem; color: #D94F00; margin: 0 2px; }
+/* いまだけのコーデ: 何が出るかはお楽しみなので、ぼかして「ちらっと」だけ見せる */
+.gh-silhouettes { display: flex; gap: 2px; }
+.gh-silhouettes img { width: 30px; height: 30px; border-radius: 8px; background: #FFFFFF; filter: blur(2px) saturate(0.7); }
 .gh-rank-letter { font-size: 1.9rem; font-weight: 900; line-height: 1; text-shadow: 0 2px 0 #0F3F80; }
 .gh-rank-num { font-size: 0.75rem; font-weight: 800; background: #C0392B; border-radius: 999px; padding: 0 8px; margin-top: 2px; }
 .gh-stats { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
@@ -97,7 +117,7 @@ body:has(.ui-preview-bar) { --preview-h: 48px; }
 .gh-season { margin: 0; justify-self: start; padding: 4px 12px; border-radius: 999px; background: rgba(255, 255, 255, 0.9); font-weight: 800; font-size: 0.85rem; box-shadow: var(--shadow); }
 .gh-event { display: grid; gap: 2px; padding: 8px 12px; border-radius: 14px; text-decoration: none; color: #FFFFFF;
   background: linear-gradient(135deg, #6A5BE2, #2E7BE8); border: 3px solid #FFFFFF; box-shadow: var(--shadow); }
-.gh-event-tag { justify-self: start; font-size: 0.7rem; font-weight: 800; color: #24304A; background: #FFD84D; border-radius: 999px; padding: 0 8px; }
+.gh-event-tag { justify-self: start; font-size: 0.75rem; font-weight: 800; color: #24304A; background: #FFD84D; border-radius: 999px; padding: 0 8px; }
 .gh-event-title { font-weight: 900; font-size: 0.95rem; line-height: 1.3; }
 .gh-event-sub { font-size: 0.75rem; opacity: 0.95; }
 
@@ -112,7 +132,7 @@ body:has(.ui-preview-bar) { --preview-h: 48px; }
 
 .gh-right { right: 8px; top: 150px; display: grid; gap: 10px; }
 .gh-icon { position: relative; display: grid; justify-items: center; width: 64px; padding: 6px 2px; border-radius: 16px; text-decoration: none;
-  color: var(--text); background: rgba(255, 255, 255, 0.92); border: 3px solid #FFFFFF; box-shadow: var(--shadow); font-size: 0.7rem; font-weight: 800; }
+  color: var(--text); background: rgba(255, 255, 255, 0.92); border: 3px solid #FFFFFF; box-shadow: var(--shadow); font-size: 0.75rem; font-weight: 800; }
 .gh-icon span:first-child { font-size: 1.5rem; line-height: 1.2; }
 .gh-badge { position: absolute; top: -6px; right: -6px; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; background: #E53935; color: #FFFFFF;
   font-size: 0.75rem; display: grid; place-items: center; border: 2px solid #FFFFFF; }
@@ -124,7 +144,7 @@ body:has(.ui-preview-bar) { --preview-h: 48px; }
 .gh-btn span { font-size: 1.6rem; line-height: 1.2; }
 .gh-btn-sub { background: linear-gradient(180deg, #FFFFFF, #E6F3FF); color: var(--text); min-height: 72px; }
 .gh-btn-main { background: linear-gradient(180deg, #FF9A4D, #D94F00); color: #FFFFFF; font-size: 1.35rem; min-height: 92px; text-shadow: 0 2px 0 #B84200; }
-.gh-btn-main small { font-size: 0.7rem; font-weight: 700; text-shadow: none; }
+.gh-btn-main small { font-size: 0.75rem; font-weight: 700; text-shadow: none; }
 .gh-btn:active { transform: translateY(3px); }
 
 @media (max-height: 640px) {

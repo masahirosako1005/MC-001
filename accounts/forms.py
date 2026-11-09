@@ -6,6 +6,7 @@ from django.contrib.auth import password_validation
 from django.contrib.auth.forms import AuthenticationForm
 
 from core import ratelimit
+from core.net import client_ip
 
 from .models import User, email_hash_of
 
@@ -31,8 +32,9 @@ class SignupForm(forms.Form):
         widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
     )
     share_activity = forms.BooleanField(
-        label="みっけ仲間に表示する", required=False, initial=True,
-        help_text="同じシンボルを 30 分以内にみっけした人に、ニックネームと今のコーデを表示します"
+        # 本人が選んだときだけ表示する (オプトイン)。子どもやプライバシーを重視する人への配慮
+        label="みっけ仲間に表示する", required=False, initial=False,
+        help_text=f"同じスポットで {settings.MIKKE_FINDER_WINDOW_MINUTES} 分以内にみっけした人に、ニックネームと今のコーデを表示します"
                   "(場所や時刻のくわしい情報は出しません)。あとからアカウント画面で変えられます。",
     )
 
@@ -91,22 +93,26 @@ class ThrottledLoginForm(AuthenticationForm):
             raise forms.ValidationError(self.error_messages["invalid_login"], code="invalid_login",
                                         params={"username": self.username_field.verbose_name})
 
-    def _keys(self) -> list[str]:
+    def _limits(self) -> list[tuple[str, int]]:
+        """(カウントのキー, 上限)。IP 単位はアカウント単位より緩くする (同じ回線の人をまとめてロックしない)。"""
         email = self.data.get("username", "")
-        ip = self.request.META.get("REMOTE_ADDR", "") if self.request else ""
-        return [f"{self.key_prefix}:acct:{email_hash_of(email)}", f"{self.key_prefix}:ip:{ip}"]
+        ip = client_ip(self.request)
+        return [(f"{self.key_prefix}:acct:{email_hash_of(email)}", settings.MIKKE_LOGIN_MAX_FAILURES),
+                (f"{self.key_prefix}:ip:{ip}", settings.MIKKE_LOGIN_MAX_FAILURES_PER_IP)]
 
-    def clean(self):
-        limit = settings.MIKKE_LOGIN_MAX_FAILURES
-        keys = self._keys()
-        if any(ratelimit.count(k) >= limit for k in keys):
+    def _check_and_count(self, *, scale: float = 1.0, lock_seconds: int | None = None):
+        limits = [(k, max(1, int(n * scale))) for k, n in self._limits()]
+        if any(ratelimit.count(k) >= n for k, n in limits):
             raise forms.ValidationError(self.error_messages["locked"], code="locked")
         try:
-            return super().clean()
+            return AuthenticationForm.clean(self)
         except forms.ValidationError:
-            for k in keys:
-                ratelimit.hit(k, limit, settings.MIKKE_LOGIN_LOCK_SECONDS)
+            for k, n in limits:
+                ratelimit.hit(k, n, lock_seconds or settings.MIKKE_LOGIN_LOCK_SECONDS)
             raise
+
+    def clean(self):
+        return self._check_and_count()
 
 
 class OperatorLoginForm(ThrottledLoginForm):
@@ -116,16 +122,8 @@ class OperatorLoginForm(ThrottledLoginForm):
     key_prefix = "opslogin"
 
     def clean(self):
-        limit = max(3, settings.MIKKE_LOGIN_MAX_FAILURES // 2)
-        keys = self._keys()
-        if any(ratelimit.count(k) >= limit for k in keys):
-            raise forms.ValidationError(self.error_messages["locked"], code="locked")
-        try:
-            return AuthenticationForm.clean(self)
-        except forms.ValidationError:
-            for k in keys:
-                ratelimit.hit(k, limit, settings.MIKKE_LOGIN_LOCK_SECONDS * 2)
-            raise
+        # 上限は利用者用の半分 (アカウント単位は最低 3 回)、ロック時間は 2 倍
+        return self._check_and_count(scale=0.6, lock_seconds=settings.MIKKE_LOGIN_LOCK_SECONDS * 2)
 
 
 class WithdrawForm(forms.Form):

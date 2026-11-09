@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-import secrets
 import unicodedata
 
+from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
 from django.utils import timezone
 
 from core.crypto import blind_index, normalize_email
 from core.fields import EncryptedTextField
+from core.ids import random_code, unique_code
 
 EMAIL_INDEX_PURPOSE = "user.email"
 
@@ -63,8 +64,9 @@ class User(AbstractBaseUser, PermissionsMixin):
         help_text="サイト運営者が発行した仮パスワードのアカウントは、最初にパスワードを変更してもらう")
     # みっけしたとき「こんな人が獲得しているよ」に、ニックネームとアバターを出してよいか (本人が選ぶ)
     share_activity = models.BooleanField(
-        "みっけ仲間に表示する", default=True,
-        help_text="ON のとき、同じシンボルを 30 分以内にみっけした人に、ニックネームと今のコーデが表示されます")
+        "みっけ仲間に表示する", default=False,
+        help_text=f"ON のとき、同じスポットで {settings.MIKKE_FINDER_WINDOW_MINUTES} 分以内にみっけした人に、"
+                  "ニックネームと今のコーデが表示されます")
     date_joined = models.DateTimeField("登録日時", default=timezone.now)
 
     objects = UserManager()
@@ -114,8 +116,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
 def new_manager_code() -> str:
     """管理者のユニーク ID (例: MK-7Q4H2Z)。紛らわしい文字 (0/O, 1/I/L) は使わない。"""
-    alphabet = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
-    return "MK-" + "".join(secrets.choice(alphabet) for _ in range(6))
+    return "MK-" + random_code(6)
 
 
 class ManagerProfile(models.Model):
@@ -151,6 +152,13 @@ class ManagerProfile(models.Model):
 
     def __str__(self) -> str:
         return f"{self.display_name} ({self.manager_code})"
+
+    def save(self, *args, **kwargs):
+        if self._state.adding:  # 管理者 ID が既存と重なったら作り直す
+            others = ManagerProfile.objects.exclude(pk=self.pk)
+            if others.filter(manager_code=self.manager_code).exists():
+                self.manager_code = unique_code(new_manager_code, lambda c: others.filter(manager_code=c).exists())
+        super().save(*args, **kwargs)
 
     @property
     def display_name(self) -> str:

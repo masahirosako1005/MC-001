@@ -9,11 +9,23 @@
 
   {# ---- 上部ステータスバー ---- #}
   <div class="gh-top">
-    <a class="gh-rank" href="{% url 'rewards:achievements' %}" aria-label="旅ランク {{ rank }}、みっけ {{ metrics.total_discoveries }} 回(実績を見る)">
-      <span class="gh-rank-label">旅ランク</span>
-      <span class="gh-rank-letter">{{ rank }}</span>
-      <span class="gh-rank-num">{{ metrics.total_discoveries }}</span>
-    </a>
+    {# 旅ランク: 押すと、ランクの上がり方と次のランクまでの回数を説明する #}
+    <details class="gh-rank-wrap">
+      <summary class="gh-rank" aria-label="旅ランク {{ rank }}、みっけ {{ metrics.total_discoveries }} 回(ランクの説明を見る)">
+        <span class="gh-rank-label">旅ランク</span>
+        <span class="gh-rank-letter">{{ rank }}</span>
+        <span class="gh-rank-num">{{ metrics.total_discoveries }}</span>
+      </summary>
+      <div class="gh-rank-panel">
+        <p><strong>旅ランク {{ rank_info.rank }}</strong>(みっけ {{ metrics.total_discoveries }} 回)</p>
+        <p>{% if rank_info.next %}あと <strong>{{ rank_info.remaining }} 回</strong>みっけすると <strong>{{ rank_info.next }}</strong> ランク!{% else %}最高ランクです!{% endif %}</p>
+        <p class="help">シンボルをみっけした回数でランクが上がります。</p>
+        <ul class="gh-rank-table">
+          {% for r in rank_info.table %}<li{% if r.current %} class="is-current" aria-current="true"{% endif %}><b>{{ r.rank }}</b> {{ r.from }} 回〜</li>{% endfor %}
+        </ul>
+        <a href="{% url 'rewards:achievements' %}">実績を見る</a>
+      </div>
+    </details>
     <div class="gh-stats">
       <a class="gh-stat" href="{% url 'wardrobe:index' %}"><span aria-hidden="true">👕</span><span class="visually-hidden">集めたアイテム</span>{{ metrics.distinct_items }}<small>/{{ item_total }}</small></a>
       <a class="gh-stat" href="{% url 'explore:mikke' %}"><span aria-hidden="true">📍</span><span class="visually-hidden">訪れたスポット</span>{{ metrics.distinct_spots }}</a>
@@ -58,15 +70,30 @@
   <nav class="gh-right" aria-label="ショートカット">
     <a class="gh-icon" href="{% url 'rewards:coupons' %}"><span aria-hidden="true">✉️</span><span>クーポン</span>{% if coupon_count %}<b class="gh-badge">{{ coupon_count }}</b>{% endif %}</a>
     <a class="gh-icon" href="{% url 'rewards:achievements' %}"><span aria-hidden="true">📋</span><span>実績</span>{% if achievement_count %}<b class="gh-badge gh-badge-soft">{{ achievement_count }}</b>{% endif %}</a>
-    <a class="gh-icon" href="{% url 'explore:history' %}"><span aria-hidden="true">🎁</span><span>履歴</span></a>
+    <a class="gh-icon" href="{% url 'explore:history' %}"><span aria-hidden="true">🕘</span><span>履歴</span></a>
     <a class="gh-icon" href="{% url 'explore:mikke' %}"><span aria-hidden="true">🗺️</span><span>地図</span></a>
   </nav>
 
-  {# ---- 下部: 大きなボタン ---- #}
+  {# ---- 下部: いまの情報 + 大きなボタン (きせかえ・コンテストは下のタブにあるので重ねない) ---- #}
   <div class="gh-bottom">
-    <a class="gh-btn gh-btn-sub" href="{% url 'wardrobe:index' %}"><span aria-hidden="true">👗</span>きせかえ</a>
+    <a class="gh-info gh-info-limited" href="{% url 'explore:mikke' %}">
+      <span class="gh-info-title">いまだけのコーデ</span>
+      {% if limited_now %}
+      <span class="gh-silhouettes">
+        {% for it in limited_now %}<img src="{{ it.image }}" alt="" width="40" height="40" loading="lazy" title="{{ it.label }}・{{ it.spot }}">{% endfor %}
+      </span>
+      <span class="visually-hidden">{% for it in limited_now %}{{ it.label }}のコーデ({{ it.spot }}){% if not forloop.last %}、{% endif %}{% endfor %}</span>
+      <span class="gh-info-sub">{{ limited_now.0.label }} ほか</span>
+      {% else %}
+      <span class="gh-info-sub">季節や時間帯で変わります</span>
+      {% endif %}
+    </a>
     <a class="gh-btn gh-btn-main" href="{% url 'explore:mikke' %}"><span aria-hidden="true">📷</span>みっけに行く<small>{{ mikke_season_label }}の{{ mikke_slot_label }}だけのアイテムも</small></a>
-    <a class="gh-btn gh-btn-sub" href="{% url 'contest:list' %}"><span aria-hidden="true">🏆</span>コンテスト</a>
+    <div class="gh-info gh-info-season" role="group" aria-label="季節の変わり目">
+      <span class="gh-info-title">{{ season_countdown.next }}まで</span>
+      <span class="gh-info-big">あと<strong>{{ season_countdown.days }}</strong>日</span>
+      <span class="gh-info-sub">{{ mikke_season_label }}限定は今のうち</span>
+    </div>
   </div>
 </section>
 {% endblock %}

@@ -20,8 +20,8 @@
     {% include "includes/field.html" with field=form.name %}
     {% include "includes/field.html" with field=form.hint %}
     {% include "includes/field.html" with field=form.cooldown_hours %}
-    <label class="staff-toggle">{{ form.is_active }} 公開する</label>
-    <label class="staff-toggle">{{ form.is_secret }} シークレットシンボルにする</label>
+    <label class="toggle">{{ form.is_active }} 公開する</label>
+    <label class="toggle">{{ form.is_secret }} シークレットシンボルにする</label>
     <p class="help">{{ form.is_secret.help_text }}</p>
   </fieldset>
   <fieldset class="option-group">

@@ -18,7 +18,7 @@
     {% csrf_token %}
     {% include "includes/field.html" with field=form.password %}
     <div class="field{% if form.confirm.errors %} has-error{% endif %}">
-      <label class="staff-toggle">{{ form.confirm }} {{ form.confirm.label }}</label>
+      <label class="toggle">{{ form.confirm }} {{ form.confirm.label }}</label>
       {% if form.confirm.errors %}<ul class="errors" role="alert"><li>確認のチェックを入れてください。</li></ul>{% endif %}
     </div>
     <button type="submit" class="btn btn-danger btn-block">退会する</button>

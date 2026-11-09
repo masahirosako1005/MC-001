@@ -72,16 +72,16 @@
 <section aria-labelledby="table-h">
   <h2 id="table-h">すべてのスポット({{ data.spots|length }} 件)</h2>
   <div class="table-wrap">
-  <table class="table num-table">
+  <table class="table num-table table-cards">
     <caption class="visually-hidden">スポットごとの数値</caption>
     <thead><tr><th scope="col">スポット</th><th scope="col">管理者</th><th scope="col">付近に来た</th><th scope="col">PV</th><th scope="col">カメラ起動</th><th scope="col">みっけ</th><th scope="col">コーデ獲得</th><th scope="col">利用割合</th></tr></thead>
     <tbody>
     {% for r in data.spots %}
     <tr>
       <th scope="row">{{ r.spot.name }}{% if not r.spot.is_active %} <span class="badge">非公開</span>{% endif %}</th>
-      <td>{{ r.owner }}</td>
-      <td>{{ r.visitors }}</td><td>{{ r.page_views }}</td><td>{{ r.camera }}</td><td>{{ r.finders }}</td><td>{{ r.coord }}</td>
-      <td>{% if r.rate is not None %}<span class="rate-cell">{{ r.rate }}%</span>{% else %}—{% endif %}</td>
+      <td data-label="管理者">{{ r.owner }}</td>
+      <td data-label="付近に来た">{{ r.visitors }}</td><td data-label="PV">{{ r.page_views }}</td><td data-label="カメラ起動">{{ r.camera }}</td><td data-label="みっけ">{{ r.finders }}</td><td data-label="コーデ獲得">{{ r.coord }}</td>
+      <td data-label="利用割合">{% if r.rate is not None %}<span class="rate-cell">{{ r.rate }}%</span>{% else %}—{% endif %}</td>
     </tr>
     {% empty %}
     <tr><td colspan="8">スポットがありません。</td></tr>

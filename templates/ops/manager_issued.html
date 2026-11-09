@@ -2,18 +2,22 @@
 {% block title %}仮パスワードの発行{% endblock %}
 {% block body_class %}page-ops{% endblock %}
 {% block content %}
-<h1>{% if created %}管理者を追加しました{% else %}仮パスワードを再発行しました{% endif %}</h1>
+<h1>{% if created %}管理者を追加しました{% else %}仮パスワードを発行しました{% endif %}</h1>
 {% include "ops/_nav.html" %}
 <section class="narrow issued">
   <dl class="issued-list">
+    {% if profile %}
     <dt>店舗・会社</dt><dd>{{ profile.display_name }}</dd>
     <dt>管理者 ID</dt><dd><strong>{{ profile.manager_code }}</strong></dd>
+    {% else %}
+    <dt>ニックネーム</dt><dd>{{ manager.nickname }}(#{{ manager.pk }}・{{ manager.get_role_display }})</dd>
+    {% endif %}
     <dt>ログイン用メールアドレス</dt><dd>{{ manager.email }}</dd>
     <dt>仮パスワード</dt><dd><code class="temp-password">{{ password }}</code></dd>
   </dl>
   <p class="message message-warning" role="alert">仮パスワードは<strong>この画面でしか表示されません</strong>(保存していません)。
-    安全な方法で担当者に伝えてください。担当者は通常のログイン画面からログインし、最初にパスワードを変更します。</p>
-  <p><a class="btn btn-primary" href="{% url 'ops:users' %}?role=manager">利用者管理へ</a>
-     <a class="btn btn-ghost" href="{% url 'ops:manager_edit' manager.pk %}">管理者の情報を見る</a></p>
+    本人確認をしたうえで、安全な方法で本人に伝えてください。本人は通常のログイン画面からログインし、最初にパスワードを変更します。</p>
+  <p><a class="btn btn-primary" href="{% url 'ops:users' %}">利用者管理へ</a>
+     {% if profile %}<a class="btn btn-ghost" href="{% url 'ops:manager_edit' manager.pk %}">管理者の情報を見る</a>{% endif %}</p>
 </section>
 {% endblock %}

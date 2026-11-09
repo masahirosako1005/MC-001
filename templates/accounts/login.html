@@ -10,6 +10,7 @@
     <input type="hidden" name="next" value="{{ next }}">
     <button type="submit" class="btn btn-primary btn-block">ログイン</button>
   </form>
+  <p class="center"><a href="{% url 'accounts:password_help' %}">パスワードを忘れた方</a></p>
   <p class="center">はじめての方は <a href="{% url 'accounts:signup' %}">アカウントをつくる</a></p>
 </section>
 {% endblock %}

@@ -28,14 +28,12 @@ from django.utils import timezone
 
 from accounts.models import ManagerProfile, User, email_hash_of
 from core import audit
+from core.demo import DEMO_DOMAIN, DEMO_MANAGER_GROUP, DEMO_USER_GROUP
 from core.timeutil import season_of, slot_of
 from explore.models import Discovery, DropEntry, NearbyVisit, Spot, SpotVisit, Symbol
 from wardrobe.models import CATEGORY_CHOICES, Item, UserItem
 
 DEMO_SPOT_PREFIX = "demo-spot-"
-DEMO_MANAGER_GROUP = "デモ管理者"
-DEMO_USER_GROUP = "デモ利用者"
-DEMO_DOMAIN = "demo.mikke.test"
 # ローカル確認用 (test@test.com と同じ)。DEBUG=True のときだけ使われ、本番では投入できない
 TEST_PASSWORD = "test1234"  # noqa: S105
 _rng = secrets.SystemRandom()

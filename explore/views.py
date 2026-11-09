@@ -15,8 +15,11 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from core import audit, ratelimit
+from core.http import svg_response, too_many_requests
 from core.models import SiteSetting
 from core.permissions import managed_spots, managed_symbols, manager_required
+from wardrobe.models import CATEGORY_CHOICES
+from wardrobe.services import config_svg, get_config, item_preview_svg, item_zoom_svg
 
 from . import finders, services
 from .forms import ImageSymbolInfoForm, collect_view_uploads
@@ -50,9 +53,6 @@ def _error(exc: services.ExploreError, status: int = 400) -> JsonResponse:
     return JsonResponse({"error": exc.code, "message": exc.message, **exc.extra}, status=status)
 
 
-# スポットとシンボルのカード一覧 (いまは非表示。True にすると「みっけ」画面の下に出る)
-SHOW_SPOT_CARDS = False
-
 
 @login_required
 @require_GET
@@ -84,7 +84,7 @@ def mikke(request):
     ]
     return render(request, "explore/mikke.html", {
         "rows": rows,
-        "show_spot_cards": SHOW_SPOT_CARDS,
+        "show_spot_cards": settings.MIKKE_SHOW_SPOT_CARDS,
         "spot_points": points,
         **_map_context(),
         "nearby_url": reverse("explore:api_nearby"),
@@ -100,7 +100,10 @@ def _map_context() -> dict:
     }
 
 
-def _coords_from(data: dict) -> tuple[float, float] | None:
+def _coords_from(data) -> tuple[float, float] | None:
+    """{"lat", "lng"} を検証して (緯度, 経度) を返す。不正なら None。"""
+    if not isinstance(data, dict):
+        return None
     try:
         lat, lng = float(data["lat"]), float(data["lng"])
     except (KeyError, TypeError, ValueError):
@@ -165,13 +168,8 @@ def symbol_item_svg(request, pk: int, code: str):
     drop = symbol.drops.select_related("item").filter(item__code=code, item__is_active=True).first()
     if drop is None:
         raise Http404
-    from wardrobe.services import get_config, item_preview_svg
-
     cfg = get_config(request.user)
-    resp = HttpResponse(item_preview_svg(drop.item, cfg.skin_tone, cfg.eye_color), content_type="image/svg+xml; charset=utf-8")
-    resp.headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; sandbox"
-    resp.headers["Cache-Control"] = "private, max-age=300"
-    return resp
+    return svg_response(item_preview_svg(drop.item, cfg.skin_tone, cfg.eye_color), cache="private, max-age=300")
 
 
 @login_required
@@ -199,17 +197,6 @@ def api_scan(request):
     return JsonResponse(result)
 
 
-def _coords(data: dict) -> tuple[float, float] | None:
-    loc = data.get("location")
-    if not isinstance(loc, dict):
-        return None
-    try:
-        lat, lng = float(loc["lat"]), float(loc["lng"])
-    except (KeyError, TypeError, ValueError):
-        return None
-    if not (-90 <= lat <= 90 and -180 <= lng <= 180):
-        return None
-    return lat, lng
 
 
 @require_POST
@@ -220,7 +207,7 @@ def api_collect(request):
     key = request.headers.get("Idempotency-Key", "")
     try:
         data = _json_body(request)
-        result = services.collect(request.user, str(data.get("ticket", ""))[:1000], key, _coords(data))
+        result = services.collect(request.user, str(data.get("ticket", ""))[:1000], key, _coords_from(data.get("location")))
     except (ValueError, json.JSONDecodeError):
         return JsonResponse({"error": "bad_request", "message": "リクエストが正しくありません。"}, status=400)
     except services.Cooldown as exc:
@@ -240,9 +227,14 @@ def api_collect(request):
 
 
 # ---------------------------------------------------------------- こんな人が獲得しているよ
-def _finder_or_404(request, token: str):
+class _FinderRateLimited(Exception):
+    pass
+
+
+def _finder_target(request, token: str):
+    """みっけ仲間の ID から相手を取り出す。レート超過は _FinderRateLimited (429)、無効な ID は 404。"""
     if not ratelimit.hit(f"finder:{request.user.pk}", 120, 60):
-        raise Http404
+        raise _FinderRateLimited
     try:
         return finders.read_token(token, request.user)
     except finders.FinderNotFound as exc:
@@ -253,41 +245,38 @@ def _finder_or_404(request, token: str):
 @api_login_required
 def api_finder(request, token: str):
     """みっけ仲間のコーデ (着ているアイテムと、どこで手に入れたか)。"""
-    target = _finder_or_404(request, token)
+    try:
+        target = _finder_target(request, token)
+    except _FinderRateLimited:
+        return too_many_requests()
     return JsonResponse(finders.finder_profile(target, request.user, token))
 
 
 @login_required
 @require_GET
 def finder_avatar_svg(request, token: str):
-    from wardrobe.services import config_svg, get_config
-
-    target = _finder_or_404(request, token)
+    try:
+        target = _finder_target(request, token)
+    except _FinderRateLimited:
+        return too_many_requests(json=False)
     svg = config_svg(get_config(target), label=f"{target.nickname}さんのコーデ")
-    return _sandboxed_svg(svg)
+    return svg_response(svg, cache="private, max-age=120")
 
 
 @login_required
 @require_GET
 def finder_item_svg(request, token: str, code: str):
     """みっけ仲間が今着ているアイテムの絵 (着ていないアイテムは 404)。"""
-    from wardrobe.models import CATEGORY_CHOICES
-    from wardrobe.services import get_config, item_zoom_svg
-
-    target = _finder_or_404(request, token)
+    try:
+        target = _finder_target(request, token)
+    except _FinderRateLimited:
+        return too_many_requests(json=False)
     config = get_config(target)
     item = next((getattr(config, c) for c, _ in CATEGORY_CHOICES
                  if getattr(config, c) is not None and getattr(config, c).code == code), None)
     if item is None:
         raise Http404
-    return _sandboxed_svg(item_zoom_svg(item, config.skin_tone, config.eye_color))
-
-
-def _sandboxed_svg(svg: str) -> HttpResponse:
-    resp = HttpResponse(svg, content_type="image/svg+xml; charset=utf-8")
-    resp.headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; sandbox"
-    resp.headers["Cache-Control"] = "private, max-age=120"
-    return resp
+    return svg_response(item_zoom_svg(item, config.skin_tone, config.eye_color), cache="private, max-age=120")
 
 
 @require_GET
@@ -375,11 +364,8 @@ def symbol_view_image(request, pk: int, angle: str):
 @require_GET
 def symbol_svg(request, pk: int):
     symbol = get_object_or_404(managed_symbols(request.user).select_related("spot"), pk=pk, kind=Symbol.KIND_QR)
-    resp = HttpResponse(render_symbol_svg(symbol), content_type="image/svg+xml; charset=utf-8")
-    resp.headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; sandbox"
-    if request.GET.get("download") == "1":
-        resp.headers["Content-Disposition"] = f'attachment; filename="mikke-symbol-{symbol.pk}.svg"'
-    return resp
+    filename = f"mikke-symbol-{symbol.pk}.svg" if request.GET.get("download") == "1" else None
+    return svg_response(render_symbol_svg(symbol), cache="private, no-cache", filename=filename)
 
 
 @manager_required

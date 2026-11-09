@@ -21,7 +21,6 @@
   const btnCollect = $("btn-collect");
   const collectLabel = $("btn-collect-label");
   const fileInput = $("file-input");
-  const dialog = $("reward-dialog");
 
   const csrf = document.querySelector('meta[name="csrf-token"]').content;
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -408,7 +407,7 @@
         t.state = "cooldown";
         t.info.status = "cooldown";
         btnCollect.hidden = true;
-        showReward(res.data);
+        document.dispatchEvent(new CustomEvent("mikke:reward", { detail: res.data }));
         setStatus("受け取りました!ほかのシンボルもさがしてみよう。");
       } else if (res.status === 401) {
         window.location.reload();
@@ -428,243 +427,11 @@
     }
   }
 
-  // ---------- 結果ダイアログ ----------
-  function showReward(d) {
-    const title = $("reward-title");
-    const spot = $("reward-spot");
-    const art = $("reward-art");
-    const img = $("reward-img");
-    const badgeNew = $("reward-new");
-    const rarity = $("reward-rarity");
-    const text = $("reward-text");
-    const extra = $("reward-extra");
-    const list = $("reward-achievements");
-    const link = $("reward-link");
-    const itemImg = (code) => `${root.dataset.itemSvgBase}${encodeURIComponent(code)}.svg`;
-    const couponImg = (id) => `${root.dataset.couponBase}${encodeURIComponent(id)}.svg`;
-    // 手に入れた物の絵を出す (読み込めなかったときは絵の枠ごと隠し、文字だけで伝える)
-    const zoom = $("reward-zoom");
-    // 小さなパーツ (くつ・顔など) は、全身の絵に虫めがね風の拡大図を重ねて、何を手に入れたか分かるようにする
-    const ZOOMABLE = new Set(["shoes", "bottom", "top", "hair", "face"]);
-    function showZoom(code) {
-      zoom.onerror = () => { zoom.hidden = true; };
-      zoom.src = `${itemImg(code)}?zoom=1`;
-      zoom.hidden = false;
-    }
-    function showArt(src, alt, kind, w, h) {
-      zoom.hidden = true;
-      art.className = `reward-art is-${kind}`;
-      img.onerror = () => { art.hidden = true; };
-      img.width = w;
-      img.height = h;
-      img.alt = alt;
-      img.src = src;
-      art.hidden = false;
-    }
-
-    spot.textContent = d.symbol ? `${d.symbol.spot} ・ ${d.symbol.name}` : "";
-    art.hidden = true;
-    badgeNew.hidden = true;
-    rarity.textContent = "";
-    link.hidden = false;
-    list.replaceChildren();
-    const notes = [];
-    if (d.visit_days > 1 && d.is_revisit_day) notes.push(`このスポット ${d.visit_days} 日目の訪問!再訪限定のごほうびが出やすくなっています。`);
-
-    if (d.reward_kind === "item" && d.item) {
-      title.textContent = d.item.new ? "NEW!みっけ!" : "みっけ!";
-      showArt(itemImg(d.item.code), `手に入れたアイテム: ${d.item.name}${d.item.new ? "" : "(取得済み)"}`, "item", 180, 242);
-      if (ZOOMABLE.has(d.item.slot)) showZoom(d.item.code);
-      // 初めてなら「NEW」、もう持っているコーデなら「取得済み」
-      badgeNew.hidden = false;
-      badgeNew.textContent = d.item.new ? "NEW" : "取得済み";
-      badgeNew.classList.toggle("is-owned", !d.item.new);
-      if (d.item.rarity) rarity.textContent = "★".repeat(d.item.rarity);
-      text.textContent = `${d.item.name} を手に入れた!`;
-      if (d.item.rarity) notes.unshift(`${d.item.category || ""} ${"★".repeat(d.item.rarity)}${"☆".repeat(5 - d.item.rarity)}`);
-      if (!d.item.new) notes.push("取得済みのコーデです(コレクション回数が増えました)。");
-      link.textContent = "着せかえる";
-      link.href = root.dataset.wardrobeUrl;
-    } else if (d.reward_kind === "coupon" && d.coupon) {
-      title.textContent = "クーポンをみっけ!";
-      showArt(couponImg(d.coupon.id), `手に入れたクーポン: ${d.coupon.shop || ""}「${d.coupon.title}」`, "coupon", 288, 180);
-      badgeNew.hidden = false;
-      badgeNew.textContent = "NEW";
-      badgeNew.classList.remove("is-owned");
-      text.textContent = `${d.coupon.shop || ""}「${d.coupon.title}」`;
-      if (d.coupon.benefit) notes.unshift(d.coupon.benefit);
-      link.textContent = "クーポンを見る";
-      link.href = `${root.dataset.couponBase}${encodeURIComponent(d.coupon.id)}/`;
-    } else {
-      // ふつうは必ずコーデが出る (衣装全振り)。アイテムが 1 つも登録されていない場合だけここに来る
-      title.textContent = "みっけ!";
-      text.textContent = "シンボルをみっけしました。";
-      link.hidden = true;
-    }
-    extra.textContent = notes.join(" ");
-    // 実績のごほうびも、絵つきで並べる
-    for (const a of d.achievements || []) {
-      const li = document.createElement("li");
-      const head = document.createElement("span");
-      head.textContent = `${a.icon} 実績「${a.name}」達成!`;
-      li.appendChild(head);
-      const gifts = [];
-      if (a.item) gifts.push({ src: itemImg(a.item.code), label: `アイテム「${a.item.name}」`, cls: "is-item" });
-      if (a.coupon) gifts.push({ src: couponImg(a.coupon.id), label: `クーポン「${a.coupon.title}」`, cls: "is-coupon" });
-      for (const g of gifts) {
-        const fig = document.createElement("span");
-        fig.className = `reward-gift ${g.cls}`;
-        const gi = document.createElement("img");
-        gi.src = g.src;
-        gi.alt = "";
-        gi.onerror = () => gi.remove();
-        const cap = document.createElement("span");
-        cap.textContent = `${g.label} も手に入れた!`;
-        fig.append(gi, cap);
-        li.appendChild(fig);
-      }
-      list.appendChild(li);
-    }
-    renderFinders(d.recent_finders || []);
-    showFinderView(false);
-    if (typeof dialog.showModal === "function") dialog.showModal();
-    else dialog.setAttribute("open", "");
-  }
-
-  $("reward-close").addEventListener("click", () => dialog.close());
-
-  // ---------- こんな人が獲得しているよ (直近 30 分に同じシンボルでみっけした人) ----------
-  const finderSection = $("reward-finders");
-  const finderList = $("finder-list");
-  const finderView = $("finder-view");
-  const rewardMain = $("reward-main");
-  const finderItems = $("finder-items");
-  const finderObtained = $("finder-obtained");
-  const finderAvatar = $("finder-avatar");
-  const finderUrl = (token, rest = "") => `${root.dataset.finderBase}${encodeURIComponent(token)}/${rest}`;
-  let finderOpener = null;
-
-  function el(tag, cls, text) {
-    const e = document.createElement(tag);
-    if (cls) e.className = cls;
-    if (text != null) e.textContent = text;
-    return e;
-  }
-
-  function renderFinders(list) {
-    finderList.replaceChildren();
-    finderSection.hidden = !list.length;
-    for (const f of list) {
-      const li = el("li");
-      const b = el("button", "finder-chip");
-      b.type = "button";
-      const img = el("img");
-      img.src = finderUrl(f.token, "avatar.svg");
-      img.alt = "";
-      img.width = 44;
-      img.height = 66;
-      img.loading = "lazy";
-      b.append(img, el("span", "finder-chip-name", f.nickname), el("span", "finder-chip-ago", f.ago));
-      b.setAttribute("aria-label", `${f.nickname}さん(${f.ago})のコーデを見る`);
-      b.addEventListener("click", () => openFinder(f, b));
-      li.appendChild(b);
-      finderList.appendChild(li);
-    }
-  }
-
-  function showFinderView(on) {
-    finderView.hidden = !on;
-    rewardMain.hidden = on;
-  }
-
-  async function openFinder(f, opener) {
-    finderOpener = opener;
-    showFinderView(true);
-    $("finder-name").textContent = `${f.nickname}さんのコーデ`;
-    finderAvatar.src = finderUrl(f.token, "avatar.svg");
-    finderAvatar.alt = `${f.nickname}さんのアバター`;
-    finderItems.replaceChildren();
-    $("finder-goto").hidden = true;
-    finderObtained.textContent = "読み込んでいます…";
-    $("finder-back").focus();
-    let d;
-    try {
-      const res = await fetch(finderUrl(f.token), { credentials: "same-origin" });
-      if (!res.ok) throw new Error(String(res.status));
-      d = await res.json();
-    } catch (_) {
-      finderObtained.textContent = "この人のコーデは、いまは見られません(公開をやめたか、時間がたちました)。";
-      return;
-    }
-    finderObtained.textContent = "アイテムを押すと、どこで手に入れたかが見られます。";
-    for (const it of d.items) {
-      const li = el("li");
-      const b = el("button", "finder-item");
-      b.type = "button";
-      b.setAttribute("aria-pressed", "false");
-      const img = el("img");
-      img.src = it.image;
-      img.alt = "";
-      img.width = 64;
-      img.height = 64;
-      img.loading = "lazy";
-      b.append(img, el("span", "finder-item-cat", it.category), el("span", "finder-item-name", it.name));
-      b.addEventListener("click", () => {
-        for (const other of finderItems.querySelectorAll("button")) other.setAttribute("aria-pressed", "false");
-        b.setAttribute("aria-pressed", "true");
-        showObtained(it);
-      });
-      li.appendChild(b);
-      finderItems.appendChild(li);
-    }
-  }
-
-  $("finder-back").addEventListener("click", () => {
-    showFinderView(false);
-    if (finderOpener) finderOpener.focus();
-  });
-
-  // どこで手に入れたか。スポット名は押せるようにして「これをみっけに行く」につなぐ
-  const gotoBox = $("finder-goto");
-  let gotoTarget = null;
-
-  function showObtained(it) {
-    gotoBox.hidden = true;
-    finderObtained.replaceChildren();
-    if (!it.spot) {
-      finderObtained.textContent = `「${it.name}」は、${it.obtained}`;
-      return;
-    }
-    const link = el("button", "spot-link", it.spot.name);
-    link.type = "button";
-    link.setAttribute("aria-label", `${it.spot.name}(地図で見る)`);
-    link.addEventListener("click", () => openGoto(it, link));
-    finderObtained.append(`「${it.name}」は、`, link, `でみっけ${it.season ? `(${it.season})` : ""}`);
-  }
-
-  function openGoto(it, opener) {
-    gotoTarget = { ...it.spot, item: it.name, opener };
-    $("finder-goto-title").textContent = `「${it.name}」を ${it.spot.name} でみっけしよう`;
-    gotoBox.hidden = false;
-    $("finder-goto-yes").focus();
-  }
-
-  $("finder-goto-no").addEventListener("click", () => {
-    gotoBox.hidden = true;
-    if (gotoTarget && gotoTarget.opener) gotoTarget.opener.focus();
-  });
-
-  $("finder-goto-yes").addEventListener("click", () => {
-    if (!gotoTarget) return;
-    const target = gotoTarget;
-    gotoBox.hidden = true;
-    dialog.close();
-    // カメラ中なら止めて、地図 (①さがす) にもどってからスポットを表示する
+  // ---------- 結果の表示は reward_dialog.js / finders.js ----------
+  // 「これをみっけに行く」: カメラ中なら止めて地図 (①さがす) にもどる
+  document.addEventListener("mikke:go-map", () => {
     if (stream || still) stopCamera(true);
     else showCameraView(false);
-    document.dispatchEvent(new CustomEvent("mikke:focus-spot", {
-      detail: { id: target.id, name: target.name, lat: target.lat, lng: target.lng, item: target.item },
-    }));
   });
 
   // ---------- 近くにシンボルがあるときだけカメラを使える ----------
@@ -676,20 +443,40 @@
   const PASS_MS = 3 * 60 * 1000; // 確認から 3 分以内なら、もう一度は調べない
   let nearbyOk = false;
   let searching = false;
+  let lastError = null; // "location" (位置情報が取れない) / "network" / "server"
+  const reasonEl = $("btn-start-reason");
+
+  // 押せないときの理由 (ボタンの中に表示する)
+  function startReason() {
+    if (searching) return "近くのシンボルを探しています…";
+    if (lastError === "location") return "位置情報の利用を許可すると押せます";
+    if (lastError) return "通信できませんでした。「近くのシンボルを探す」をもう一度";
+    return "近くにシンボルが見つかると押せます";
+  }
 
   function setReady() {
     const ok = (nearbyOk || (skipEl && skipEl.checked)) && !searching;
     btnStart.disabled = !ok;
     fileInput.disabled = !ok;
     fileLabel.classList.toggle("is-disabled", !ok);
-    $("step-search").classList.toggle("is-done", nearbyOk);
-    $("step-search").classList.toggle("is-current", !nearbyOk);
-    $("step-camera").classList.toggle("is-current", nearbyOk);
+    if (reasonEl) {
+      reasonEl.textContent = ok ? "" : startReason();
+      reasonEl.hidden = ok;
+    }
+    // 手順の表示: いまの手順を強調し、終わった手順には ✓ を付ける
+    const s1 = $("step-search");
+    const s2 = $("step-camera");
+    s1.classList.toggle("is-done", nearbyOk);
+    s1.classList.toggle("is-current", !nearbyOk);
+    s2.classList.toggle("is-current", nearbyOk);
+    if (nearbyOk) { s1.removeAttribute("aria-current"); s2.setAttribute("aria-current", "step"); }
+    else { s2.removeAttribute("aria-current"); s1.setAttribute("aria-current", "step"); }
   }
   document.addEventListener("mikke:nearby-start", () => { searching = true; setReady(); });
   document.addEventListener("mikke:nearby", (ev) => {
     searching = false;
     nearbyOk = !!(ev.detail.ok && ev.detail.data.has_nearby);
+    lastError = ev.detail.ok ? null : ev.detail.error;
     setReady();
   });
   if (skipEl) skipEl.addEventListener("change", setReady);

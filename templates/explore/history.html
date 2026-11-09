@@ -3,15 +3,15 @@
 {% block content %}
 <h1>みっけ履歴</h1>
 {% if discoveries %}
-<table class="table">
+<table class="table table-cards">
   <caption class="visually-hidden">最近 100 件のみっけ履歴</caption>
   <thead><tr><th scope="col">日時</th><th scope="col">場所</th><th scope="col">ごほうび</th></tr></thead>
   <tbody>
   {% for d in discoveries %}
   <tr>
-    <td><time datetime="{{ d.found_at|date:'c' }}">{{ d.found_at|date:"Y/n/j H:i" }}</time></td>
-    <td>{{ d.symbol.spot.name }}<br><span class="muted">{{ d.symbol.name }}</span></td>
-    <td>{% if d.reward_kind == "none" %}なし{% else %}{{ d.reward_label }}{% if d.is_new and d.reward_kind == "item" %} <span class="badge badge-available">NEW</span>{% endif %}{% endif %}</td>
+    <td data-label="日時"><time datetime="{{ d.found_at|date:'c' }}">{{ d.found_at|date:"Y/n/j H:i" }}</time></td>
+    <td data-label="場所">{{ d.symbol.spot.name }}<br><span class="muted">{{ d.symbol.name }}</span></td>
+    <td data-label="ごほうび">{% if d.reward_kind == "none" %}なし{% else %}{{ d.reward_label }}{% if d.is_new and d.reward_kind == "item" %} <span class="badge badge-available">NEW</span>{% endif %}{% endif %}</td>
   </tr>
   {% endfor %}
   </tbody>

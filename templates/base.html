@@ -13,6 +13,9 @@
 </head>
 <body class="theme-{{ ui_theme.key }} {% block body_class %}{% endblock %}">
   <a class="skip-link" href="#main">本文へスキップ</a>
+  {% if mikke_debug %}
+  <p class="debug-bar" role="note">開発モード(DEBUG)で動いています。公開・デモのときは .env の DJANGO_DEBUG=0 にしてください。</p>
+  {% endif %}
   {% if ui_previewing %}
   <p class="ui-preview-bar" role="status">管理者プレビュー: 「{{ ui_theme.label }}」を表示中(ほかの利用者には見えません)
     <a href="?ui=reset">プレビューをやめる</a></p>
@@ -25,16 +28,23 @@
     <p class="now-badge" title="季節と時間帯で出会えるアイテムが変わります">
       <span class="visually-hidden">いまの季節と時間帯:</span>{{ mikke_season_label }}・{{ mikke_slot_label }}
     </p>
-    {% if user.is_operator %}
-    <a class="btn btn-ghost btn-small" href="{% url 'ops:dashboard' %}" aria-label="運営メニュー(利用者管理・分析)">運営</a>
-    {% elif user.can_manage_spots %}
-    <a class="btn btn-ghost btn-small" href="{% url 'explore:manage_spots' %}" aria-label="スポット・シンボルの設定">設定</a>
-    {% endif %}
     {% if user.is_authenticated %}
-    <a class="btn btn-ghost btn-small" href="{% url 'accounts:account' %}">アカウント</a>
-    <form method="post" action="{% url 'accounts:logout' %}" class="logout-form">
-      {% csrf_token %}<button type="submit" class="btn btn-ghost btn-small">ログアウト</button>
-    </form>
+    {# 狭い画面でもロゴと季節バッジが重ならないよう、ボタン類は 1 つのメニューにまとめる #}
+    <details class="site-menu">
+      <summary class="btn btn-ghost btn-small" aria-label="メニューを開く"><span aria-hidden="true">≡</span> メニュー</summary>
+      <nav class="site-menu-panel" aria-label="アカウントメニュー">
+        {% if user.is_operator %}<a href="{% url 'ops:dashboard' %}">運営メニュー(利用者管理・分析)</a>{% endif %}
+        {% if user.can_manage_spots %}<a href="{% url 'explore:manage_spots' %}">スポット・シンボルの設定</a>{% endif %}
+        <a href="{% url 'explore:history' %}">みっけ履歴</a>
+        <a href="{% url 'rewards:achievements' %}">実績</a>
+        <a href="{% url 'accounts:account' %}">アカウント(パスワード・退会)</a>
+        <form method="post" action="{% url 'accounts:logout' %}" class="logout-form">
+          {% csrf_token %}<button type="submit">ログアウト</button>
+        </form>
+      </nav>
+    </details>
+    {% else %}
+    <a class="btn btn-ghost btn-small" href="{% url 'accounts:login' %}">ログイン</a>
     {% endif %}
   </header>
   {% endblock %}
@@ -55,7 +65,7 @@
     {# スポット (地図) とカメラは「みっけ」に統合: 近くのシンボルをさがす → カメラでみっけ #}
     <a href="{% url 'explore:mikke' %}" class="tab-camera" {% if p == '/explore/' %}aria-current="page"{% endif %}><span aria-hidden="true">📷</span>みっけ</a>
     <a href="{% url 'contest:list' %}" {% if 'contest' in p %}aria-current="page"{% endif %}><span aria-hidden="true">🏆</span>コンテスト</a>
-    <a href="{% url 'rewards:coupons' %}" {% if 'rewards' in p %}aria-current="page"{% endif %}><span aria-hidden="true">🎁</span>ごほうび</a>
+    <a href="{% url 'rewards:coupons' %}" {% if 'rewards' in p %}aria-current="page"{% endif %}><span aria-hidden="true">🎟️</span>クーポン</a>
     {% endwith %}
   </nav>
   {% endif %}

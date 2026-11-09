@@ -16,7 +16,7 @@
   </dl>
 
   {% if coupon.status == "available" %}
-  <form method="post" action="{% url 'rewards:coupon_use' coupon.pk %}" data-confirm="お店の方の前で押してください。使用済みにすると元に戻せません。使用しますか?">
+  <form method="post" action="{% url 'rewards:coupon_use' coupon.pk %}" data-confirm="お店の方の前で押してください。使用済みにすると元に戻せません(このクーポンは 1 回しか使えません)。使用しますか?" data-confirm-ok="使用する">
     {% csrf_token %}
     <button type="submit" class="btn btn-primary btn-block btn-large">お店で使う</button>
   </form>

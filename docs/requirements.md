@@ -57,6 +57,7 @@
 | R49 | Must | 配るクーポン 1 枚ごとにユニークな ID(他ユーザと重複しない・1 回だけ使える)、クーポンそのものにも ID |
 | R50 | Should | 取得場所のスポット名をタップすると「これをみっけに行く」を出し、マップ上でそのスポットを分かりやすく表示する |
 | R51 | Must | 衣装全振り: みっけしたら必ずコーデを出す(「準備中」「からっぽ」は出さない)。取得済みのコーデも出し、「取得済み」と表示する |
+| R52 | Must | 評価レポート(docs/review-2026-11-09.md)の指摘を解消する。対応表は docs/review-response-2026-11-09.md |
 
 ## トレーサビリティ
 
@@ -112,6 +113,7 @@
 | R49 | `CouponTemplate.coupon_id`(CP-)、`UserCoupon.redeem_hash`(一意制約)、`issue_coupon` の再試行、`use_coupon` の条件付き UPDATE | `CouponIdTests` | ✅ |
 | R50 | `finders.obtained_info`(公開中のスポットだけ `spot` を返す)、`camera.js:showObtained / openGoto`、`spotmap.js` の `mikke:focus-spot`(強調マーカーとポップアップ) | `test_profile_shows_outfit_and_where` `test_no_map_link_for_unavailable_spot`、ブラウザでスポット名 → 「これをみっけに行く」→ 地図で表示を確認 | ✅ |
 | R51 | `services.fallback_outfit`(レア度 2 まで・体のタイプが合う・未所持を優先)、`collect`、`camera.js:showReward`(NEW / 取得済み) | `test_no_drop_still_gives_outfit` `test_fallback_outfit_choice` `test_fallback_when_everything_owned_is_marked_owned` `test_coupon_stopped_between_draw_and_issue_is_not_500`、ブラウザでドロップ未設定のシンボルからコーデが出ることを確認 | ✅ |
+| R52 | `docs/review-response-2026-11-09.md` の各項目(`core/ids.py` `core/net.py` `core/http.py` `core/demo.py` `core/templatetags/mikke_forms.py`、`static/js/reward_dialog.js` `finders.js`、ヘッダーメニュー、表のカード表示、404/500 ほか) | `core/tests_review.py`(24 件)、ブラウザでスマホ幅のヘッダー・表・ホーム・みっけ画面・確認ダイアログを確認 | ✅(I1・I6・S2・U13 は理由を付けて対応しない) |
 | R18 | `maps/`(Range 配信)、`maps/tiles/kyobashi.pmtiles`、`scripts/extract_tiles.py`、`static/js/spotmap.js`(Leaflet + protomaps-leaflet) | `maps/tests.py`(Range・416・パストラバーサル・ログイン必須・外部 API を CSP で許可していない)、ブラウザで外部への通信がないことを確認 | ✅ |
 
 ## 未達・残課題

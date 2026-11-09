@@ -9,7 +9,7 @@
     {% if form.non_field_errors %}<div class="errors" role="alert">{{ form.non_field_errors }}</div>{% endif %}
     {% for field in form %}{% if field.name != "share_activity" %}{% include "includes/field.html" %}{% endif %}{% endfor %}
     <div class="field">
-      <label class="staff-toggle">{{ form.share_activity }} {{ form.share_activity.label }}</label>
+      <label class="toggle">{{ form.share_activity }} {{ form.share_activity.label }}</label>
       <p class="help">{{ form.share_activity.help_text }}</p>
     </div>
     <button type="submit" class="btn btn-primary btn-block">登録してはじめる</button>

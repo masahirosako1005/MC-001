@@ -43,7 +43,7 @@ class FinderBase(TestCase):
         self.top = Item.objects.create(code="top-x", name="法被", category="top", style="happi", color="#C0392B")
         self.people = []
         for i in range(8):
-            u = User.objects.create_user(f"p{i}@example.com", PW, f"なかま{i}")
+            u = User.objects.create_user(f"p{i}@example.com", PW, f"なかま{i}", share_activity=True)
             AvatarConfig.objects.create(user=u, hair=self.hat, top=self.top)
             self.people.append(u)
 
@@ -146,9 +146,21 @@ class FinderProfileTests(FinderBase):
         self.assertEqual(self.client.get(reverse("explore:api_finder", args=[self.token])).status_code, 404)
 
     def test_token_expires(self):
-        later = timezone.now() + dt.timedelta(seconds=finders.TOKEN_MAX_AGE + 5)
-        with mock.patch("django.core.signing.time.time", return_value=later.timestamp()):
+        import time
+
+        later = time.time() + finders.TOKEN_TTL_SECONDS + 5
+        with mock.patch("django.core.cache.backends.locmem.time.time", return_value=later):
             self.assertEqual(self.client.get(reverse("explore:api_finder", args=[self.token])).status_code, 404)
+
+    def test_token_is_opaque(self):
+        # ID はランダムな 24 文字だけ (署名付き JSON のように中身を取り出せる形ではない)。2 回作ると別の値になる
+        self.assertRegex(self.token, r"^[A-Za-z0-9_-]{24}$")
+        self.assertNotEqual(finders.make_token(self.target.pk, self.viewer.pk), self.token)
+
+    def test_rate_limit_is_429(self):
+        with mock.patch("explore.views.ratelimit.hit", return_value=False):
+            self.assertEqual(self.client.get(reverse("explore:api_finder", args=[self.token])).status_code, 429)
+            self.assertEqual(self.client.get(reverse("explore:finder_avatar_svg", args=[self.token])).status_code, 429)
 
     def test_login_required(self):
         self.client.logout()
@@ -156,6 +168,12 @@ class FinderProfileTests(FinderBase):
 
 
 class SharingSettingTests(TestCase):
+    def test_default_is_opt_in(self):
+        self.assertFalse(User.objects.create_user("x@example.com", PW, "x").share_activity)
+        from accounts.forms import SignupForm
+
+        self.assertFalse(SignupForm().fields["share_activity"].initial)
+
     def test_signup_choice_and_account_toggle(self):
         self.client.post(reverse("accounts:signup"), {
             "nickname": "あたらしい", "email": "n@example.com", "password1": PW, "password2": PW})

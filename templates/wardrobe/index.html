@@ -3,6 +3,11 @@
 {% block content %}
 <h1>きせかえ</h1>
 <p class="muted">集めたアイテム {{ owned_count }} / {{ total_count }} 種類。まだ見ぬアイテムは、季節や時間を変えて探してみよう。</p>
+{% if config.version == 1 %}
+{# まだ一度も保存していない人にだけ出す (保存すると version が上がって消える) #}
+<p class="message message-info first-hint" role="note"><span aria-hidden="true">👗</span> まずは<strong>髪と服</strong>を選んでみよう。
+  下のパーツを押すと左の絵がすぐ変わります。決まったら「この服装で保存」を押してね。</p>
+{% endif %}
 {% if staff %}
 <p class="message message-info staff-note"><span aria-hidden="true">🛠️</span> 管理者モード: 持っていないパーツも含め、すべてのパーツを自由に選べます。
   <a href="{% url 'wardrobe:catalog' %}">パーツ一覧</a></p>
@@ -26,7 +31,7 @@
       </div>
       <p class="help">どちらのタイプも自由に選べます。タイプに合ったパーツが表示されます。</p>
       {% if staff %}
-      <label class="staff-toggle"><input type="checkbox" id="show-all-types"> ほかのタイプのパーツも表示する(管理者)</label>
+      <label class="toggle"><input type="checkbox" id="show-all-types"> ほかのタイプのパーツも表示する(管理者)</label>
       {% endif %}
     </fieldset>
 
@@ -68,7 +73,7 @@
           <span class="item-card{% if not row.owned %} is-unowned{% endif %}">
             <img src="{% url 'wardrobe:item_svg' item.code %}" alt="" width="64" height="96" loading="lazy">
             <span class="item-name">{{ item.name }}</span>
-            <span class="rarity" aria-label="レア度 {{ item.rarity }}">{{ item.rarity_stars }}</span>
+            <span class="rarity"><span aria-hidden="true">{{ item.rarity_stars }}</span><span class="visually-hidden">レア度 {{ item.rarity }}/5</span></span>
             {% if not row.owned %}<span class="badge">未所持</span>{% endif %}
           </span>
         </label>

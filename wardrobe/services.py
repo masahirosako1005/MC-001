@@ -62,9 +62,33 @@ def ensure_starter_kit(user, body_type: str = "girl") -> AvatarConfig:
     return config
 
 
+BASIC_SLOTS = ("hair", "top", "bottom", "shoes")
+
+
+def dress_if_bare(config: AvatarConfig) -> AvatarConfig:
+    """髪も服も何も着ていない (「裸のマネキン」に見える) ときだけ、初期アイテムを着せる。
+
+    初期アイテムができる前に作られたアカウントのためのもの。何か 1 つでも着ていれば本人の選択とみなして変えない。
+    """
+    if any(getattr(config, f"{c}_id") for c in BASIC_SLOTS):
+        return config
+    starters = list(Item.objects.filter(is_starter=True, is_active=True).order_by("rarity", "code"))
+    for item in starters:
+        UserItem.objects.get_or_create(user=config.user, item=item)
+    changed = False
+    for cat in BASIC_SLOTS:
+        first = next((i for i in starters if i.category == cat and i.fits(config.body_type)), None)
+        if first is not None:
+            setattr(config, cat, first)
+            changed = True
+    if changed:
+        config.save()
+    return config
+
+
 def get_config(user) -> AvatarConfig:
     config = AvatarConfig.objects.select_related(*CATEGORIES).filter(user=user).first()
-    return config or ensure_starter_kit(user)
+    return dress_if_bare(config) if config else ensure_starter_kit(user)
 
 
 def selectable_items(user):

@@ -24,11 +24,11 @@ from accounts.models import User
 from contest import services as contest_services
 from contest.models import Contest
 from core import audit
+from core.demo import DEMO_DOMAIN, DEMO_USER_GROUP
 from wardrobe.avatar import CATEGORY_CHOICES, EYE_COLORS, SKIN_TONES
 from wardrobe.models import AvatarConfig, Item, UserItem
 
-DEMO_GROUP = "デモ利用者"
-DEMO_DOMAIN = "demo.mikke.test"
+DEMO_GROUP = DEMO_USER_GROUP
 _rng = secrets.SystemRandom()
 
 # 架空のニックネームの素材 (実在の人物とは無関係)
@@ -83,7 +83,8 @@ class Command(BaseCommand):
         starters = list(Item.objects.filter(is_starter=True, is_active=True))
         now = timezone.now()
         for i in range(start, start + n):
-            user = User(email=f"demo{i + 1:03d}@{DEMO_DOMAIN}", nickname=_name(STYLE),
+            # 仮想利用者は「みっけ仲間に表示する」を ON にしておく (こんな人が獲得しているよ の確認用)
+            user = User(email=f"demo{i + 1:03d}@{DEMO_DOMAIN}", nickname=_name(STYLE), share_activity=True,
                         date_joined=now - dt.timedelta(days=_rng.randrange(0, 120), minutes=_rng.randrange(0, 1440)))
             user.set_unusable_password()
             user.last_login = user.date_joined + dt.timedelta(days=_rng.randrange(0, 30))

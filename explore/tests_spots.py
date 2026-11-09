@@ -6,7 +6,6 @@ import datetime as dt
 import json
 import uuid
 from decimal import Decimal
-from unittest import mock
 
 from django.core.cache import cache
 from django.db import IntegrityError, transaction
@@ -204,10 +203,8 @@ class MikkePageTests(Base):
             self.assertNotContains(res, hidden)
 
     def test_spot_cards_can_be_shown_again(self):
-        from explore import views
-
         self.client.force_login(self.user)
-        with mock.patch.object(views, "SHOW_SPOT_CARDS", True):
+        with self.settings(MIKKE_SHOW_SPOT_CARDS=True):
             res = self.client.get(reverse("explore:mikke"))
         self.assertContains(res, 'class="spot-card"')
         self.assertContains(res, "？？？(シークレットシンボル)")  # 見つけるまでは隠す

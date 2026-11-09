@@ -53,6 +53,12 @@ class ForcePasswordChangeMiddleware:
                 name = None
             static = request.path_info.startswith("/" + settings.STATIC_URL.lstrip("/"))
             if name not in self.ALLOWED_NAMES and not static:
+                # JSON API には画面への転送ではなく 403 JSON を返す (fetch が HTML を受け取らないように)
+                if "/api/" in request.path_info or "application/json" in request.headers.get("Accept", ""):
+                    from django.http import JsonResponse
+
+                    return JsonResponse({"error": "password_change_required",
+                                         "message": "パスワードを変更してから、もう一度お試しください。"}, status=403)
                 return redirect("accounts:password_change")
         return self.get_response(request)
 

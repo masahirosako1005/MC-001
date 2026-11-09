@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from core import audit
+from core.http import svg_response
 
 from . import services
 from .models import Contest, ContestEntry
@@ -97,7 +97,5 @@ def contest_ranking(request, pk: int):
 @require_GET
 def entry_svg(request, entry_id):
     entry = get_object_or_404(ContestEntry, pk=entry_id, contest__is_active=True)
-    resp = HttpResponse(services.snapshot_svg(entry.avatar), content_type="image/svg+xml; charset=utf-8")
-    resp.headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; sandbox"
-    resp.headers["Cache-Control"] = "private, max-age=3600"  # スナップショットなので変わらない
-    return resp
+    # スナップショットなので変わらない
+    return svg_response(services.snapshot_svg(entry.avatar), cache="private, max-age=3600")

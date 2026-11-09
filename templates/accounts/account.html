@@ -9,7 +9,7 @@
     {% csrf_token %}
     {% include "includes/field.html" with field=form.nickname %}
     {% if user.role == "user" %}
-    <label class="staff-toggle">{{ form.share_activity }} {{ form.share_activity.label }}</label>
+    <label class="toggle">{{ form.share_activity }} {{ form.share_activity.label }}</label>
     <p class="help">{{ form.share_activity.help_text }}。コーデをどこで手に入れたかは、スポット名と季節だけが見えます。</p>
     {% else %}<input type="hidden" name="share_activity" value="">{% endif %}
     <button type="submit" class="btn btn-primary">保存</button>

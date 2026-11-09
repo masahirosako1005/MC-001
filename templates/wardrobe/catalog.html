@@ -17,7 +17,7 @@
     <li class="catalog-item{% if not i.is_active %} is-inactive{% endif %}">
       <img src="{% url 'wardrobe:item_svg' i.code %}" alt="" width="96" height="144" loading="lazy">
       <strong>{{ i.name }}</strong>
-      <span class="rarity">{{ i.rarity_stars }}</span>
+      <span class="rarity"><span aria-hidden="true">{{ i.rarity_stars }}</span><span class="visually-hidden">レア度 {{ i.rarity }}/5</span></span>
       <code>{{ i.code }}</code>
       {% if i.is_starter %}<span class="badge">初期</span>{% endif %}{% if not i.is_active %}<span class="badge">無効</span>{% endif %}
     </li>

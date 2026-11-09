@@ -1,6 +1,6 @@
-<div class="field{% if field.errors %} has-error{% endif %}">
+{% load mikke_forms %}<div class="field{% if field.errors %} has-error{% endif %}">
   <label for="{{ field.id_for_label }}">{{ field.label }}</label>
   {% if field.help_text %}<p class="help" id="{{ field.auto_id }}_help">{{ field.help_text }}</p>{% endif %}
-  {{ field }}
+  {% described field %}
   {% if field.errors %}<ul class="errors" id="{{ field.auto_id }}_errors" role="alert">{% for e in field.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
 </div>

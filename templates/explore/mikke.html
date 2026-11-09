@@ -9,7 +9,7 @@
          data-image-symbols-url="{% url 'explore:api_image_symbols' %}"
          data-collect-url="{% url 'explore:api_collect' %}"
          data-camera-start-url="{% url 'explore:api_camera_start' %}"
-         data-finder-base="{% url 'explore:mikke' %}finders/"
+         data-finder-url="{% url 'explore:api_finder' 'TOKEN' %}"
          data-wardrobe-url="{% url 'wardrobe:index' %}"
          data-item-svg-base="{% url 'wardrobe:index' %}items/"
          data-coupon-base="{% url 'rewards:coupons' %}">
@@ -17,8 +17,8 @@
   {# ① 近くのシンボルをさがす (現在地の取得 → シンボルの検索) #}
   <div id="mikke-find" class="mikke-find" data-nearby-url="{{ nearby_url }}" data-radius="{{ radius_m }}">
     <ol class="mikke-steps" aria-label="みっけの手順">
-      <li id="step-search" class="is-current"><span aria-hidden="true">1</span>近くのシンボルをさがす</li>
-      <li id="step-camera"><span aria-hidden="true">2</span>カメラでみっけ</li>
+      <li id="step-search" class="is-current" aria-current="step"><span class="step-mark" aria-hidden="true">1</span>近くのシンボルをさがす<span class="visually-hidden step-done-text">(済み)</span></li>
+      <li id="step-camera"><span class="step-mark" aria-hidden="true">2</span>カメラでみっけ</li>
     </ol>
     <p id="nearby-status" class="gps-gate" role="status" aria-live="polite">現在地のまわり {{ radius_m }}m にシンボルがあるか調べます。</p>
 
@@ -27,15 +27,17 @@
 
     <div class="mikke-actions">
       <button type="button" class="btn btn-ghost" id="btn-nearby"><span aria-hidden="true">✦</span> 近くのシンボルを探す(周囲 {{ radius_m }}m)</button>
-      <button type="button" class="btn btn-primary btn-large btn-block" id="btn-start" disabled aria-describedby="nearby-status">
-        <span aria-hidden="true">📷</span> カメラでみっけ
+      <button type="button" class="btn btn-primary btn-large btn-block btn-with-reason" id="btn-start" disabled aria-describedby="nearby-status">
+        <span><span aria-hidden="true">📷</span> カメラでみっけ</span>
+        {# 押せないときは、その理由をボタンの中に書く #}
+        <small id="btn-start-reason" class="btn-reason">近くにシンボルが見つかると押せます</small>
       </button>
       <label class="btn btn-ghost file-btn is-disabled" id="file-label">
         <span aria-hidden="true">🖼️</span> 写真から読み取る
         <input type="file" id="file-input" accept="image/*" class="visually-hidden" disabled>
       </label>
       {% if user.can_manage_spots %}
-      <label class="staff-toggle"><input type="checkbox" id="gps-skip"> 位置の確認を省略する(管理者・運営のテスト用)</label>
+      <label class="toggle"><input type="checkbox" id="gps-skip"> 位置の確認を省略する(管理者・運営のテスト用)</label>
       {% endif %}
     </div>
     <ul id="nearby-list" class="nearby-list" aria-label="近くのシンボル" hidden></ul>
@@ -121,4 +123,6 @@
 <script src="{% static 'js/nearby.js' %}" defer></script>
 <script src="{% static 'js/spotmap.js' %}" defer></script>
 <script src="{% static 'js/camera.js' %}" defer></script>
+<script src="{% static 'js/reward_dialog.js' %}" defer></script>
+<script src="{% static 'js/finders.js' %}" defer></script>
 {% endblock %}

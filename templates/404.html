@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}ページが見つかりません{% endblock %}
+{% block content %}
+<section class="narrow error-page">
+  <p class="error-code" aria-hidden="true">404</p>
+  <h1>ページが見つかりません</h1>
+  <p>お探しのページは、移動したか、公開が終わった可能性があります。URL をお確かめください。</p>
+  <p><a class="btn btn-primary" href="{% url 'core:home' %}">ホームへもどる</a></p>
+</section>
+{% endblock %}

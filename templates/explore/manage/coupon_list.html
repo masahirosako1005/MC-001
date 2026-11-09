@@ -7,22 +7,22 @@
   クーポンごとに<strong>クーポン ID</strong>(CP-から始まる)が付き、利用者に配る 1 枚ごとにも重ならない<strong>引換コード</strong>が付きます。引換コードは 1 回しか使えません。</p>
 <p><a class="btn btn-primary" href="{% url 'explore:manage_coupon_create' %}">＋ クーポンを登録</a></p>
 <div class="table-wrap">
-<table class="table manage-table">
+<table class="table manage-table table-cards">
   <caption class="visually-hidden">クーポンの一覧</caption>
   <thead><tr><th scope="col">クーポン</th><th scope="col">クーポン ID</th>{% if user.is_operator %}<th scope="col">登録した管理者</th>{% endif %}<th scope="col">状態</th><th scope="col">有効期限</th><th scope="col">配布・使用</th><th scope="col">操作</th></tr></thead>
   <tbody>
   {% for c in coupons %}
   <tr>
-    <td><strong>{{ c.title }}</strong><br><span class="muted">{{ c.shop_name }} ・ {{ c.benefit }}</span></td>
-    <td><code>{{ c.coupon_id }}</code></td>
-    {% if user.is_operator %}<td>{% if c.owner %}{{ c.owner.manager_profile.display_name|default:c.owner.nickname }}{% else %}<span class="muted">サイト運営者</span>{% endif %}</td>{% endif %}
-    <td><span class="badge">{{ c.status_label }}</span>{% if not c.n_drops %}<br><span class="muted">シンボル未設定</span>{% endif %}</td>
-    <td>{% if c.available_until %}{{ c.available_until|date:"Y/n/j H:i" }}まで{% else %}<strong>無期限</strong>{% endif %}<br><span class="muted">受け取りから {{ c.valid_days }} 日</span></td>
-    <td>{{ c.n_issued }} 枚配布<br><span class="muted">{{ c.n_used }} 枚使用</span></td>
-    <td class="actions"><a href="{% url 'explore:manage_coupon_edit' c.pk %}">編集</a></td>
+    <td data-label="クーポン"><strong>{{ c.title }}</strong><br><span class="muted">{{ c.shop_name }} ・ {{ c.benefit }}</span></td>
+    <td data-label="クーポン ID"><code>{{ c.coupon_id }}</code></td>
+    {% if user.is_operator %}<td data-label="登録した管理者">{% if c.owner %}{{ c.owner.manager_profile.display_name|default:c.owner.nickname }}{% else %}<span class="muted">サイト運営者</span>{% endif %}</td>{% endif %}
+    <td data-label="状態"><span class="badge">{{ c.status_label }}</span>{% if not c.n_drops %}<br><span class="muted">シンボル未設定</span>{% endif %}</td>
+    <td data-label="有効期限">{% if c.available_until %}{{ c.available_until|date:"Y/n/j H:i" }}まで{% else %}<strong>無期限</strong>{% endif %}<br><span class="muted">受け取りから {{ c.valid_days }} 日</span></td>
+    <td data-label="配布・使用">{{ c.n_issued }} 枚配布<br><span class="muted">{{ c.n_used }} 枚使用</span></td>
+    <td class="actions" data-label="操作"><a href="{% url 'explore:manage_coupon_edit' c.pk %}">編集</a></td>
   </tr>
   {% empty %}
-  <tr><td colspan="7">クーポンはまだありません。</td></tr>
+  <tr><td colspan="{% if user.is_operator %}7{% else %}6{% endif %}">クーポンはまだありません。</td></tr>
   {% endfor %}
   </tbody>
 </table>

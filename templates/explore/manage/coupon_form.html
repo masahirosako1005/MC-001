@@ -21,11 +21,11 @@
   <fieldset class="option-group">
     <legend>有効期限</legend>
     {% include "includes/field.html" with field=form.valid_days %}
-    <label class="staff-toggle">{{ form.no_expiry }} {{ form.no_expiry.label }}</label>
+    <label class="toggle">{{ form.no_expiry }} {{ form.no_expiry.label }}</label>
     <div id="expires-field">{% include "includes/field.html" with field=form.available_until %}</div>
     <p class="help">利用者が使える期限は「受け取ってから {{ form.valid_days.value|default:"30" }} 日」と「有効期限」の早いほうです。</p>
   </fieldset>
-  <label class="staff-toggle">{{ form.is_active }} 配布する</label>
+  <label class="toggle">{{ form.is_active }} 配布する</label>
   <p class="help">配布を止めると新しく配られなくなります(受け取り済みのクーポンは期限まで使えます)。</p>
   <button type="submit" class="btn btn-primary btn-block btn-large">{% if coupon %}保存{% else %}登録する{% endif %}</button>
 </form>

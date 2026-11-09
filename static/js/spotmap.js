@@ -45,9 +45,43 @@
   }
 
   const markers = spots.map((s) =>
-    L.marker([s.lat, s.lng], { title: s.name, alt: s.name, keyboard: true }).bindPopup(popup(s)).addTo(map));
+    L.marker([s.lat, s.lng], { title: s.name, alt: s.name, keyboard: true }).bindPopup(popup(s)));
+
+  // ピンが密集しても読めるよう、引いた表示 (ズーム 14 以下) では近いピンを数字付きの丸にまとめる (簡易クラスタリング)
+  const CLUSTER_MAX_ZOOM = 14;
+  const CLUSTER_PX = 44;
+  const spotLayer = L.layerGroup().addTo(map);
+  function renderSpots() {
+    spotLayer.clearLayers();
+    if (map.getZoom() > CLUSTER_MAX_ZOOM) {
+      markers.forEach((m) => spotLayer.addLayer(m));
+      return;
+    }
+    const groups = [];
+    for (const m of markers) {
+      const p = map.latLngToLayerPoint(m.getLatLng());
+      const g = groups.find((x) => x.p.distanceTo(p) < CLUSTER_PX);
+      if (g) g.items.push(m);
+      else groups.push({ p, items: [m] });
+    }
+    for (const g of groups) {
+      if (g.items.length === 1) {
+        spotLayer.addLayer(g.items[0]);
+        continue;
+      }
+      const area = L.latLngBounds(g.items.map((m) => m.getLatLng()));
+      const n = g.items.length;
+      const icon = L.divIcon({ className: "", iconSize: [40, 40], html: `<div class="spot-cluster">${n}</div>` });
+      L.marker(area.getCenter(), { icon, title: `スポット ${n} 件(押すと拡大)`, alt: `スポット ${n} 件`, keyboard: true })
+        .on("click", () => map.fitBounds(area.pad(0.4), { maxZoom: CLUSTER_MAX_ZOOM + 2 }))
+        .addTo(spotLayer);
+    }
+  }
+  map.on("zoomend", renderSpots);
+
   const inArea = spots.filter((s) => bounds.contains([s.lat, s.lng]));
   if (inArea.length > 1) map.fitBounds(L.latLngBounds(inArea.map((s) => [s.lat, s.lng])).pad(0.3), { maxZoom: 16 });
+  renderSpots();
 
   // 「現在地」: ①現在地の取得 → ②近くのシンボル検索 を順番に行う (nearby.js)。
   // 「近くのシンボルを探す」ボタンと同じ動作で、結果は下の mikke:nearby で地図に描く。
@@ -106,7 +140,11 @@
       img.alt = it.name;
       img.loading = "lazy";
       li.appendChild(img);
-      li.appendChild(mk("span", null, `${it.name} ${"★".repeat(it.rarity)}`));
+      const name = mk("span", null, `${it.name} `);
+      const stars = mk("span", null, "★".repeat(it.rarity));
+      stars.setAttribute("aria-hidden", "true");
+      name.append(stars, mk("span", "visually-hidden", `(レア度 ${it.rarity}/5)`));
+      li.appendChild(name);
       const cond = it.conditions.length ? it.conditions.join("・") : "いつでも";
       li.appendChild(mk("span", "coord-cond", it.now ? cond : `${cond}(今は出ない)`));
       ul.appendChild(li);

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 
+from . import net
 from .crypto import blind_index
 from .models import AuditLog
 
@@ -9,8 +10,8 @@ logger = logging.getLogger("mikke.audit")
 
 
 def client_ip(request) -> str:
-    # リバースプロキシを置く場合は信頼できるヘッダーの扱いを別途設定すること
-    return request.META.get("REMOTE_ADDR", "") if request is not None else ""
+    # 信頼済みプロキシ経由のときだけ X-Forwarded-For を使う (core/net.py)
+    return net.client_ip(request)
 
 
 def record(action: str, *, request=None, actor=None, target=None, **detail) -> AuditLog:

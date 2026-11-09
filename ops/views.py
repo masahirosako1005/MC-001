@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import secrets
-
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.views import LoginView
@@ -17,6 +15,7 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 from accounts.forms import OperatorLoginForm
 from accounts.models import ManagerProfile, User, email_hash_of
 from core import audit
+from core.ids import random_code
 from core.permissions import operator_required
 from core.timeutil import SEASON_LABELS, SLOT_LABELS
 
@@ -24,14 +23,15 @@ from . import analytics, charts
 from .forms import ManagerAccountForm, ManagerProfileForm
 
 FUNNEL = [("visitors", "付近に来た"), ("camera", "カメラ起動"), ("coord", "コーデ獲得")]
-TEMP_PASSWORD_WORDS = ["sora", "kamome", "shiokaze", "sakura", "momiji", "hotaru", "tsuki", "nami", "mori", "kawa",
-                       "yuki", "hoshi", "kumo", "akari", "hikari", "kaze", "umi", "yama", "hana", "tori"]
 
 
 def _temp_password() -> str:
-    """仮パスワード (単語 4 つ + 数字)。最初のログインで変更してもらう。"""
-    words = [secrets.choice(TEMP_PASSWORD_WORDS) for _ in range(4)]
-    return "-".join(words) + f"-{secrets.randbelow(9000) + 1000}"
+    """仮パスワード (例: 7QK4H-2ZMNP-X8RTA-C3WVE)。31 種類 × 20 文字 ≒ 2^99 通り。最初のログインで変更してもらう。
+
+    読み間違えやすい文字 (0/O, 1/I/L) を除き、5 文字ずつ区切って書き写しやすくしている。
+    """
+    body = random_code(20)
+    return "-".join(body[i:i + 5] for i in range(0, 20, 5))
 
 
 class OperatorLoginView(LoginView):
@@ -154,15 +154,18 @@ def manager_edit(request, pk: int):
 
 @operator_required
 @require_POST
-def manager_reset_password(request, pk: int):
-    manager = _manager_or_404(pk)
+def user_reset_password(request, pk: int):
+    """仮パスワードの再発行 (パスワードを忘れた利用者・管理者から依頼があったとき)。サイト運営者のアカウントは対象外。"""
+    target = get_object_or_404(User.objects.select_related("manager_profile"), pk=pk,
+                               role__in=[User.ROLE_USER, User.ROLE_MANAGER])
     password = _temp_password()
-    manager.set_password(password)
-    manager.must_change_password = True
-    manager.save()
-    audit.record("ops.manager_reset_password", request=request, target=manager)
-    return render(request, "ops/manager_issued.html", {"manager": manager, "profile": manager.manager_profile,
-                                                       "password": password, "created": False})
+    target.set_password(password)
+    target.must_change_password = True
+    target.save()
+    audit.record("ops.reset_password", request=request, target=target, role=target.role)
+    return render(request, "ops/manager_issued.html", {
+        "manager": target, "profile": getattr(target, "manager_profile", None), "password": password, "created": False,
+    })
 
 
 @operator_required

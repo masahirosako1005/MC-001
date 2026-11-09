@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 import os
 from pathlib import Path
 
@@ -63,7 +64,7 @@ MIDDLEWARE = [
     "django.middleware.csp.ContentSecurityPolicyMiddleware",
     "core.middleware.SecurityHeadersMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
-    "django.middleware.locale.LocaleMiddleware",
+    # 画面は日本語のみのため LocaleMiddleware は使わない (多言語化するときに戻す)
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -144,8 +145,13 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
-MIKKE_LOGIN_MAX_FAILURES = 5
+MIKKE_LOGIN_MAX_FAILURES = 5  # アカウント単位のロック
+# IP 単位のロックはアカウント単位より緩くする (同じ回線・施設の Wi-Fi の人をまとめてロックしないため)
+MIKKE_LOGIN_MAX_FAILURES_PER_IP = int(env("MIKKE_LOGIN_MAX_FAILURES_PER_IP", "20"))
 MIKKE_LOGIN_LOCK_SECONDS = 15 * 60
+# 信頼済みリバースプロキシの IP / CIDR (カンマ区切り)。このときだけ X-Forwarded-For を使う (core/net.py)
+MIKKE_TRUSTED_PROXIES = [ipaddress.ip_network(p.strip(), strict=False)
+                         for p in env("MIKKE_TRUSTED_PROXIES", "").split(",") if p.strip()]
 
 # ---- 国際化 ----
 LANGUAGE_CODE = "ja"
@@ -158,7 +164,16 @@ STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "mikke"}}
+# キャッシュ (レート制限・ログインロック・みっけ仲間の表示 ID に使う)。
+# 既定のメモリキャッシュは 1 プロセス内だけで有効。複数プロセス / 複数台で動かすときは
+# MIKKE_CACHE=db (createcachetable が必要) か MIKKE_CACHE=redis://… を設定すること。
+_CACHE = env("MIKKE_CACHE", "locmem")
+if _CACHE == "db":
+    CACHES = {"default": {"BACKEND": "django.core.cache.backends.db.DatabaseCache", "LOCATION": "mikke_cache"}}
+elif _CACHE.startswith(("redis://", "rediss://")):
+    CACHES = {"default": {"BACKEND": "django.core.cache.backends.redis.RedisCache", "LOCATION": _CACHE}}
+else:
+    CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "mikke"}}
 
 # ---- セキュリティ (OWASP ASVS L2 / Top 10:2025) ----
 SECURE_COOKIES = env_bool("DJANGO_SECURE_COOKIES", not DEBUG)
@@ -213,11 +228,24 @@ MIKKE_IMAGE_SIMILARITY_THRESHOLD = float(env("MIKKE_IMAGE_SIMILARITY_THRESHOLD",
 
 # ---- 地図 (Protomaps / PMTiles をローカル配信。外部 API は使わない) ----
 MIKKE_TILES_DIR = BASE_DIR / "maps" / "tiles"
+# パスワードを忘れた方の問い合わせ先 (画面に表示する。メールアドレスや窓口名など)
+MIKKE_SUPPORT_CONTACT = env("MIKKE_SUPPORT_CONTACT", "みっけ運営事務局(サイト内のお問い合わせ窓口)")
+# 「こんな人が獲得しているよ」に出す期間 (分)。文言もこの値から作る
+MIKKE_FINDER_WINDOW_MINUTES = 30
+
+def _floats(name: str, default: str) -> list[float]:
+    return [float(v) for v in env(name, default).split(",")]
+
+
+# 地図 (タイルを別の地域で作り直したときは .env で変える)。既定は大阪府 京橋付近 (scripts/extract_tiles.py の範囲)
+_b = _floats("MIKKE_MAP_BOUNDS", "34.6800,135.5150,34.7080,135.5500")  # 南,西,北,東
+_c = _floats("MIKKE_MAP_CENTER", "34.6950,135.5330")
 MIKKE_MAP = {
-    "tiles": "kyobashi",
-    # 大阪府 京橋付近 (scripts/extract_tiles.py で切り出した範囲)
-    "bounds": [[34.6800, 135.5150], [34.7080, 135.5500]],
-    "center": [34.6950, 135.5330],
-    "zoom": 15,
-    "max_data_zoom": 15,
+    "tiles": env("MIKKE_MAP_TILES", "kyobashi"),
+    "bounds": [[_b[0], _b[1]], [_b[2], _b[3]]],
+    "center": [_c[0], _c[1]],
+    "zoom": int(env("MIKKE_MAP_ZOOM", "15")),
+    "max_data_zoom": int(env("MIKKE_MAP_MAX_DATA_ZOOM", "15")),
 }
+# 「みっけ」画面の下にスポットとシンボルのカード一覧を出すか (いまは非表示)
+MIKKE_SHOW_SPOT_CARDS = env_bool("MIKKE_SHOW_SPOT_CARDS", False)

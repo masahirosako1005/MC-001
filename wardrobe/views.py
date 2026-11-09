@@ -8,6 +8,7 @@ from django.shortcuts import redirect, render
 from django.views.decorators.http import require_GET, require_http_methods
 
 from core import audit
+from core.http import svg_response
 
 from .avatar import (
     BODY_TYPE_CHOICES,
@@ -33,12 +34,8 @@ from .services import (
 
 
 def _svg_response(svg: str, *, cacheable: bool = False) -> HttpResponse:
-    resp = HttpResponse(svg, content_type="image/svg+xml; charset=utf-8")
-    # SVG 単体で開かれた場合もスクリプトを実行させない
-    resp.headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; sandbox"
     # 着せ替え直後に古い画像が出ないよう、アバター画像はキャッシュさせない
-    resp.headers["Cache-Control"] = "private, max-age=300" if cacheable else "private, no-store"
-    return resp
+    return svg_response(svg, cache="private, max-age=300" if cacheable else "private, no-store")
 
 
 def _parse_int(value: str | None) -> int | None:

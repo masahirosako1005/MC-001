@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
@@ -7,7 +8,7 @@ from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.views import LoginView
 from django.db import transaction
 from django.shortcuts import redirect, render
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_GET, require_http_methods
 
 from core import audit
 from wardrobe.services import ensure_starter_kit
@@ -37,6 +38,12 @@ def signup(request):
         messages.success(request, "ようこそ「みっけ」へ!まずはアバターの服を選んでみましょう。")
         return redirect("wardrobe:index")
     return render(request, "accounts/signup.html", {"form": form})
+
+
+@require_GET
+def password_help(request):
+    """パスワードを忘れた方へ。メール送信の仕組みがないため、サイト運営者が本人確認のうえ仮パスワードを発行する。"""
+    return render(request, "accounts/password_help.html", {"support": settings.MIKKE_SUPPORT_CONTACT})
 
 
 @login_required

@@ -1,23 +1,20 @@
 from __future__ import annotations
 
 import datetime as dt
-import secrets
 
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Max
 from django.utils import timezone
 
+from core.ids import random_code
 from wardrobe.models import UserItem
 from wardrobe.services import grant_item
 
 from .models import Achievement, CouponTemplate, UserAchievement, UserCoupon
 
-# 読み間違えやすい文字 (0/O, 1/I/L) を除いた英数字
-CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
-
 
 def new_redeem_code() -> str:
-    body = "".join(secrets.choice(CODE_ALPHABET) for _ in range(8))
+    body = random_code(8)
     return f"MK-{body[:4]}-{body[4:]}"
 
 
@@ -55,9 +52,8 @@ class CouponUnavailable(Exception):
 def use_coupon(coupon: UserCoupon, *, now: dt.datetime | None = None) -> UserCoupon:
     """クーポンを使用済みにする。条件付き UPDATE で二重使用を防ぎ、再送には同じ結果を返す (冪等)。"""
     now = now or timezone.now()
-    # クーポン自体の有効期限が後から短くされた場合も、期限を過ぎたものは使えない
-    tpl = coupon.template
-    if tpl.available_until and tpl.available_until <= now and coupon.used_at is None:
+    # 期限の判定は UserCoupon.effective_expires_at に一本化 (クーポン自体の期限が後から短くされた場合も含む)
+    if coupon.used_at is None and coupon.is_expired(now):
         raise CouponUnavailable("このクーポンは有効期限が切れています。")
     updated = UserCoupon.objects.filter(pk=coupon.pk, used_at__isnull=True, expires_at__gt=now).update(used_at=now)
     coupon.refresh_from_db()

@@ -74,6 +74,14 @@ python -m venv .venv
 - **PostgreSQL が使えない場合**: `.env` に `DB_ENGINE=sqlite` を書くと SQLite(`mikke.sqlite3`)で動きます。フィールド暗号化はどちらでも有効です。
 - アプリ制御ポリシー(WDAC / Smart App Control)が psycopg 同梱 DLL や `.venv\Scripts\*.exe` を拒否する環境では、`settings.py` が PostgreSQL 付属の `libpq.dll` を使う pure-python 実装に自動で切り替えます。コマンドは `python -m ruff` のように `python -m` 経由で実行してください。
 
+### 公開・デモ・本番で動かすとき(必ず確認)
+
+- **`.env` の `DJANGO_DEBUG=0` にする。** DEBUG のままだと 404 などのエラー画面に内部の URL 構成(管理画面の場所など)が表示されます。DEBUG のときは画面上部に赤い警告帯が出ます。
+- **複数のプロセス・サーバーで動かすときは `MIKKE_CACHE` を設定する。** 既定のメモリキャッシュは 1 プロセスの中だけで有効なため、レート制限・ログインのロック・「こんな人が獲得しているよ」の表示 ID がプロセスごとにばらばらになります。`MIKKE_CACHE=db`(`python manage.py createcachetable` が必要)か `MIKKE_CACHE=redis://…` にしてください。
+- **リバースプロキシ(ロードバランサー)の内側で動かすときは `MIKKE_TRUSTED_PROXIES` にプロキシの IP / CIDR を書く。** そのときだけ `X-Forwarded-For` から接続元 IP を取ります(書かないと全員がプロキシの IP に見え、IP 単位のロックで全員がログインできなくなるおそれがあります)。IP 単位のロックはアカウント単位(5 回)より緩い 20 回です(`MIKKE_LOGIN_MAX_FAILURES_PER_IP`)。
+- パスワードを忘れた人の問い合わせ先を `MIKKE_SUPPORT_CONTACT` に書く(ログイン画面の「パスワードを忘れた方」に表示)。運営者が本人確認のうえ「利用者管理 > 仮パスワード」で発行します。
+- 地図の範囲・タイル(`MIKKE_MAP_BOUNDS` など)、スポットのカード一覧の表示(`MIKKE_SHOW_SPOT_CARDS`)も `.env` で変えられます(`.env.example` 参照)。
+
 ### スマートフォンで試すには
 
 カメラ API は「安全なコンテキスト」(HTTPS または localhost)でのみ動きます。PC の localhost では動作しますが、スマホから LAN 経由で開く場合は HTTPS 化(リバースプロキシや開発用証明書)が必要です。

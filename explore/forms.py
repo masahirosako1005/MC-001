@@ -1,8 +1,13 @@
 from __future__ import annotations
 
-from django import forms
+import secrets
 
+from django import forms
+from django.utils import timezone
+
+from accounts.models import User
 from rewards.models import CouponTemplate
+from wardrobe.models import Item
 
 from .image_symbols import MAX_FEATURES_BYTES, MAX_JPEG_BYTES, ImageSymbolError
 from .models import ANGLES, MAX_VIEWS, DropEntry, Spot, Symbol
@@ -53,8 +58,6 @@ class SpotForm(forms.ModelForm):
         self.user = user
         if user is not None and user.is_operator:
             # サイト運営者は担当の管理者を選べる (空欄 = サイト運営者のスポット)
-            from accounts.models import User
-
             owner = self.fields["owner"]
             owner.queryset = User.objects.filter(role=User.ROLE_MANAGER, is_active=True).select_related("manager_profile")
             owner.label_from_instance = lambda u: (str(u.manager_profile) if hasattr(u, "manager_profile")
@@ -90,9 +93,7 @@ class SpotForm(forms.ModelForm):
         if self.user is not None and self.user.is_manager and spot.owner_id is None:
             spot.owner = self.user
         if not spot.slug:
-            import secrets as _secrets
-
-            spot.slug = f"spot-{_secrets.token_hex(4)}"
+            spot.slug = f"spot-{secrets.token_hex(4)}"
         if commit:
             spot.save()
         return spot
@@ -130,8 +131,6 @@ class CouponForm(forms.ModelForm):
         if data.get("no_expiry"):
             data["available_until"] = None
         until = data.get("available_until")
-        from django.utils import timezone
-
         if until and until <= timezone.now() and "available_until" in self.changed_data:
             self.add_error("available_until", "有効期限は、これから先の日時にしてください。")
         days = data.get("valid_days")
@@ -140,13 +139,13 @@ class CouponForm(forms.ModelForm):
         return data
 
     def save(self, commit=True):
-        import secrets as _secrets
-
+        creating = self.instance.pk is None
         tpl = super().save(commit=False)
         tpl.available_until = self.cleaned_data.get("available_until")
         if not tpl.code:
-            tpl.code = f"cp-{_secrets.token_hex(5)}"
-        if self.user is not None and self.user.is_manager and tpl.owner_id is None:
+            tpl.code = f"cp-{secrets.token_hex(5)}"
+        # 登録した管理者を記録するのは新規作成のときだけ (運営者のクーポンを編集しても持ち主は変えない)
+        if creating and self.user is not None and self.user.is_manager and tpl.owner_id is None:
             tpl.owner = self.user
         if commit:
             tpl.save()
@@ -185,8 +184,6 @@ class DropForm(forms.ModelForm):
 
     def __init__(self, *args, coupons=None, **kwargs):
         super().__init__(*args, **kwargs)
-        from wardrobe.models import Item
-
         self.fields["item"].queryset = Item.objects.filter(is_active=True).order_by("category", "rarity", "code")
         self.fields["item"].label_from_instance = lambda i: f"{i.get_category_display()}: {i.name} {'★' * i.rarity}"
         self.fields["coupon"].queryset = coupons if coupons is not None else self.fields["coupon"].queryset.none()

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import secrets
 import uuid
 
 from django.conf import settings
@@ -9,6 +8,7 @@ from django.utils import timezone
 
 from core.crypto import blind_index
 from core.fields import EncryptedTextField
+from core.ids import random_code, unique_code
 
 REDEEM_INDEX_PURPOSE = "coupon.redeem"
 
@@ -17,12 +17,9 @@ def redeem_hash_of(code: str) -> str:
     return blind_index(code.strip().upper(), REDEEM_INDEX_PURPOSE)
 
 
-ID_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"  # 読み間違えやすい文字 (0/O, 1/I/L) を除く
-
-
 def new_coupon_id() -> str:
     """クーポン (ひな形) そのものの ID。例: CP-7Q4H2Z"""
-    return "CP-" + "".join(secrets.choice(ID_ALPHABET) for _ in range(6))
+    return "CP-" + random_code(6)
 
 
 class CouponTemplate(models.Model):
@@ -56,6 +53,13 @@ class CouponTemplate(models.Model):
 
     def __str__(self) -> str:
         return f"{self.shop_name}: {self.title} ({self.coupon_id})"
+
+    def save(self, *args, **kwargs):
+        if self._state.adding:  # クーポン ID が既存と重なったら作り直す
+            others = CouponTemplate.objects.exclude(pk=self.pk)
+            if others.filter(coupon_id=self.coupon_id).exists():
+                self.coupon_id = unique_code(new_coupon_id, lambda c: others.filter(coupon_id=c).exists())
+        super().save(*args, **kwargs)
 
     def is_distributable(self, now=None) -> bool:
         now = now or timezone.now()
@@ -115,16 +119,19 @@ class UserCoupon(models.Model):
             self.redeem_hash = redeem_hash_of(self.redeem_code)
         super().save(*args, **kwargs)
 
+    def effective_expires_at(self):
+        """実際に使える期限: 受け取り時に決めた期限と、クーポン自体の有効期限 (後から短くされた場合) の早いほう。"""
+        until = self.template.available_until
+        return min(self.expires_at, until) if until is not None else self.expires_at
+
+    def is_expired(self, now=None) -> bool:
+        return self.effective_expires_at() <= (now or timezone.now())
+
     @property
     def status(self) -> str:
         if self.used_at:
             return "used"
-        now = timezone.now()
-        if self.expires_at <= now:
-            return "expired"
-        # クーポン自体の有効期限が、受け取り後に短くされた場合
-        until = self.template.available_until
-        if until is not None and until <= now:
+        if self.is_expired():
             return "expired"
         return "available"
 

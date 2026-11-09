@@ -75,12 +75,13 @@ def find_symbol(payload: str) -> Symbol:
     return symbol
 
 
-def next_available_at(user, symbol: Symbol) -> dt.datetime | None:
+def next_available_at(user, symbol: Symbol, now: dt.datetime | None = None) -> dt.datetime | None:
+    """次にみっけできる時刻 (クールダウン中でなければ None)。now は collect(now=) と同じ時刻を渡す。"""
     last = Discovery.objects.filter(user=user, symbol=symbol).order_by("-found_at").values_list("found_at", flat=True).first()
     if last is None:
         return None
     nxt = last + dt.timedelta(hours=symbol.cooldown_hours)
-    return nxt if nxt > timezone.now() else None
+    return nxt if nxt > (now or timezone.now()) else None
 
 
 def make_ticket(user, symbol: Symbol) -> str:
@@ -416,8 +417,8 @@ def collect(user, ticket: str, idempotency_key: str, coords: tuple[float, float]
             return _result_from_discovery(existing)
 
         symbol = read_ticket(user, ticket)
-        nxt = next_available_at(user, symbol)
-        if nxt and nxt > now:
+        nxt = next_available_at(user, symbol, now)
+        if nxt:
             raise Cooldown("このシンボルはもうみっけ済みです。時間をおいてまた来てね。",
                            next_available_at=nxt.isoformat())
         check_location(symbol, coords)
