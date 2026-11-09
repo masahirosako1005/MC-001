@@ -1,0 +1,137 @@
+/* =====================================================================
+   B. ゲームホーム(1画面完結)
+   スマホゲームのホーム画面のような、ポップで押しやすい見た目。
+   ホームはスクロールせずに 1 画面で主要機能へ行ける。
+   ===================================================================== */
+:root {
+  --bg: #EAF6FF;
+  --surface: #FFFFFF;
+  --surface-2: #FFF4D6;
+  --text: #24304A;
+  --muted: #55607A;
+  --primary: #D94F00;
+  --primary-hover: #B84200;
+  --accent: #FFD84D;
+  --border: #CFE3F5;
+  --radius: 18px;
+  --shadow: 0 4px 0 rgba(36, 48, 74, 0.12), 0 8px 18px rgba(36, 48, 74, 0.10);
+  color-scheme: light;
+}
+body { background: linear-gradient(180deg, #BDE6FF 0%, #EAF6FF 40%, #FFF7E8 100%) fixed; font-weight: 500; }
+h1, h2, h3 { font-weight: 800; letter-spacing: 0.02em; }
+h2 { display: inline-block; padding: 2px 16px; border-radius: 999px; background: linear-gradient(90deg, #FF8A3D, #FFB84D); color: #FFFFFF;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.2); }
+.site-header { background: linear-gradient(90deg, #FFFFFF, #FFF4D6); border-bottom: 3px solid #FFD84D; }
+.brand span { color: #D94F00; font-size: 1.4rem; text-shadow: 0 2px 0 #FFE7A8; }
+.btn { border-radius: 14px; box-shadow: 0 4px 0 rgba(0, 0, 0, 0.18); transition: transform 0.08s; }
+.btn:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.18); }
+.btn-primary { background: linear-gradient(180deg, #FF8A3D, #D94F00); border-color: #B84200; }
+.btn-accent { background: linear-gradient(180deg, #FFE680, #FFC93D); }
+.btn-ghost { background: #FFFFFF; border: 2px solid #CFE3F5; }
+.card, .spot-card, .option-group, .evaluate-card, .ranking-item, .achievement, .coupon a, .stats div, .contest-steps li {
+  border: 3px solid #FFFFFF; box-shadow: var(--shadow);
+}
+.tabbar { background: linear-gradient(180deg, #FFFFFF, #FFF4D6); border-top: 3px solid #FFD84D; border-radius: 18px 18px 0 0; }
+.tabbar a[aria-current="page"] { color: #D94F00; }
+.tabbar .tab-camera span { background: linear-gradient(180deg, #FF8A3D, #D94F00); box-shadow: 0 4px 0 #B84200; }
+
+/* ---------------------------------------------------- ログイン前: タイトル画面 */
+.page-title-screen main { max-width: none; padding: 0; }
+.page-title-screen { padding-bottom: 0; }
+.title-screen { position: relative; min-height: 100dvh; display: grid; place-items: center; overflow: hidden; }
+.title-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.title-screen::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(255, 255, 255, 0) 30%, rgba(255, 248, 232, 0.9) 85%); }
+.title-inner { position: relative; z-index: 1; text-align: center; padding: 24px 16px 40px; max-width: 640px; width: 100%; align-self: end; }
+.title-season { display: inline-block; margin: 0 0 8px; padding: 4px 14px; border-radius: 999px; background: rgba(255, 255, 255, 0.85); font-weight: 700; }
+.title-logo { font-size: clamp(3rem, 14vw, 5.5rem); margin: 0; color: #FFFFFF; letter-spacing: 0.08em;
+  -webkit-text-stroke: 3px #D94F00; paint-order: stroke fill;
+  text-shadow: 0 5px 0 #B84200, 0 10px 22px rgba(0, 0, 0, 0.45); }
+.title-logo span { color: #FFD84D; font-size: 0.5em; vertical-align: middle; }
+.title-catch { font-weight: 800; font-size: 1.1rem; margin: 8px 0 18px; text-shadow: 0 1px 0 #FFFFFF; }
+.title-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.title-start { min-width: 200px; font-size: 1.3rem; animation: title-pulse 1.8s ease-in-out infinite; }
+@keyframes title-pulse { 50% { transform: scale(1.05); } }
+.title-thumbs { list-style: none; padding: 0; margin: 20px 0 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.title-thumbs li { position: relative; border-radius: 10px; overflow: hidden; border: 2px solid #FFFFFF; box-shadow: var(--shadow); }
+.title-thumbs img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; }
+.title-thumbs span { position: absolute; left: 0; right: 0; bottom: 0; font-size: 0.6rem; color: #FFFFFF; background: rgba(0, 0, 0, 0.5); padding: 2px; }
+.title-note { color: #55607A; }
+
+/* ---------------------------------------------------- ログイン後: 1 画面ホーム */
+.page-game-home main { max-width: none; padding: 0; }
+.page-game-home { padding-bottom: 0; }
+.page-game-home .messages { position: absolute; z-index: 40; left: 0; right: 0; top: 64px; }
+body { --preview-h: 0px; }
+body:has(.ui-preview-bar) { --preview-h: 48px; }
+.gh {
+  position: relative; overflow: hidden; margin: 0 auto; max-width: 560px;
+  height: calc(100dvh - var(--tabbar-h) - env(safe-area-inset-bottom) - var(--preview-h));
+  min-height: 560px;
+}
+.gh-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.gh::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.15), transparent 30%, transparent 70%, rgba(36, 48, 74, 0.25)); }
+.gh > * { position: absolute; z-index: 2; }
+
+.gh-top { top: 8px; left: 8px; right: 8px; display: flex; gap: 6px; align-items: flex-start; }
+.gh-rank { display: grid; justify-items: center; width: 72px; padding: 4px 0 6px; text-decoration: none; color: #FFFFFF;
+  background: radial-gradient(circle at 50% 30%, #6BC6FF, #1F6FD0); border: 3px solid #FFFFFF; border-radius: 16px; box-shadow: var(--shadow); }
+.gh-rank-label { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.1em; }
+.gh-rank-letter { font-size: 1.9rem; font-weight: 900; line-height: 1; text-shadow: 0 2px 0 #0F3F80; }
+.gh-rank-num { font-size: 0.75rem; font-weight: 800; background: #C0392B; border-radius: 999px; padding: 0 8px; margin-top: 2px; }
+.gh-stats { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.gh-stat { display: flex; align-items: center; justify-content: center; gap: 4px; min-height: 36px; padding: 2px 6px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92); border: 2px solid #FFFFFF; box-shadow: var(--shadow); color: var(--text); text-decoration: none; font-weight: 800; font-size: 0.9rem; }
+.gh-stat small { color: var(--muted); font-weight: 600; }
+.gh-menu { position: relative; }
+.gh-menu summary { list-style: none; cursor: pointer; min-height: 44px; padding: 10px 14px; border-radius: 14px; font-weight: 800; color: #FFFFFF;
+  background: linear-gradient(180deg, #7ED957, #3FA62F); border: 3px solid #FFFFFF; box-shadow: var(--shadow); }
+.gh-menu summary::-webkit-details-marker { display: none; }
+.gh-menu-panel { position: absolute; right: 0; top: 52px; min-width: 200px; display: grid; background: #FFFFFF; border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; z-index: 50; }
+.gh-menu-panel a, .gh-menu-panel button { display: block; text-align: left; padding: 12px 16px; min-height: 44px; color: var(--text); text-decoration: none;
+  font: inherit; font-weight: 700; background: none; border: 0; border-bottom: 1px solid var(--border); cursor: pointer; width: 100%; }
+.gh-menu-panel form { margin: 0; }
+
+.gh-left { left: 8px; top: 92px; display: grid; gap: 8px; max-width: 46%; }
+.gh-season { margin: 0; justify-self: start; padding: 4px 12px; border-radius: 999px; background: rgba(255, 255, 255, 0.9); font-weight: 800; font-size: 0.85rem; box-shadow: var(--shadow); }
+.gh-event { display: grid; gap: 2px; padding: 8px 12px; border-radius: 14px; text-decoration: none; color: #FFFFFF;
+  background: linear-gradient(135deg, #6A5BE2, #2E7BE8); border: 3px solid #FFFFFF; box-shadow: var(--shadow); }
+.gh-event-tag { justify-self: start; font-size: 0.7rem; font-weight: 800; color: #24304A; background: #FFD84D; border-radius: 999px; padding: 0 8px; }
+.gh-event-title { font-weight: 900; font-size: 0.95rem; line-height: 1.3; }
+.gh-event-sub { font-size: 0.75rem; opacity: 0.95; }
+
+.gh-center { left: 0; right: 0; top: 170px; bottom: 104px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; pointer-events: none; }
+.gh-center > * { pointer-events: auto; }
+.gh-avatar-link { display: block; height: 100%; max-height: 520px; }
+.gh-avatar { height: 100%; width: auto; filter: drop-shadow(0 8px 10px rgba(0, 0, 0, 0.25)); }
+/* セリフは顔を隠さないよう、体の前 (画面の下寄り) に出す */
+.gh-bubble { position: absolute; left: 4px; right: 76px; bottom: 34%; margin: 0; z-index: 3;
+  padding: 12px 16px; border-radius: 18px; background: rgba(255, 255, 255, 0.94); font-weight: 700; line-height: 1.6; box-shadow: var(--shadow); }
+.gh-bubble::after { content: ""; position: absolute; left: 58%; top: -12px; border: 10px solid transparent; border-bottom-color: rgba(255, 255, 255, 0.94); border-top: 0; }
+
+.gh-right { right: 8px; top: 150px; display: grid; gap: 10px; }
+.gh-icon { position: relative; display: grid; justify-items: center; width: 64px; padding: 6px 2px; border-radius: 16px; text-decoration: none;
+  color: var(--text); background: rgba(255, 255, 255, 0.92); border: 3px solid #FFFFFF; box-shadow: var(--shadow); font-size: 0.7rem; font-weight: 800; }
+.gh-icon span:first-child { font-size: 1.5rem; line-height: 1.2; }
+.gh-badge { position: absolute; top: -6px; right: -6px; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; background: #E53935; color: #FFFFFF;
+  font-size: 0.75rem; display: grid; place-items: center; border: 2px solid #FFFFFF; }
+.gh-badge-soft { background: #3FA62F; }
+
+.gh-bottom { left: 8px; right: 8px; bottom: 10px; display: grid; grid-template-columns: 1fr 1.7fr 1fr; gap: 8px; align-items: end; }
+.gh-btn { display: grid; justify-items: center; gap: 0; padding: 8px 4px; border-radius: 18px; text-decoration: none; font-weight: 900; text-align: center;
+  border: 3px solid #FFFFFF; box-shadow: 0 5px 0 rgba(0, 0, 0, 0.2), 0 10px 20px rgba(0, 0, 0, 0.15); }
+.gh-btn span { font-size: 1.6rem; line-height: 1.2; }
+.gh-btn-sub { background: linear-gradient(180deg, #FFFFFF, #E6F3FF); color: var(--text); min-height: 72px; }
+.gh-btn-main { background: linear-gradient(180deg, #FF9A4D, #D94F00); color: #FFFFFF; font-size: 1.35rem; min-height: 92px; text-shadow: 0 2px 0 #B84200; }
+.gh-btn-main small { font-size: 0.7rem; font-weight: 700; text-shadow: none; }
+.gh-btn:active { transform: translateY(3px); }
+
+@media (max-height: 640px) {
+  .gh-right { top: 128px; gap: 6px; }
+  .gh-icon { width: 56px; }
+  .gh-center { top: 128px; }
+}
+@media (min-width: 720px) {
+  .gh { border-radius: 24px; margin-top: 12px; height: calc(100dvh - var(--tabbar-h) - 24px); box-shadow: 0 10px 40px rgba(36, 48, 74, 0.25); }
+}
+@media (prefers-reduced-motion: reduce) { .title-start { animation: none; } }

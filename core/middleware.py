@@ -1,6 +1,36 @@
 from __future__ import annotations
 
 
+class UiThemeMiddleware:
+    """表示する UI テーマを決める。
+
+    - 通常: 管理画面の「サイト設定」で選ばれたテーマ (全員共通)
+    - 管理者のみ: URL に ?ui=<テーマ名> を付けると、自分のセッションだけでそのテーマを試せる (?ui=reset で解除)
+    """
+
+    SESSION_KEY = "ui_preview"
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        from .models import SiteSetting
+        from .themes import THEMES, get_theme
+
+        user = getattr(request, "user", None)
+        is_staff = bool(user and user.is_authenticated and user.is_staff)
+        if is_staff and "ui" in request.GET:
+            value = request.GET["ui"]
+            if value == "reset":
+                request.session.pop(self.SESSION_KEY, None)
+            elif value in THEMES:
+                request.session[self.SESSION_KEY] = value
+        preview = request.session.get(self.SESSION_KEY) if is_staff else None
+        request.ui_previewing = bool(preview)
+        request.ui_theme = get_theme(preview or SiteSetting.current().ui_theme)
+        return self.get_response(request)
+
+
 class SecurityHeadersMiddleware:
     """Django 標準で付かない追加のセキュリティヘッダーを付与する。"""
 

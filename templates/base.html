@@ -8,10 +8,16 @@
   <title>{% block title %}みっけ{% endblock %} | みっけ</title>
   <link rel="icon" href="{% static 'img/icon.svg' %}" type="image/svg+xml">
   <link rel="stylesheet" href="{% static 'css/mikke.css' %}">
+  {% if ui_theme.css %}<link rel="stylesheet" href="{% static 'css/themes/'|add:ui_theme.css %}">{% endif %}
   {% block head %}{% endblock %}
 </head>
-<body class="{% block body_class %}{% endblock %}">
+<body class="theme-{{ ui_theme.key }} {% block body_class %}{% endblock %}">
   <a class="skip-link" href="#main">本文へスキップ</a>
+  {% if ui_previewing %}
+  <p class="ui-preview-bar" role="status">管理者プレビュー: 「{{ ui_theme.label }}」を表示中(ほかの利用者には見えません)
+    <a href="?ui=reset">プレビューをやめる</a></p>
+  {% endif %}
+  {% block site_header %}
   <header class="site-header">
     <a class="brand" href="{% url 'core:home' %}" aria-label="みっけ ホーム">
       <img src="{% static 'img/icon.svg' %}" alt="" width="32" height="32"><span>みっけ</span>
@@ -28,6 +34,7 @@
     </form>
     {% endif %}
   </header>
+  {% endblock %}
 
   {% if messages %}
   <div class="messages" role="status" aria-live="polite">

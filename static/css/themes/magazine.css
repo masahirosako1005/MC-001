@@ -1,0 +1,65 @@
+/* =====================================================================
+   C. トラベルマガジン
+   大きな写真と明朝体の見出し、余白を広く取った旅行雑誌風。
+   ===================================================================== */
+:root {
+  --bg: #FAF8F4;
+  --surface: #FFFFFF;
+  --surface-2: #F1ECE3;
+  --text: #22252B;
+  --muted: #5E636E;
+  --primary: #1F3A5F;
+  --primary-hover: #152A47;
+  --accent: #B5562E;
+  --border: #E2DCD0;
+  --radius: 4px;
+  --shadow: none;
+  color-scheme: light;
+}
+body { background: var(--bg); }
+h1, h2, h3, .brand span, .mag-kicker {
+  font-family: "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", "Noto Serif JP", serif;
+}
+h1 { font-weight: 600; letter-spacing: 0.04em; }
+h2 { font-weight: 600; letter-spacing: 0.06em; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+.site-header { background: var(--bg); border-bottom: 1px solid var(--text); }
+.btn { border-radius: 2px; letter-spacing: 0.08em; }
+.btn-ghost { border-color: var(--text); }
+.card, .spot-card, .option-group, .evaluate-card, .ranking-item, .achievement, .coupon a, .stats div { border-radius: 2px; }
+.tabbar { border-top: 1px solid var(--text); }
+.tabbar .tab-camera span { border-radius: 2px; }
+main { max-width: 1040px; }
+
+/* ログイン前 */
+.mag-hero { position: relative; margin: 0 -16px; min-height: 78dvh; display: grid; align-items: end; overflow: hidden; }
+.mag-hero img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.mag-hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 35%, rgba(10, 12, 20, 0.75)); }
+.mag-hero-text { position: relative; z-index: 1; color: #FFFFFF; padding: 32px 24px 40px; max-width: 640px; }
+.mag-hero-text h1 { font-size: clamp(2rem, 7vw, 3.4rem); line-height: 1.3; margin: 8px 0; }
+.mag-hero-text .mag-kicker { color: #F3D9B1; }
+.mag-light { color: #FFFFFF; border-color: #FFFFFF; }
+.mag-kicker { margin: 0; font-size: 0.8rem; letter-spacing: 0.3em; color: var(--accent); }
+.mag-section { margin: 48px 0; }
+.mag-grid { display: grid; gap: 16px; grid-template-columns: 1fr; }
+.mag-figure { margin: 0; }
+.mag-figure img { display: block; width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: cover; }
+.mag-figure figcaption { padding: 8px 0; color: var(--muted); font-size: 0.9rem; display: grid; }
+.mag-figure figcaption strong { color: var(--text); font-family: "Hiragino Mincho ProN", "Yu Mincho", serif; font-size: 1.05rem; }
+.mag-steps { padding-left: 1.4em; display: grid; gap: 12px; }
+.mag-steps strong { display: block; font-family: "Hiragino Mincho ProN", "Yu Mincho", serif; font-size: 1.1rem; }
+@media (min-width: 720px) {
+  .mag-grid { grid-template-columns: repeat(3, 1fr); }
+  .mag-figure.is-wide { grid-column: span 2; grid-row: span 2; }
+  .mag-figure.is-wide img { aspect-ratio: auto; height: calc(100% - 64px); }
+}
+
+/* ログイン後ホーム */
+.mag-home-hero { display: grid; grid-template-columns: 140px 1fr; gap: 20px; align-items: center; padding: 24px 0; border-bottom: 1px solid var(--border); }
+.mag-home-avatar img { width: 140px; height: auto; }
+.mag-home-hero h1 { margin: 4px 0 8px; }
+.mag-stats div { background: transparent; border: 0; border-top: 1px solid var(--text); border-radius: 0; text-align: left; }
+.mag-stats dd { font-family: "Hiragino Mincho ProN", "Yu Mincho", serif; }
+.mag-contest { background: var(--surface-2); padding: 20px; }
+.mag-journal { list-style: none; padding: 0; margin: 0; }
+.mag-journal li { display: grid; grid-template-columns: 4em 1fr auto; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.mag-journal time { color: var(--accent); font-family: "Hiragino Mincho ProN", "Yu Mincho", serif; }

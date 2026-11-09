@@ -34,6 +34,10 @@
 | R26 | Must | アバターの周りに動くエフェクト(キラキラ・ハートが浮かぶ等)を付けられる |
 | R27 | Must | コンテスト ①エントリー ②評価モードへ遷移 ③3 体×3 回・各回 1 体まで高評価 |
 | R28 | Must | コンテスト ④表示回数が少ないアバターを優先 ⑤10 人まで BOT を含む・以降は非表示・BOT 評価はランキング対象外 |
+| R29 | Must | ログイン前・ログイン後・その他ページを含む UI 案を複数用意する |
+| R30 | Must | ログイン前ページに Claude が生成した仮想の写真画像を使う |
+| R31 | Must | UI 案を管理画面から切り替えられる |
+| R32 | Must | 参考画像のように 1 画面でまとまった UI を試しに実装する |
 
 ## トレーサビリティ
 
@@ -66,6 +70,10 @@
 | R26 | `scenes.EFFECT`(10 種類、SVG の CSS アニメーション)、`AvatarConfig.effect` | `test_effect_is_animated_and_respects_reduced_motion`、ブラウザで 2 コマ比較し動作を確認 | ✅ |
 | R27 | `contest/`(`enter` / `current_round` / `vote`、評価画面) | `EntryTests` `EvaluationTests` `test_full_flow_via_http`、ブラウザでエントリー→3 回評価→ランキングを確認 | ✅ |
 | R28 | `contest.services.pick_candidates / bots_visible`、`vote` の BOT 除外 | `SelectionTests`(低表示回数優先・偏り 2 以内・層内ランダム)、`BotTests`(9 人で BOT あり・10 人で BOT なし・BOT 評価は加算しない) | ✅ |
+| R29 | `core/themes.py`(4 案)、`static/css/themes/*.css`、`templates/core/landing_* / home_*` | `test_each_theme_switches_landing_home_and_css`、ブラウザで 4 案のログイン前・ホーム・きせかえを確認 | ✅(見た目は🔶) |
+| R30 | `static/img/photos/*.svg`(`scripts/make_photos.py`)、各ログイン前テンプレート | `test_landing_uses_virtual_photos_with_disclaimer` `test_photos_exist_and_are_safe_svgs` | ✅ |
+| R31 | `core.models.SiteSetting`、`SiteSettingAdmin`、`UiThemeMiddleware`(管理者の試し見) | `test_admin_switches_theme_for_everyone` `test_staff_can_preview_only_for_themselves` `test_non_staff_cannot_preview` `test_admin_singleton`、ブラウザで管理画面から切り替えを確認 | ✅ |
+| R32 | `templates/core/home_game.html`、`themes/game.css`、`/wardrobe/me.svg?layer=` | `test_game_home_is_one_screen_with_status` `test_avatar_layers`、ブラウザでスクロールなし(縦 812 = 画面 812)を確認 | ✅ |
 | R18 | `maps/`(Range 配信)、`maps/tiles/kyobashi.pmtiles`、`scripts/extract_tiles.py`、`static/js/spotmap.js`(Leaflet + protomaps-leaflet) | `maps/tests.py`(Range・416・パストラバーサル・ログイン必須・外部 API を CSP で許可していない)、ブラウザで外部への通信がないことを確認 | ✅ |
 
 ## 未達・残課題

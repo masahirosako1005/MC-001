@@ -1,0 +1,34 @@
+/* =====================================================================
+   D. 和モダン
+   藍色 × 朱色、和紙の地色に青海波の模様。構成はスタンダードと同じ。
+   ===================================================================== */
+:root {
+  --bg: #F6F1E7;
+  --surface: #FFFDF8;
+  --surface-2: #EFE6D6;
+  --text: #1F2F54;
+  --muted: #4E5A74;
+  --primary: #B7282E;
+  --primary-hover: #95191F;
+  --accent: #E8B84A;
+  --border: #D9CDB6;
+  --radius: 8px;
+  --shadow: 0 1px 0 rgba(31, 47, 84, 0.08);
+  color-scheme: light;
+}
+body { background-color: var(--bg); background-image: url("../../img/seigaiha.svg"); background-size: 64px 32px; }
+h1, h2, h3 { font-family: "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", serif; }
+h2 { border-left: 6px solid var(--primary); padding-left: 10px; }
+.site-header { background: #1F2F54; border-bottom: 3px solid var(--primary); }
+.site-header .brand, .site-header .brand span { color: #FFFFFF; }
+.site-header .now-badge { background: rgba(255, 255, 255, 0.15); color: #FFFFFF; }
+.site-header .btn-ghost { color: #FFFFFF; border-color: rgba(255, 255, 255, 0.5); }
+.site-header .btn-ghost:hover { background: rgba(255, 255, 255, 0.12); }
+.btn { border-radius: 6px; }
+.card, .spot-card, .option-group, .evaluate-card, .ranking-item, .achievement, .stats div { border-color: var(--border); }
+.tabbar { background: #1F2F54; border-top: 3px solid var(--primary); }
+.tabbar a { color: #C9D2E6; }
+.tabbar a[aria-current="page"] { color: #FFFFFF; }
+.tabbar .tab-camera span { background: var(--primary); border-color: #1F2F54; }
+.hero h1 { font-size: 2rem; }
+.photo-card { border: 3px solid #FFFDF8; outline: 1px solid var(--border); }

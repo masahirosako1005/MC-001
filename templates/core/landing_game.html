@@ -1,0 +1,24 @@
+{% extends "base.html" %}{% load static %}
+{% block title %}タップしてはじめよう{% endblock %}
+{% block body_class %}page-title-screen{% endblock %}
+{% block site_header %}{% endblock %}
+{% block content %}
+<section class="title-screen">
+  <img class="title-bg" src="{% static 'img/photos/castle.svg' %}" alt="" width="1200" height="800">
+  <div class="title-inner">
+    <p class="title-season">{{ mikke_season_label }}の{{ mikke_slot_label }} ・ いま探索できるスポット {{ spots|length }} か所</p>
+    <h1 class="title-logo"><span aria-hidden="true">✦</span> みっけ <span aria-hidden="true">✦</span></h1>
+    <p class="title-catch">街にかくれた光を、カメラでさがす旅へ。</p>
+    <div class="title-actions">
+      <a class="btn btn-primary btn-large title-start" href="{% url 'accounts:signup' %}">はじめる</a>
+      <a class="btn btn-ghost btn-large title-login" href="{% url 'accounts:login' %}">ログイン</a>
+    </div>
+    <ul class="title-thumbs" aria-label="こんな場所で遊べます(イメージ)">
+      {% for key, title, text in photos %}
+      <li><img src="{% static 'img/photos/'|add:key|add:'.svg' %}" alt="{{ title }}のイメージ" width="1200" height="800" loading="lazy"><span>{{ title }}</span></li>
+      {% endfor %}
+    </ul>
+    <p class="photo-note title-note">※ 背景・写真はCGによるイメージです。</p>
+  </div>
+</section>
+{% endblock %}

@@ -505,6 +505,17 @@ def _defs(eye_color: str) -> str:
     )
 
 
+def render_background_svg(part: Part | None, label: str = "背景") -> str:
+    """背景だけの SVG (画面いっぱいに敷く用。縦横比を保ったまま切り抜いて全面を覆う)。"""
+    inner = ""
+    if part is not None and part.style in STYLES["background"]:
+        inner = _fmt(STYLES["background"][part.style]["svg"], part.color).replace('clip-path="url(#card)"', "")
+    if not inner:
+        inner = '<rect x="0" y="0" width="200" height="300" fill="url(#bg)"/>'
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 300" preserveAspectRatio="xMidYMid slice" '
+            f'role="img" aria-label="{escape(label)}">{_defs("brown")}{inner}</svg>')
+
+
 def render_svg(skin_tone: str, parts: dict[str, Part | None], *, body_type: str = "girl", eye_color: str = "brown",
                label: str = "アバター", size: int | None = None, background: bool = True) -> str:
     """アバター全体の SVG 文字列を返す。"""

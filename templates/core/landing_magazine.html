@@ -1,0 +1,40 @@
+{% extends "base.html" %}{% load static %}
+{% block title %}旅の続きを、もう一度{% endblock %}
+{% block content %}
+<section class="mag-hero">
+  <img src="{% static 'img/photos/riverside.svg' %}" alt="夕暮れの川べりのイメージ" width="1200" height="800">
+  <div class="mag-hero-text">
+    <p class="mag-kicker">MIKKE — vol.{{ mikke_season_label }}</p>
+    <h1>同じ街に、<br>二度目の発見を。</h1>
+    <p>季節と時間でかたちを変える「みっけ」を、カメラでさがす旅へ。</p>
+    <div class="hero-actions">
+      <a class="btn btn-primary btn-large" href="{% url 'accounts:signup' %}">はじめる</a>
+      <a class="btn btn-ghost btn-large mag-light" href="{% url 'accounts:login' %}">ログイン</a>
+    </div>
+  </div>
+</section>
+
+<section class="mag-section" aria-labelledby="mag-feature">
+  <p class="mag-kicker">FEATURE</p>
+  <h2 id="mag-feature">この{{ mikke_season_label }}、訪れたい場所</h2>
+  <div class="mag-grid">
+    {% for key, title, text in photos %}
+    <figure class="mag-figure{% if forloop.first %} is-wide{% endif %}">
+      <img src="{% static 'img/photos/'|add:key|add:'.svg' %}" alt="{{ title }}のイメージ" width="1200" height="800" loading="lazy">
+      <figcaption><strong>{{ title }}</strong>{{ text }}</figcaption>
+    </figure>
+    {% endfor %}
+  </div>
+  <p class="photo-note">※ 写真はCGによるイメージです。</p>
+</section>
+
+<section class="mag-section mag-columns" aria-labelledby="mag-how">
+  <p class="mag-kicker">HOW TO</p>
+  <h2 id="mag-how">旅のたのしみ方</h2>
+  <ol class="mag-steps">
+    <li><strong>みつける</strong>看板や像にカメラを向けると、光るマークが現れます。</li>
+    <li><strong>あつめる</strong>マークをタップして、アバターの服やお店のクーポンを手に入れます。</li>
+    <li><strong>また来る</strong>季節・時間・再訪の日数で、出会えるものが変わります。</li>
+  </ol>
+</section>
+{% endblock %}

@@ -30,6 +30,19 @@
   </article>
 </section>
 
+<section aria-labelledby="photos-h" class="photo-strip-section">
+  <h2 id="photos-h">こんな場所で、みっけ</h2>
+  <ul class="photo-strip">
+    {% for key, title, text in photos %}
+    <li class="photo-card">
+      <img src="{% static 'img/photos/'|add:key|add:'.svg' %}" alt="{{ title }}のイメージ" width="1200" height="800" loading="lazy">
+      <div><strong>{{ title }}</strong><span>{{ text }}</span></div>
+    </li>
+    {% endfor %}
+  </ul>
+  <p class="photo-note">※ 写真はCGによるイメージです。</p>
+</section>
+
 {% if spots %}
 <section aria-labelledby="spots-h">
   <h2 id="spots-h">いま探索できるスポット</h2>

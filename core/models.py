@@ -1,7 +1,45 @@
 from __future__ import annotations
 
 from django.conf import settings
+from django.core.cache import cache
 from django.db import models
+
+from .themes import DEFAULT_THEME, THEME_CHOICES
+
+
+class SiteSetting(models.Model):
+    """サイト全体の設定 (1 行だけ)。UI テーマを管理画面から切り替える。"""
+
+    ui_theme = models.CharField("UI テーマ", max_length=32, choices=THEME_CHOICES, default=DEFAULT_THEME,
+                                help_text="利用者全員に適用されます。管理者は URL に ?ui=テーマ名 を付けると自分だけ試せます")
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+                                   related_name="+", verbose_name="更新者")
+    updated_at = models.DateTimeField("更新日時", auto_now=True)
+
+    CACHE_KEY = "mikke:site-setting"
+
+    class Meta:
+        verbose_name = verbose_name_plural = "サイト設定"
+        constraints = [
+            models.CheckConstraint(condition=models.Q(ui_theme__in=[k for k, _ in THEME_CHOICES]),
+                                   name="sitesetting_theme_valid"),
+        ]
+
+    def __str__(self) -> str:
+        return "サイト設定"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1  # 常に 1 行
+        super().save(*args, **kwargs)
+        cache.delete(self.CACHE_KEY)
+
+    @classmethod
+    def current(cls) -> SiteSetting:
+        obj = cache.get(cls.CACHE_KEY)
+        if obj is None:
+            obj, _ = cls.objects.get_or_create(pk=1)
+            cache.set(cls.CACHE_KEY, obj, 60)
+        return obj
 
 
 class AuditLog(models.Model):

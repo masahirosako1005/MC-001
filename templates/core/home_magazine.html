@@ -1,0 +1,47 @@
+{% extends "base.html" %}{% load static %}
+{% block title %}ホーム{% endblock %}
+{% block content %}
+<section class="mag-home-hero">
+  <div class="mag-home-avatar"><img src="{% url 'wardrobe:avatar_svg' %}" alt="{{ user.nickname }}さんのアバター" width="200" height="300"></div>
+  <div>
+    <p class="mag-kicker">{{ mikke_season_label }} / {{ mikke_slot_label }}</p>
+    <h1>{{ user.nickname }}さんの旅ノート</h1>
+    <p>{{ greeting }}</p>
+    <a class="btn btn-primary btn-large" href="{% url 'explore:camera' %}">カメラでさがす</a>
+  </div>
+</section>
+
+<section class="mag-section" aria-labelledby="mh-stats">
+  <p class="mag-kicker">RECORD</p>
+  <h2 id="mh-stats">これまでの記録</h2>
+  <dl class="stats mag-stats">
+    <div><dt>旅ランク</dt><dd>{{ rank }}</dd></div>
+    <div><dt>みっけ回数</dt><dd>{{ metrics.total_discoveries }}</dd></div>
+    <div><dt>訪れたスポット</dt><dd>{{ metrics.distinct_spots }}</dd></div>
+    <div><dt>アイテム</dt><dd>{{ metrics.distinct_items }}</dd></div>
+  </dl>
+</section>
+
+{% if contest %}
+<section class="mag-section mag-contest" aria-labelledby="mh-contest">
+  <p class="mag-kicker">EVENT</p>
+  <h2 id="mh-contest">{{ contest.title }}</h2>
+  <p>{{ contest.theme }}</p>
+  <a class="btn btn-ghost" href="{% url 'contest:detail' contest.pk %}">{% if contest_entered %}評価・ランキングへ{% else %}エントリーする{% endif %}</a>
+</section>
+{% endif %}
+
+<section class="mag-section" aria-labelledby="mh-recent">
+  <p class="mag-kicker">JOURNAL</p>
+  <h2 id="mh-recent">最近のみっけ</h2>
+  {% if recent %}
+  <ul class="mag-journal">
+    {% for d in recent %}
+    <li><time datetime="{{ d.found_at|date:'c' }}">{{ d.found_at|date:"n.j" }}</time><span>{{ d.symbol.spot.name }}</span><strong>{% if d.reward_kind == "none" %}—{% else %}{{ d.reward_label }}{% endif %}</strong></li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty">まだ記録がありません。最初のみっけに出かけましょう。</p>
+  {% endif %}
+</section>
+{% endblock %}

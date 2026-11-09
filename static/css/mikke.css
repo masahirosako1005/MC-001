@@ -285,6 +285,19 @@ progress { flex: 1; height: 12px; accent-color: var(--primary); }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ---- UI テーマ共通 ---- */
+.ui-preview-bar { margin: 0; padding: 6px 16px; background: #1A5FD0; color: #FFFFFF; font-size: 0.85rem; text-align: center; }
+.ui-preview-bar a { color: #FFFFFF; font-weight: 700; margin-left: 8px; }
+.photo-strip { list-style: none; padding: 0 0 8px; margin: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(240px, 72%);
+  gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; }
+.photo-card { scroll-snap-align: start; position: relative; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+.photo-card img { display: block; width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: cover; }
+.photo-card div { position: absolute; left: 0; right: 0; bottom: 0; padding: 24px 12px 10px; color: #FFFFFF;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.65)); display: grid; }
+.photo-card span { font-size: 0.85rem; }
+.photo-note { font-size: 0.75rem; color: var(--muted); margin: 4px 0 0; }
+@media (min-width: 720px) { .photo-strip { grid-auto-columns: minmax(260px, 32%); } }
+
 /* ---- コンテスト ---- */
 .lead-left { font-size: 1.05rem; }
 .contest-steps { list-style: none; padding: 0; display: grid; gap: 6px; }

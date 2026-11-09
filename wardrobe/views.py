@@ -9,7 +9,14 @@ from django.views.decorators.http import require_GET, require_http_methods
 
 from core import audit
 
-from .avatar import BODY_TYPE_CHOICES, CATEGORY_CHOICES, EYE_COLOR_CHOICES, ITEM_BODY_CHOICES, SKIN_TONE_CHOICES
+from .avatar import (
+    BODY_TYPE_CHOICES,
+    CATEGORY_CHOICES,
+    EYE_COLOR_CHOICES,
+    ITEM_BODY_CHOICES,
+    SKIN_TONE_CHOICES,
+    render_background_svg,
+)
 from .models import Item, UserItem
 from .services import (
     EquipError,
@@ -20,6 +27,7 @@ from .services import (
     get_config,
     item_preview_svg,
     selectable_items,
+    to_part,
 )
 
 
@@ -98,7 +106,13 @@ def index(request):
 @login_required
 @require_GET
 def avatar_svg(request):
-    return _svg_response(config_svg(get_config(request.user), label=f"{request.user.nickname}さんのアバター"))
+    """自分のアバター。?layer=avatar で背景なし、?layer=bg で背景だけ (1 画面ホームで重ねて表示する用)。"""
+    config = get_config(request.user)
+    layer = request.GET.get("layer")
+    if layer == "bg":
+        return _svg_response(render_background_svg(to_part(config.background)))
+    label = f"{request.user.nickname}さんのアバター"
+    return _svg_response(config_svg(config, label=label, background=layer != "avatar"))
 
 
 @login_required
