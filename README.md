@@ -104,28 +104,23 @@ python -m venv .venv
 
 ```
 config/      Django 設定 (環境変数から読み込み)
-core/        暗号化 (crypto.py / fields.py)、監査ログ、レート制限、季節・時間帯、ホーム
-accounts/    利用者 (メール暗号化 + ブラインドインデックス)、登録・ログイン (連続失敗ロック)
-explore/     スポット・シンボル (QR / 画像・最大 9 角度)・ドロップ表・訪問記録・みっけ記録、スキャン/受け取り API
-maps/        地図タイル (PMTiles) の Range 配信、tiles/kyobashi.pmtiles
-contest/     コーデコンテスト (エントリー・評価・ランキング・BOT)
+core/        横断機能: 暗号化・監査ログ・レート制限・権限・ID 生成・接続元 IP・季節/時間帯・UI テーマ・ホーム・シードコマンド
+accounts/    アカウント (利用者 / 管理者 / サイト運営者)、管理者の基本情報、登録・ログイン・退会
+explore/     スポット・シンボル (QR / 画像・最大 9 角度)・ドロップ・訪問/みっけ記録、読み取り/受け取り/近くの判定 API、
+             みっけ仲間、スポット・シンボル・クーポンの設定画面
 wardrobe/    アイテム、所持品、アバター設定、SVG アバター描画
-rewards/     クーポン (引換コード暗号化)、実績
-templates/   画面テンプレート
-static/      CSS / JS (camera.js = 疑似AR) / jsQR (vendor)
-scripts/     ローカル PostgreSQL 管理
-docs/        ADR、要件トレーサビリティ
+rewards/     クーポン (ひな形・発行・使用)、実績
+contest/     コーデコンテスト (エントリー・評価・ランキング・BOT)
+maps/        地図タイル (PMTiles) の Range 配信、tiles/kyobashi.pmtiles
+ops/         サイト運営者: 専用ログイン・分析・利用者管理
+templates/   画面テンプレート (アプリごと、includes/ は共通部品)
+static/      css/ (themes/)、js/ (カメラ・地図・結果画面など)、img/、vendor/ (同梱ライブラリ)
+scripts/     ローカル PostgreSQL 管理、地図タイル切り出し、仮想写真の生成
+docs/        設計書・要件・API・ADR・評価レポート
+<app>/tests/ 各アプリのテスト (test_*.py)
 ```
 
 ## ドキュメント
 
-- [要件とトレーサビリティ](docs/requirements.md)
-- [ADR 0001 シンボル検出方式](docs/adr/0001-symbol-detection.md)
-- [ADR 0002 DB 暗号化](docs/adr/0002-db-encryption.md)
-- [ADR 0003 再訪を促すゲーム設計](docs/adr/0003-revisit-design.md)
-- [ADR 0004 アバターの描画方式](docs/adr/0004-avatar-rendering.md)
-- [ADR 0005 画像シンボル(撮影した写真をシンボルにする)](docs/adr/0005-image-symbols.md)
-- [ADR 0006 地図は Protomaps のタイルをローカル配信](docs/adr/0006-local-protomaps.md)
-- [ADR 0007 コーデコンテスト](docs/adr/0007-contest.md)
-- [ADR 0008 UI テーマ(デザイン案)の切り替え](docs/adr/0008-ui-themes.md)
-- [API 仕様](docs/api.md)
+- **[設計書](docs/design.md)**(全体構成・権限・機能・データ・API・セキュリティ・運用)
+- [ドキュメント一覧](docs/README.md)(要件とトレーサビリティ・API 仕様・ADR 0001〜0011・評価レポート)

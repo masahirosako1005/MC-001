@@ -57,7 +57,7 @@
 | R49 | Must | 配るクーポン 1 枚ごとにユニークな ID(他ユーザと重複しない・1 回だけ使える)、クーポンそのものにも ID |
 | R50 | Should | 取得場所のスポット名をタップすると「これをみっけに行く」を出し、マップ上でそのスポットを分かりやすく表示する |
 | R51 | Must | 衣装全振り: みっけしたら必ずコーデを出す(「準備中」「からっぽ」は出さない)。取得済みのコーデも出し、「取得済み」と表示する |
-| R52 | Must | 評価レポート(docs/review-2026-11-09.md)の指摘を解消する。対応表は docs/review-response-2026-11-09.md |
+| R52 | Must | 評価レポート(docs/reviews/2026-11-09-review.md)の指摘を解消する。対応表は docs/reviews/2026-11-09-response.md |
 
 ## トレーサビリティ
 
@@ -65,17 +65,17 @@
 |---|---|---|---|
 | R1 | `config/`, `manage.py`, `.claude/launch.json` | 全テスト(`manage.py test`) | ✅ |
 | R2 | `config/settings.py`(`DB_ENGINE`)、`scripts/localdb.py` | 全テストを PostgreSQL 17 で実行 | ✅ |
-| R3 | `explore/models.py` DropEntry(季節・時間帯・`min_visit_days`)、SpotVisit、クールダウン | `explore/tests.py` `test_season_and_slot_filter` `test_revisit_unlock` `test_visit_days_counted_per_local_day` `test_cooldown_*` | ✅ |
+| R3 | `explore/models.py` DropEntry(季節・時間帯・`min_visit_days`)、SpotVisit、クールダウン | `explore/tests/test_explore.py` `test_season_and_slot_filter` `test_revisit_unlock` `test_visit_days_counted_per_local_day` `test_cooldown_*` | ✅ |
 | R4 | `static/js/camera.js`、`explore/symbols.py`、`explore/services.py:scan` | `test_scan_ready_then_cooldown` `test_parse_payload` `test_scan_and_collect_flow`、ブラウザで検出→マーク表示を確認 | ✅(検出は🔶手動) |
 | R5 | `camera.js:collect`、`explore/services.py:collect`、`/explore/api/collect` | `test_collect_grants_item_and_records` `test_idempotent_replay` | ✅ |
-| R6 | `wardrobe/`(avatar.py, services.equip, views) | `wardrobe/tests.py` 全般 | ✅ |
-| R7 | `rewards/services.issue_coupon`、DropEntry.coupon、`rewards/views` | `test_coupon_drop`、`rewards/tests.py` | ✅ |
+| R6 | `wardrobe/`(avatar.py, services.equip, views) | `wardrobe/tests/test_wardrobe.py` 全般 | ✅ |
+| R7 | `rewards/services.issue_coupon`、DropEntry.coupon、`rewards/views` | `test_coupon_drop`、`rewards/tests/test_rewards.py` | ✅ |
 | R8 | `rewards/models.Achievement`、`services.evaluate_achievements` | `test_achievement_unlocked_once` | ✅ |
-| R9 | `core/crypto.py`、`core/fields.py`、`scripts/localdb.py`(TLS/SCRAM)、settings のセキュリティ設定 | `core/tests.py`(暗号文で保存・改ざん検知・AAD・鍵ローテーション・ヘッダー)、`accounts/tests.py`(Argon2・ロック・CSRF) | ✅ |
+| R9 | `core/crypto.py`、`core/fields.py`、`scripts/localdb.py`(TLS/SCRAM)、settings のセキュリティ設定 | `core/tests/test_core.py`(暗号文で保存・改ざん検知・AAD・鍵ローテーション・ヘッダー)、`accounts/tests/test_accounts.py`(Argon2・ロック・CSRF) | ✅ |
 | R10 | 「写真から読み取る」、マークと同じ動作のボタン、`prefers-reduced-motion` | ブラウザで写真読み取りを確認 | 🔶 |
 | R11 | 各 `admin.py`、`/explore/symbols/print/`、`seed_mikke`、`createadmin` | `test_symbol_print_staff_only` | ✅ |
 | R12 | 署名付きチケット、Idempotency-Key、行ロック、クールダウン、位置情報判定、レート制限、画像シンボルの照合用パッチ(サーバーのみ保持) | `test_ticket_bound_to_user` `test_forged_ticket_rejected` `test_expired_ticket_rejected` `test_location_required` `test_rate_limit` `test_scan_with_wrong_patch` `test_catalog_does_not_leak_secrets` | ✅ |
-| R13 | `explore/image_symbols.py`、`services.register_image_symbol / scan_image`、`/explore/symbols/register/`、`static/js/imagematch.js`(jsfeat)、`symbol_register.js`、`camera.js:detectImage` | `explore/tests_image.py`、ブラウザで登録 → 合成した街の写真から検出 → 受け取り | ✅(検出精度は🔶手動・実機未確認) |
+| R13 | `explore/image_symbols.py`、`services.register_image_symbol / scan_image`、`/explore/symbols/register/`、`static/js/imagematch.js`(jsfeat)、`symbol_register.js`、`camera.js:detectImage` | `explore/tests/test_image_symbols.py`、ブラウザで登録 → 合成した街の写真から検出 → 受け取り | ✅(検出精度は🔶手動・実機未確認) |
 | R14 | `imagematch.js:cropQuad`(射影変換で正面補正)、`symbol_register.js`(4 隅ドラッグ・矢印キー) | ブラウザで 4 隅のドラッグと切り抜きを確認 | 🔶 |
 | R15 | `image_symbols.similarity`(16×16・位置ずれ ±1 マス・最大 NCC)、`MIKKE_IMAGE_SIMILARITY_THRESHOLD=0.65`、端末側の照合条件の緩和 | `SimilarityTests`(位置ずれ許容・無関係は 65% 未満・しきい値変更)、ブラウザで距離・角度を変えた 44 回の検証(ADR 0005) | ✅ |
 | R16 | `symbol_register.js`(ブラシ・消しゴム・全消去)、`imagematch.js:extractReference / packMask32`、`SymbolView.verify_mask` | `test_masked_area_is_ignored` `test_too_much_masked` `test_register_multi_angle_with_mask`、ブラウザで塗った部分の特徴点が消えることを確認 | ✅ |
@@ -113,8 +113,8 @@
 | R49 | `CouponTemplate.coupon_id`(CP-)、`UserCoupon.redeem_hash`(一意制約)、`issue_coupon` の再試行、`use_coupon` の条件付き UPDATE | `CouponIdTests` | ✅ |
 | R50 | `finders.obtained_info`(公開中のスポットだけ `spot` を返す)、`camera.js:showObtained / openGoto`、`spotmap.js` の `mikke:focus-spot`(強調マーカーとポップアップ) | `test_profile_shows_outfit_and_where` `test_no_map_link_for_unavailable_spot`、ブラウザでスポット名 → 「これをみっけに行く」→ 地図で表示を確認 | ✅ |
 | R51 | `services.fallback_outfit`(レア度 2 まで・体のタイプが合う・未所持を優先)、`collect`、`camera.js:showReward`(NEW / 取得済み) | `test_no_drop_still_gives_outfit` `test_fallback_outfit_choice` `test_fallback_when_everything_owned_is_marked_owned` `test_coupon_stopped_between_draw_and_issue_is_not_500`、ブラウザでドロップ未設定のシンボルからコーデが出ることを確認 | ✅ |
-| R52 | `docs/review-response-2026-11-09.md` の各項目(`core/ids.py` `core/net.py` `core/http.py` `core/demo.py` `core/templatetags/mikke_forms.py`、`static/js/reward_dialog.js` `finders.js`、ヘッダーメニュー、表のカード表示、404/500 ほか) | `core/tests_review.py`(24 件)、ブラウザでスマホ幅のヘッダー・表・ホーム・みっけ画面・確認ダイアログを確認 | ✅(I1・I6・S2・U13 は理由を付けて対応しない) |
-| R18 | `maps/`(Range 配信)、`maps/tiles/kyobashi.pmtiles`、`scripts/extract_tiles.py`、`static/js/spotmap.js`(Leaflet + protomaps-leaflet) | `maps/tests.py`(Range・416・パストラバーサル・ログイン必須・外部 API を CSP で許可していない)、ブラウザで外部への通信がないことを確認 | ✅ |
+| R52 | `docs/reviews/2026-11-09-response.md` の各項目(`core/ids.py` `core/net.py` `core/http.py` `core/demo.py` `core/templatetags/mikke_forms.py`、`static/js/reward_dialog.js` `finders.js`、ヘッダーメニュー、表のカード表示、404/500 ほか) | `core/tests/test_review_fixes.py`(24 件)、ブラウザでスマホ幅のヘッダー・表・ホーム・みっけ画面・確認ダイアログを確認 | ✅(I1・I6・S2・U13 は理由を付けて対応しない) |
+| R18 | `maps/`(Range 配信)、`maps/tiles/kyobashi.pmtiles`、`scripts/extract_tiles.py`、`static/js/spotmap.js`(Leaflet + protomaps-leaflet) | `maps/tests/test_tiles.py`(Range・416・パストラバーサル・ログイン必須・外部 API を CSP で許可していない)、ブラウザで外部への通信がないことを確認 | ✅ |
 
 ## 未達・残課題
 

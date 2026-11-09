@@ -19,5 +19,5 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"*/tests.py" = ["S105", "S106"]
+"*/tests/*.py" = ["S105", "S106"]  # テスト用のパスワード文字列
 "scripts/*" = ["S603", "S607"]
