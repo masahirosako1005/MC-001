@@ -70,6 +70,8 @@ class ServiceTests(Base):
         r = services.collect(self.user, self.ticket(), str(uuid.uuid4()))
         self.assertEqual(r.reward_kind, "item")
         self.assertTrue(r.is_new)
+        # 結果画面で絵 (全身 + 部位の拡大図) を出すための情報
+        self.assertEqual((r.item["code"], r.item["slot"]), ("hair-a", "hair"))
         self.assertTrue(UserItem.objects.filter(user=self.user, item=self.item).exists())
         self.assertEqual(Discovery.objects.filter(user=self.user).count(), 1)
         self.assertEqual(SpotVisit.objects.filter(user=self.user).count(), 1)

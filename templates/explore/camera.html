@@ -10,7 +10,8 @@
          data-collect-url="{% url 'explore:api_collect' %}"
          data-wardrobe-url="{% url 'wardrobe:index' %}"
          data-item-svg-base="{% url 'wardrobe:index' %}items/"
-         data-coupon-base="{% url 'rewards:coupons' %}">
+         data-coupon-base="{% url 'rewards:coupons' %}"
+         data-nothing-img="{% static 'img/nothing.svg' %}">
   <div class="ar-stage" id="ar-stage">
     <video id="ar-video" playsinline muted aria-hidden="true"></video>
     <canvas id="ar-canvas" aria-label="カメラ映像。シンボルが見つかると光るマークが表示されます"></canvas>
@@ -45,7 +46,12 @@
   <div class="reward-burst" aria-hidden="true"></div>
   <h2 id="reward-title">みっけ!</h2>
   <p id="reward-spot" class="muted"></p>
-  <img id="reward-img" alt="" width="150" height="202" hidden>
+  <div id="reward-art" class="reward-art" hidden>
+    <img id="reward-img" alt="" width="150" height="202">
+    <img id="reward-zoom" class="reward-zoom" alt="" width="84" height="84" hidden>
+    <span id="reward-new" class="reward-new" hidden>NEW</span>
+    <span id="reward-rarity" class="reward-rarity" aria-hidden="true"></span>
+  </div>
   <p id="reward-text" class="reward-text"></p>
   <p id="reward-extra" class="help"></p>
   <ul id="reward-achievements" class="reward-achievements"></ul>

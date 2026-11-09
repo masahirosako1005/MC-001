@@ -395,7 +395,7 @@ def collect(user, ticket: str, idempotency_key: str, coords: tuple[float, float]
             _, is_new = grant_item(user, drop.item)
             result.reward_kind, result.label, result.is_new = "item", drop.item.name, is_new
             result.item = {"code": drop.item.code, "name": drop.item.name, "category": drop.item.get_category_display(),
-                           "rarity": drop.item.rarity, "new": is_new}
+                           "slot": drop.item.category, "rarity": drop.item.rarity, "new": is_new}
             ref = drop.item.code
         elif drop and drop.coupon_id:
             c = issue_coupon(user, drop.coupon, source=f"{symbol.spot.name}でみっけ", now=now)

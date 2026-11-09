@@ -119,6 +119,26 @@ def config_svg(config: AvatarConfig, **kw) -> str:
                       body_type=config.body_type, eye_color=config.eye_color, **kw)
 
 
+# 手に入れたパーツを大きく見せるための切り抜き範囲 (viewBox 200x300 内の正方形)。
+# こもの・エフェクト・背景は形や位置がまちまちなので、全身のまま見せる。
+ZOOM_BOXES = {
+    "shoes": (74, 252, 52, 52),
+    "bottom": (48, 180, 104, 104),
+    "top": (52, 124, 96, 96),
+    "hair": (30, 4, 140, 140),
+    "face": (52, 56, 96, 96),
+}
+
+
+def item_zoom_svg(item: Item, skin_tone: str = "tone3", eye_color: str = "brown") -> str:
+    """アイテムを身につけたプレビューを、そのパーツの部分だけ大きく切り抜いたもの。"""
+    svg = item_preview_svg(item, skin_tone, eye_color)
+    box = ZOOM_BOXES.get(item.category)
+    if box is None:
+        return svg
+    return svg.replace('viewBox="0 0 200 300"', 'viewBox="{} {} {} {}"'.format(*box), 1)
+
+
 def item_preview_svg(item: Item, skin_tone: str = "tone3", eye_color: str = "brown") -> str:
     """アイテム単体を身につけたプレビュー。体のタイプはアイテムに合わせる。"""
     body = item.body_type if item.body_type in BODY_TYPES else "girl"

@@ -433,14 +433,40 @@
   function showReward(d) {
     const title = $("reward-title");
     const spot = $("reward-spot");
+    const art = $("reward-art");
     const img = $("reward-img");
+    const badgeNew = $("reward-new");
+    const rarity = $("reward-rarity");
     const text = $("reward-text");
     const extra = $("reward-extra");
     const list = $("reward-achievements");
     const link = $("reward-link");
+    const itemImg = (code) => `${root.dataset.itemSvgBase}${encodeURIComponent(code)}.svg`;
+    const couponImg = (id) => `${root.dataset.couponBase}${encodeURIComponent(id)}.svg`;
+    // 手に入れた物の絵を出す (読み込めなかったときは絵の枠ごと隠し、文字だけで伝える)
+    const zoom = $("reward-zoom");
+    // 小さなパーツ (くつ・顔など) は、全身の絵に虫めがね風の拡大図を重ねて、何を手に入れたか分かるようにする
+    const ZOOMABLE = new Set(["shoes", "bottom", "top", "hair", "face"]);
+    function showZoom(code) {
+      zoom.onerror = () => { zoom.hidden = true; };
+      zoom.src = `${itemImg(code)}?zoom=1`;
+      zoom.hidden = false;
+    }
+    function showArt(src, alt, kind, w, h) {
+      zoom.hidden = true;
+      art.className = `reward-art is-${kind}`;
+      img.onerror = () => { art.hidden = true; };
+      img.width = w;
+      img.height = h;
+      img.alt = alt;
+      img.src = src;
+      art.hidden = false;
+    }
 
     spot.textContent = d.symbol ? `${d.symbol.spot} ・ ${d.symbol.name}` : "";
-    img.hidden = true;
+    art.hidden = true;
+    badgeNew.hidden = true;
+    rarity.textContent = "";
     link.hidden = false;
     list.replaceChildren();
     const notes = [];
@@ -448,9 +474,10 @@
 
     if (d.reward_kind === "item" && d.item) {
       title.textContent = d.item.new ? "NEW!みっけ!" : "みっけ!";
-      img.src = `${root.dataset.itemSvgBase}${encodeURIComponent(d.item.code)}.svg`;
-      img.alt = d.item.name;
-      img.hidden = false;
+      showArt(itemImg(d.item.code), `手に入れたアイテム: ${d.item.name}`, "item", 180, 242);
+      if (ZOOMABLE.has(d.item.slot)) showZoom(d.item.code);
+      badgeNew.hidden = !d.item.new;
+      if (d.item.rarity) rarity.textContent = "★".repeat(d.item.rarity);
       text.textContent = `${d.item.name} を手に入れた!`;
       if (d.item.rarity) notes.unshift(`${d.item.category || ""} ${"★".repeat(d.item.rarity)}${"☆".repeat(5 - d.item.rarity)}`);
       if (!d.item.new) notes.push("もう持っているアイテムです(コレクション回数が増えました)。");
@@ -458,22 +485,40 @@
       link.href = root.dataset.wardrobeUrl;
     } else if (d.reward_kind === "coupon" && d.coupon) {
       title.textContent = "クーポンをみっけ!";
+      showArt(couponImg(d.coupon.id), `手に入れたクーポン: ${d.coupon.shop || ""}「${d.coupon.title}」`, "coupon", 288, 180);
+      badgeNew.hidden = false;
       text.textContent = `${d.coupon.shop || ""}「${d.coupon.title}」`;
       if (d.coupon.benefit) notes.unshift(d.coupon.benefit);
       link.textContent = "クーポンを見る";
       link.href = `${root.dataset.couponBase}${encodeURIComponent(d.coupon.id)}/`;
     } else {
       title.textContent = "…しーん";
+      showArt(root.dataset.nothingImg, "何もいなかった", "none", 150, 150);
       text.textContent = "いまは何もいないみたい。季節や時間帯を変えて、また来てね。";
       link.hidden = true;
     }
     extra.textContent = notes.join(" ");
+    // 実績のごほうびも、絵つきで並べる
     for (const a of d.achievements || []) {
       const li = document.createElement("li");
-      let s = `${a.icon} 実績「${a.name}」達成!`;
-      if (a.item) s += ` アイテム「${a.item.name}」`;
-      if (a.coupon) s += ` クーポン「${a.coupon.title}」`;
-      li.textContent = s;
+      const head = document.createElement("span");
+      head.textContent = `${a.icon} 実績「${a.name}」達成!`;
+      li.appendChild(head);
+      const gifts = [];
+      if (a.item) gifts.push({ src: itemImg(a.item.code), label: `アイテム「${a.item.name}」`, cls: "is-item" });
+      if (a.coupon) gifts.push({ src: couponImg(a.coupon.id), label: `クーポン「${a.coupon.title}」`, cls: "is-coupon" });
+      for (const g of gifts) {
+        const fig = document.createElement("span");
+        fig.className = `reward-gift ${g.cls}`;
+        const gi = document.createElement("img");
+        gi.src = g.src;
+        gi.alt = "";
+        gi.onerror = () => gi.remove();
+        const cap = document.createElement("span");
+        cap.textContent = `${g.label} も手に入れた!`;
+        fig.append(gi, cap);
+        li.appendChild(fig);
+      }
       list.appendChild(li);
     }
     if (typeof dialog.showModal === "function") dialog.showModal();

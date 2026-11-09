@@ -65,3 +65,49 @@ class CouponTests(TestCase):
         now = timezone.now()
         with self.assertRaises(IntegrityError), transaction.atomic():
             UserCoupon.objects.create(user=self.user, template=self.tpl, redeem_code="x", issued_at=now, expires_at=now)
+
+
+class CouponImageTests(TestCase):
+    """みっけしたときの結果画面で出すクーポンの絵。"""
+
+    def setUp(self):
+        self.user = User.objects.create_user("img@example.com", PW, "いめ")
+        self.other = User.objects.create_user("img2@example.com", PW, "いめ2")
+        self.tpl = CouponTemplate.objects.create(
+            code="c-img", title='<script>alert(1)</script>饅頭 & "お茶"', shop_name="茶屋<b>", benefit="1個サービス", valid_days=7)
+        self.coupon = issue_coupon(self.user, self.tpl, source="test")
+        self.url = reverse("rewards:coupon_svg", args=[self.coupon.pk])
+
+    def test_owner_gets_ticket_image(self):
+        self.client.force_login(self.user)
+        res = self.client.get(self.url)
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(res["Content-Type"].startswith("image/svg+xml"))
+        self.assertIn("sandbox", res["Content-Security-Policy"])
+        body = res.content.decode()
+        self.assertTrue(body.startswith("<svg"))
+        self.assertNotIn("<script", body)
+        self.assertNotIn("<b>", body)
+        self.assertIn("&lt;script&gt;", body)
+        self.assertIn("COUPON", body)
+        self.assertNotIn("使用済み", body)
+        # 引換コードは絵に入れない
+        self.assertNotIn(self.coupon.redeem_code, body)
+
+    def test_used_stamp(self):
+        use_coupon(self.coupon)
+        self.client.force_login(self.user)
+        self.assertIn("使用済み", self.client.get(self.url).content.decode())
+
+    def test_other_user_and_anonymous_cannot_see(self):
+        self.assertEqual(self.client.get(self.url).status_code, 302)
+        self.client.force_login(self.other)
+        self.assertEqual(self.client.get(self.url).status_code, 404)
+
+    def test_long_text_is_trimmed(self):
+        from rewards.coupon_art import coupon_svg
+
+        svg = coupon_svg(code="x", title="あ" * 100, shop="い" * 100, benefit="う" * 100)
+        self.assertNotIn("あ" * 41, svg)  # 読み上げ用のラベルも切り詰める
+        self.assertNotIn(">" + "あ" * 10, svg)  # 絵の中の 1 行は 9 文字まで
+        self.assertIn("…", svg)

@@ -228,6 +228,24 @@ class BodyTypeEquipTests(TestCase):
         res = self.client.get(reverse("wardrobe:preview_svg"), {"top": self.rare.pk})
         self.assertNotIn(b"#336699", res.content)  # 一般利用者は未所持を反映しない
 
+    def test_item_zoom_crops_to_part(self):
+        """みっけの結果画面で使う、手に入れたパーツの拡大図 (?zoom=1)。"""
+        from wardrobe.services import ZOOM_BOXES
+
+        self.client.force_login(self.staff)
+        full = self.client.get(reverse("wardrobe:item_svg", args=["rare"])).content.decode()
+        zoom = self.client.get(reverse("wardrobe:item_svg", args=["rare"]), {"zoom": "1"}).content.decode()
+        self.assertIn('viewBox="0 0 200 300"', full)
+        self.assertIn('viewBox="{} {} {} {}"'.format(*ZOOM_BOXES["top"]), zoom)
+        self.assertIn("#336699", zoom)
+        # 拡大しない部位 (こもの) は全身のまま
+        acc = Item.objects.create(code="acc-z", name="リボン", category="accessory", style="ribbon", color="#FF0000")
+        res = self.client.get(reverse("wardrobe:item_svg", args=[acc.code]), {"zoom": "1"}).content.decode()
+        self.assertIn('viewBox="0 0 200 300"', res)
+        # 持っていない人には拡大図も見せない
+        self.client.force_login(self.user)
+        self.assertEqual(self.client.get(reverse("wardrobe:item_svg", args=["rare"]), {"zoom": "1"}).status_code, 404)
+
     def test_catalog_staff_only(self):
         self.client.force_login(self.user)
         self.assertEqual(self.client.get(reverse("wardrobe:catalog")).status_code, 302)

@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_GET, require_POST
 
 from core import audit
 
+from . import coupon_art
 from .models import UserCoupon
 from .services import CouponUnavailable, achievement_progress, use_coupon
 
@@ -26,6 +28,20 @@ def coupon_detail(request, pk):
     # IDOR 対策: 必ず所有者で絞り込む
     coupon = get_object_or_404(UserCoupon.objects.select_related("template"), pk=pk, user=request.user)
     return render(request, "rewards/coupon_detail.html", {"coupon": coupon})
+
+
+@login_required
+@require_GET
+def coupon_svg(request, pk):
+    """クーポンの絵 (本人のクーポンだけ)。みっけしたときの結果画面などで表示する。"""
+    coupon = get_object_or_404(UserCoupon.objects.select_related("template"), pk=pk, user=request.user)
+    t = coupon.template
+    svg = coupon_art.coupon_svg(code=t.code, title=t.title, shop=t.shop_name, benefit=t.benefit,
+                                used=coupon.used_at is not None)
+    resp = HttpResponse(svg, content_type="image/svg+xml; charset=utf-8")
+    resp.headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; sandbox"
+    resp.headers["Cache-Control"] = "private, no-store"  # 使用済みの印がすぐ反映されるように
+    return resp
 
 
 @login_required

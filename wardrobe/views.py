@@ -26,6 +26,7 @@ from .services import (
     equip,
     get_config,
     item_preview_svg,
+    item_zoom_svg,
     selectable_items,
     to_part,
 )
@@ -146,7 +147,8 @@ def item_svg(request, code: str):
     if item is None:
         raise Http404
     cfg = get_config(request.user)
-    return _svg_response(item_preview_svg(item, cfg.skin_tone, cfg.eye_color), cacheable=True)
+    render = item_zoom_svg if request.GET.get("zoom") == "1" else item_preview_svg  # ?zoom=1 でパーツを大きく
+    return _svg_response(render(item, cfg.skin_tone, cfg.eye_color), cacheable=True)
 
 
 @staff_member_required

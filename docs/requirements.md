@@ -42,6 +42,7 @@
 | R34 | Must | GPS で周囲 100m(設定画面で変更可)にシンボルがあるときだけカメラを起動。ないときは「ここにはなさそう・・・」と表示して起動を防ぐ |
 | R35 | Should | 地図上で周囲のシンボルをタップすると、ここで獲得可能なコーデの画像を表示 |
 | R36 | Must | シークレットシンボルを設定でき、R35 の画像はあえて「？」の画像を表示 |
+| R37 | Must | シンボルをタップしたとき、何を手に入れたかを画像で表示する |
 
 ## トレーサビリティ
 
@@ -82,6 +83,7 @@
 | R34 | `SiteSetting.camera_radius_m`、`/explore/api/nearby`、`services.nearby_symbols`、`camera.js:gpsGate` | `NearbyApiTests`(範囲内・範囲外といちばん近いスポット・設定変更・不正入力・GET 不可・レート制限・位置を記録しない)、`SiteSettingRadiusTests`、`test_admin_switches_theme_for_everyone`(距離の変更) | ✅ |
 | R35 | `services.obtainable_items`、`/explore/symbols/<id>/items/<code>.svg`、`spotmap.js`(★マーカー・ポップアップ・一覧) | `test_within_radius` `test_preview_image` `test_secret_and_unrelated_items_are_404` | ✅ |
 | R36 | `Symbol.is_secret`、`static/img/secret.svg`、API でのマスク、スポット一覧の「？？？」 | `test_secret_is_masked`(名前・ヒント・アイテムを応答に含めない) `SecretSpotListTests` | ✅ |
+| R37 | `camera.js:showReward`(全身 + 拡大図・NEW・レア度)、`wardrobe.services.item_zoom_svg`(`?zoom=1`)、`rewards/coupon_art.py` + `/rewards/coupons/<id>.svg`、`static/img/nothing.svg` | `test_collect_grants_item_and_records`(`slot`) `test_item_zoom_crops_to_part` `CouponImageTests`(本人のみ・XSS エスケープ・使用済み・長文の切り詰め)、ブラウザで実際にみっけ → アイテムの絵、クーポン・何もなしの絵を確認 | ✅ |
 | R18 | `maps/`(Range 配信)、`maps/tiles/kyobashi.pmtiles`、`scripts/extract_tiles.py`、`static/js/spotmap.js`(Leaflet + protomaps-leaflet) | `maps/tests.py`(Range・416・パストラバーサル・ログイン必須・外部 API を CSP で許可していない)、ブラウザで外部への通信がないことを確認 | ✅ |
 
 ## 未達・残課題

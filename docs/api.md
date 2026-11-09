@@ -85,3 +85,10 @@ AR マークをタップしたときに呼ぶ。レート制限: 20 回/分/利�
 | 404 | `unknown_symbol` |
 | 409 | `{"error": "cooldown", "next_available_at": RFC3339}` |
 | 429 | `rate_limited` |
+
+`item` は `{"code", "name", "category"(表示名), "slot"(部位コード), "rarity", "new"}`。結果画面では次の絵を表示する:
+
+- アイテム: `GET /wardrobe/items/<code>.svg`(全身で身につけた姿)と、くつ・ボトムス・トップス・髪・顔は `?zoom=1`(その部位の拡大図)
+- クーポン: `GET /rewards/coupons/<id>.svg`(チケット型の絵。本人のクーポンのみ、他人は 404。引換コードは含めない。使用済みなら印つき)
+- 何もなし: `static/img/nothing.svg`
+- 実績のごほうび(アイテム・クーポン)も同じ絵を小さく並べる
