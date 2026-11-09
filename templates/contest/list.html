@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}コンテスト{% endblock %}
+{% block content %}
+<h1>コーデコンテスト</h1>
+<p class="muted">自分のアバターでエントリーして、ほかの人のコーデに「いいね」を送ろう。</p>
+{% for r in rows %}
+<article class="spot-card contest-card">
+  <header>
+    <h2><a href="{% url 'contest:detail' r.c.pk %}">{{ r.c.title }}</a></h2>
+    <p class="visit-badge">{% if r.open %}開催中{% else %}受付終了{% endif %}</p>
+  </header>
+  {% if r.c.theme %}<p>テーマ: {{ r.c.theme }}</p>{% endif %}
+  <p class="help">{{ r.c.starts_at|date:"n/j" }} 〜 {{ r.c.ends_at|date:"n/j H:i" }} {% if r.entered %}・<strong>エントリー済み</strong>{% endif %}</p>
+  <p class="links-row"><a href="{% url 'contest:detail' r.c.pk %}">くわしく見る</a><a href="{% url 'contest:ranking' r.c.pk %}">ランキング</a></p>
+</article>
+{% empty %}
+<p class="empty">いま開催中のコンテストはありません。</p>
+{% endfor %}
+{% endblock %}

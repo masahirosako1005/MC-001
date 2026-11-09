@@ -6,10 +6,15 @@
 
 from __future__ import annotations
 
+import datetime as dt
+
 from django.core.management.base import BaseCommand
 from django.db import transaction
+from django.utils import timezone
 
 from accounts.models import User
+from contest.models import Contest
+from contest.services import create_bots
 from explore.models import DropEntry, Spot, Symbol
 from rewards.models import Achievement, CouponTemplate
 from wardrobe.models import Item, UserItem
@@ -138,6 +143,14 @@ class Command(BaseCommand):
             for item in starters:
                 UserItem.objects.get_or_create(user=user, item=item)
 
+        # デモ用コンテスト (BOT 12 体つき。参加者が 10 人そろうまでの評価相手)
+        contest, _ = Contest.objects.get_or_create(
+            title="第1回 みっけコーデコンテスト",
+            defaults=dict(theme="京橋さんぽで一番かわいいコーデ", starts_at=timezone.now() - dt.timedelta(hours=1),
+                          ends_at=timezone.now() + dt.timedelta(days=30)),
+        )
+        bots_made = create_bots(contest, 12)
+
         for code, name, desc, icon, kind, th, item_code, coupon_code, order in ACHIEVEMENTS:
             Achievement.objects.update_or_create(code=code, defaults=dict(
                 name=name, description=desc, icon=icon, kind=kind, threshold=th,
@@ -148,4 +161,4 @@ class Command(BaseCommand):
             f"投入完了: アイテム {len(items)} (女の子用 {sum(i.body_type == 'girl' for i in items.values())} / "
             f"男の子用 {sum(i.body_type == 'boy' for i in items.values())}) / 追加ドロップ {len(extra)} / "
             f"スポット {len(spots)} / シンボル {len(SYMBOLS)} / "
-            f"クーポン {len(coupons)} / 実績 {len(ACHIEVEMENTS)}"))
+            f"クーポン {len(coupons)} / 実績 {len(ACHIEVEMENTS)} / コンテスト「{contest.title}」BOT 追加 {bots_made}"))

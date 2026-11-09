@@ -1,0 +1,53 @@
+{% extends "base.html" %}{% load static %}
+{% block title %}{{ contest.title }}{% endblock %}
+{% block content %}
+<p><a href="{% url 'contest:list' %}">← コンテスト一覧</a></p>
+<h1>{{ contest.title }}</h1>
+{% if contest.theme %}<p class="lead-left">テーマ: <strong>{{ contest.theme }}</strong></p>{% endif %}
+<p class="help">期間: {{ contest.starts_at|date:"Y/n/j H:i" }} 〜 {{ contest.ends_at|date:"Y/n/j H:i" }} ・ 参加 {{ real_count }} 人</p>
+
+<ol class="contest-steps">
+  <li class="{% if entry %}is-done{% else %}is-current{% endif %}"><span aria-hidden="true">①</span> 今のアバターでエントリー</li>
+  <li class="{% if entry and answered < contest.rounds %}is-current{% elif answered >= contest.rounds %}is-done{% endif %}"><span aria-hidden="true">②</span> ほかの人を評価({{ contest.per_round }} 体 × {{ contest.rounds }} 回、各回 1 体まで高評価)</li>
+  <li><span aria-hidden="true">③</span> ランキングを見る</li>
+</ol>
+
+{% if entry %}
+<section class="contest-me" aria-labelledby="me-h">
+  <h2 id="me-h">あなたのエントリー</h2>
+  <div class="contest-entry-card">
+    <img src="{% url 'contest:entry_svg' entry.pk %}" alt="エントリーしたアバター" width="160" height="240">
+    <div>
+      <p><strong>{{ entry.display_name }}</strong></p>
+      <p>高評価 <strong>{{ entry.likes }}</strong> ・ 現在 <strong>{{ rank }}</strong> 位</p>
+      <p class="help">エントリー時点の服装で参加しています(あとで着替えても変わりません)。</p>
+    </div>
+  </div>
+  {% if open and answered < contest.rounds %}
+  <a class="btn btn-primary btn-large btn-block" href="{% url 'contest:evaluate' contest.pk %}">評価する({{ answered }} / {{ contest.rounds }} 回完了)</a>
+  {% endif %}
+</section>
+{% elif open %}
+<section aria-labelledby="entry-h">
+  <h2 id="entry-h">エントリー</h2>
+  <div class="contest-entry-card">
+    <img src="{% url 'wardrobe:avatar_svg' %}" alt="今のアバター" width="160" height="240">
+    <form method="post" action="{% url 'contest:enter' contest.pk %}" class="form" data-confirm="今のアバターでエントリーします。エントリー後は取り消せません。よろしいですか?">
+      {% csrf_token %}
+      <div class="field">
+        <label for="display_name">表示名(ランキングに表示されます)</label>
+        <p class="help" id="dn-help">空欄なら「旅人#1234」のような名前になります。本名は入れないでください。評価中は名前を表示しません。</p>
+        <input id="display_name" name="display_name" maxlength="20" autocomplete="off" aria-describedby="dn-help">
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">この服装でエントリー</button>
+      <p class="help"><a href="{% url 'wardrobe:index' %}">先に着替える</a></p>
+    </form>
+  </div>
+</section>
+{% else %}
+<p class="empty">このコンテストは受付を終了しました。</p>
+{% endif %}
+
+<p><a class="btn btn-ghost" href="{% url 'contest:ranking' contest.pk %}"><span aria-hidden="true">🏆</span> ランキングを見る</a></p>
+{% endblock %}
+{% block scripts %}<script src="{% static 'js/confirm.js' %}" defer></script>{% endblock %}

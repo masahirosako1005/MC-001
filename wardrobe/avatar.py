@@ -16,11 +16,14 @@ from dataclasses import dataclass
 from django.utils.html import escape
 
 CATEGORY_CHOICES = [
+    ("face", "顔"),
     ("hair", "髪"),
     ("top", "トップス"),
     ("bottom", "ボトムス"),
     ("shoes", "くつ"),
     ("accessory", "こもの"),
+    ("effect", "エフェクト"),
+    ("background", "背景"),
 ]
 CATEGORY_LABELS = dict(CATEGORY_CHOICES)
 
@@ -306,8 +309,8 @@ ACCESSORY = {
             '<path d="M98 64 L158 66 Q158 75 142 75 L98 71 Z" fill="{d}"/><circle cx="100" cy="31" r="3" fill="{d}"/>'},
     "beret": {"label": "ベレー帽", "svg": '<path d="M54 70 Q54 34 102 30 Q148 32 150 58 Q126 50 104 56 Q76 60 54 70 Z" fill="{c}" stroke="{d}" stroke-width="1.2"/>'
               '<path d="M104 30 L106 22" stroke="{d}" stroke-width="3" stroke-linecap="round"/>'},
-    "glasses": {"label": "メガネ", "svg": '<rect x="66" y="90" width="30" height="27" rx="11" fill="none" stroke="{c}" stroke-width="2.6"/>'
-                '<rect x="104" y="90" width="30" height="27" rx="11" fill="none" stroke="{c}" stroke-width="2.6"/><path d="M96 100 L104 100" stroke="{c}" stroke-width="2.6"/>'},
+    "glasses": {"label": "メガネ", "svg": '<rect x="68" y="92" width="28" height="24" rx="10" fill="none" stroke="{c}" stroke-width="2.4"/>'
+                '<rect x="104" y="92" width="28" height="24" rx="10" fill="none" stroke="{c}" stroke-width="2.4"/><path d="M96 102 L104 102" stroke="{c}" stroke-width="2.4"/>'},
     "headphones": {"label": "ヘッドホン", "svg": '<path d="M56 92 Q54 30 100 30 Q146 30 144 92" fill="none" stroke="{c}" stroke-width="5"/>'
                    '<rect x="48" y="84" width="13" height="24" rx="6" fill="{c}" stroke="{d}" stroke-width="1.2"/>'
                    '<rect x="139" y="84" width="13" height="24" rx="6" fill="{c}" stroke="{d}" stroke-width="1.2"/>'},
@@ -329,7 +332,27 @@ ACCESSORY = {
               '<circle cx="100" cy="40" r="3" fill="#E8508A"/><circle cx="84" cy="44" r="2" fill="#6AC0E8"/><circle cx="116" cy="44" r="2" fill="#6AC0E8"/>'},
 }
 
-STYLES = {"hair": HAIR, "top": TOP, "bottom": BOTTOM, "shoes": SHOES, "accessory": ACCESSORY}
+# ---- 顔 (目・眉・口・ほお紅のセット)。色はほお紅・口もとの差し色に使う ----
+# eyes: open / happy(^^) / wink / sleepy   scale: 目の大きさ   tilt: 目尻の上下 (+ でたれ目)
+FACE = {
+    "standard": {"label": "ふつう", "eyes": "open", "scale": 1.0, "tilt": 0, "mouth": "smile", "brow": "normal", "blush": 0.4},
+    "smile": {"label": "にっこり", "eyes": "open", "scale": 1.0, "tilt": 0, "mouth": "open", "brow": "up", "blush": 0.45},
+    "happy": {"label": "うれしい", "eyes": "happy", "scale": 1.0, "tilt": 0, "mouth": "open", "brow": "up", "blush": 0.55},
+    "wink": {"label": "ウインク", "eyes": "wink", "scale": 1.0, "tilt": 0, "mouth": "grin", "brow": "normal", "blush": 0.45},
+    "tare": {"label": "たれ目", "eyes": "open", "scale": 1.0, "tilt": 2.5, "mouth": "smile", "brow": "tare", "blush": 0.45},
+    "tsuri": {"label": "つり目", "eyes": "open", "scale": 0.95, "tilt": -2.5, "mouth": "smile", "brow": "tsuri", "blush": 0.3},
+    "round": {"label": "まんまる", "eyes": "open", "scale": 1.12, "tilt": 0, "mouth": "o", "brow": "up", "blush": 0.5},
+    "sleepy": {"label": "ねむそう", "eyes": "sleepy", "scale": 1.0, "tilt": 1, "mouth": "smile", "brow": "tare", "blush": 0.35},
+    "cat": {"label": "ねこぐち", "eyes": "open", "scale": 1.0, "tilt": -1, "mouth": "cat", "brow": "normal", "blush": 0.45},
+    "cool": {"label": "クール", "eyes": "open", "scale": 0.9, "tilt": -1.5, "mouth": "flat", "brow": "tsuri", "blush": 0.15},
+    "sparkle": {"label": "キラキラ", "eyes": "open", "scale": 1.06, "tilt": 0, "mouth": "open", "brow": "up", "blush": 0.5, "star": True},
+    "shy": {"label": "てれ", "eyes": "open", "scale": 0.96, "tilt": 1.5, "mouth": "small", "brow": "tare", "blush": 0.75, "lines": True},
+}
+
+from .scenes import BACKGROUND, EFFECT, EFFECT_CSS  # noqa: E402
+
+STYLES = {"face": FACE, "hair": HAIR, "top": TOP, "bottom": BOTTOM, "shoes": SHOES, "accessory": ACCESSORY,
+          "effect": EFFECT, "background": BACKGROUND}
 
 
 def style_choices(category: str) -> list[tuple[str, str]]:
@@ -348,7 +371,7 @@ class Part:
 
 def _fmt(template: str, color: str) -> str:
     c = safe_color(color)
-    return template.format(c=c, d=shade(c, 0.68), l=shade(c, 1.45))
+    return template.format(c=c, d=shade(c, 0.68), l=shade(c, 1.45), h=c[1:])
 
 
 # =====================================================================================
@@ -379,45 +402,94 @@ def _head(skin: str) -> str:
     )
 
 
-def _eye(cx: float, cy: float, iris: str, girl: bool, outer: int) -> str:
-    """大きくてきらきらした瞳。outer は目尻の向き (-1 = 左目, 1 = 右目)。"""
-    rx, ry = (12.5, 15) if girl else (11, 13)
-    lid = "#3B2A2A"
-    lid_top = cy - ry - 5 if girl else cy - ry - 3
-    lash = (f'<path d="M{cx + outer * (rx + 0.5)} {cy - 7} L{cx + outer * (rx + 5)} {cy - 12}" stroke="{lid}" stroke-width="2.6" stroke-linecap="round"/>'
-            f'<path d="M{cx + outer * (rx - 2)} {cy - 11} L{cx + outer * (rx + 2)} {cy - 16}" stroke="{lid}" stroke-width="1.8" stroke-linecap="round"/>'
+LID = "#3B2A2A"
+EYE_X = (82, 118)
+EYE_Y = 104
+
+
+def _eye(cx: float, cy: float, iris: str, girl: bool, outer: int, preset: dict, skin: str) -> str:
+    """瞳 1 つ。顔の大きさに対して自然な大きさ (以前の約 65% の面積)。outer は目尻の向き (-1 = 左目, 1 = 右目)。"""
+    s = preset["scale"]
+    rx, ry = ((9.6, 11.4) if girl else (8.8, 10.2))
+    rx, ry = rx * s, ry * s
+    tilt = preset["tilt"]
+    lid_top = cy - ry - (3.6 if girl else 2.4)
+    # 目尻側を tilt だけ下げる (たれ目) / 上げる (つり目)
+    inner_y, outer_y = cy - 4.5 + tilt * -0.3, cy - 5 + tilt
+    x_in, x_out = cx - outer * (rx + 1.2), cx + outer * (rx + 1.2)
+    lid_d = f"M{x_in:.1f} {inner_y:.1f} Q{cx:.1f} {lid_top:.1f} {x_out:.1f} {outer_y:.1f}"
+    lash = (f'<path d="M{x_out:.1f} {outer_y:.1f} L{x_out + outer * 3.8:.1f} {outer_y - 4:.1f}" stroke="{LID}" stroke-width="2.2" stroke-linecap="round"/>'
             if girl else "")
+    hl = (f'<path d="M{cx + 3.2} {cy - 8.4} L{cx + 4.2} {cy - 5.6} L{cx + 7} {cy - 4.6} L{cx + 4.2} {cy - 3.6} L{cx + 3.2} {cy - 0.8} '
+          f'L{cx + 2.2} {cy - 3.6} L{cx - 0.6} {cy - 4.6} L{cx + 2.2} {cy - 5.6} Z" fill="#FFFFFF"/>'
+          if preset.get("star") else f'<ellipse cx="{cx + 3.1:.1f}" cy="{cy - 4.2:.1f}" rx="{3.1 * s:.1f}" ry="{3.4 * s:.1f}" fill="#FFFFFF"/>')
+    eye = (
+        f'<ellipse cx="{cx}" cy="{cy}" rx="{rx:.1f}" ry="{ry:.1f}" fill="#FFFFFF"/>'
+        f'<ellipse cx="{cx}" cy="{cy + 0.8:.1f}" rx="{rx - 1.5:.1f}" ry="{ry - 1:.1f}" fill="url(#iris-{iris[1:]})"/>'
+        f'<ellipse cx="{cx}" cy="{cy + 4.5:.1f}" rx="{rx - 3.4:.1f}" ry="{ry * 0.38:.1f}" fill="{shade(iris, 1.7)}" opacity="0.45"/>'
+        f'<ellipse cx="{cx}" cy="{cy + 1.2:.1f}" rx="{3.2 * s:.1f}" ry="{4.8 * s:.1f}" fill="{shade(iris, 0.28)}"/>'
+        + hl
+        + f'<circle cx="{cx - 3.2:.1f}" cy="{cy + 5:.1f}" r="1.6" fill="#FFFFFF" opacity="0.9"/>'
+    )
+    if preset["eyes"] == "sleepy":  # まぶたを半分おろす
+        eye += (f'<path d="M{cx - rx - 1:.1f} {cy + 0.5:.1f} L{cx - rx - 1:.1f} {cy - ry - 2:.1f} L{cx + rx + 1:.1f} {cy - ry - 2:.1f} '
+                f'L{cx + rx + 1:.1f} {cy + 0.5:.1f} Q{cx} {cy - 2:.1f} {cx - rx - 1:.1f} {cy + 0.5:.1f} Z" fill="{skin}"/>')
+        lid_d = f"M{x_in:.1f} {cy:.1f} Q{cx:.1f} {cy - 2.6:.1f} {x_out:.1f} {cy + 0.6:.1f}"
     return (
-        f'<ellipse cx="{cx}" cy="{cy}" rx="{rx}" ry="{ry}" fill="#FFFFFF"/>'
-        f'<ellipse cx="{cx}" cy="{cy + 1}" rx="{rx - 1.8}" ry="{ry - 1.2}" fill="url(#iris-{iris[1:]})"/>'
-        f'<ellipse cx="{cx}" cy="{cy + 6}" rx="{rx - 4}" ry="{ry * 0.42}" fill="{shade(iris, 1.7)}" opacity="0.45"/>'
-        f'<ellipse cx="{cx}" cy="{cy + 1.5}" rx="4.2" ry="6.2" fill="{shade(iris, 0.28)}"/>'
-        f'<ellipse cx="{cx + 4}" cy="{cy - 5.5}" rx="4.2" ry="4.6" fill="#FFFFFF"/>'
-        f'<circle cx="{cx - 4.2}" cy="{cy + 6.5}" r="2.1" fill="#FFFFFF" opacity="0.9"/>'
-        f'<circle cx="{cx + 5}" cy="{cy + 6}" r="1.2" fill="#FFFFFF" opacity="0.85"/>'
-        f'<path d="M{cx - rx - 1.5} {cy - 5} Q{cx} {lid_top} {cx + rx + 1.5} {cy - 6}" fill="none" stroke="{lid}" stroke-width="{3.8 if girl else 3.2}" stroke-linecap="round"/>'
+        eye
+        + f'<path d="{lid_d}" fill="none" stroke="{LID}" stroke-width="{3.2 if girl else 2.8}" stroke-linecap="round"/>'
         + lash
-        + f'<path d="M{cx - 7} {cy + ry - 0.5} Q{cx} {cy + ry + 2} {cx + 7} {cy + ry - 0.5}" fill="none" stroke="#B07A6A" stroke-width="1.1" opacity="0.6"/>'
+        + f'<path d="M{cx - 5.5:.1f} {cy + ry - 0.4:.1f} Q{cx} {cy + ry + 1.6:.1f} {cx + 5.5:.1f} {cy + ry - 0.4:.1f}" fill="none" stroke="#B07A6A" stroke-width="1" opacity="0.55"/>'
     )
 
 
-def _face(body_type: str, eye_color: str, brow: str) -> str:
+def _closed_eye(cx: float, cy: float) -> str:
+    """にっこり閉じた目 (^)。"""
+    return f'<path d="M{cx - 8} {cy + 2} Q{cx} {cy - 7} {cx + 8} {cy + 2}" fill="none" stroke="{LID}" stroke-width="3" stroke-linecap="round"/>'
+
+
+_MOUTHS = {
+    "smile": '<path d="M95 125 Q100 129.5 105 125" fill="none" stroke="#B5524E" stroke-width="1.7" stroke-linecap="round"/>',
+    "open": '<path d="M94.5 123.5 Q100 124.5 105.5 123.5 Q104.5 131 100 131 Q95.5 131 94.5 123.5 Z" fill="#C24B52"/>'
+            '<path d="M96.6 128.6 Q100 126.6 103.4 128.6 Q102 131 100 131 Q98 131 96.6 128.6 Z" fill="#F08A9A"/>',
+    "grin": '<path d="M93.5 123.5 Q100 125 106.5 123.5 Q105 130.5 100 130.5 Q95 130.5 93.5 123.5 Z" fill="#C24B52"/>'
+            '<path d="M94.5 124 Q100 125.3 105.5 124 L105 126 Q100 127 95 126 Z" fill="#FFFFFF"/>',
+    "cat": '<path d="M95 125 Q97.5 128.5 100 125.5 Q102.5 128.5 105 125" fill="none" stroke="#B5524E" stroke-width="1.6" stroke-linecap="round"/>',
+    "o": '<ellipse cx="100" cy="127" rx="3" ry="3.6" fill="#C24B52"/>',
+    "flat": '<path d="M96 126.5 L104 126" stroke="#9A5050" stroke-width="1.7" stroke-linecap="round"/>',
+    "small": '<path d="M97.5 126 Q100 128 102.5 126" fill="none" stroke="#B5524E" stroke-width="1.5" stroke-linecap="round"/>',
+}
+_BROWS = {
+    "normal": ("M74 84 Q82 80.5 90 83", "M110 83 Q118 80.5 126 84"),
+    "up": ("M74 82 Q82 77.5 90 80.5", "M110 80.5 Q118 77.5 126 82"),
+    "tare": ("M74 81 Q82 81 90 84", "M110 84 Q118 81 126 81"),
+    "tsuri": ("M74 86 Q82 81 90 81", "M110 81 Q118 81 126 86"),
+}
+
+
+def _face(body_type: str, eye_color: str, brow: str, face: Part | None, skin: str) -> str:
     girl = body_type == "girl"
+    preset = FACE.get(face.style if face else "standard", FACE["standard"])
+    accent = safe_color(face.color, "#FF8FA3") if face else "#FF8FA3"
     iris = EYE_COLORS.get(eye_color, EYE_COLORS["brown"])
-    bw = 1.8 if girl else 2.6
-    brows = (f'<path d="M73 79 Q81 75 89 78" fill="none" stroke="{brow}" stroke-width="{bw}" stroke-linecap="round"/>'
-             f'<path d="M111 78 Q119 75 127 79" fill="none" stroke="{brow}" stroke-width="{bw}" stroke-linecap="round"/>')
-    mouth = ('<path d="M95.5 126 Q97.8 129 100 126.5 Q102.2 129 104.5 126" fill="none" stroke="#C25A5A" stroke-width="1.6" stroke-linecap="round"/>'
-             if girl else
-             '<path d="M95 125.5 Q100 130 105 125.5" fill="none" stroke="#B5524E" stroke-width="1.8" stroke-linecap="round"/>')
-    return (
-        brows
-        + _eye(81, 103, iris, girl, -1) + _eye(119, 103, iris, girl, 1)
-        + '<path d="M99.4 119 L100.4 120.2" stroke="#C99280" stroke-width="1.2" stroke-linecap="round"/>'
-        + mouth
-        + '<ellipse cx="70" cy="120" rx="7.5" ry="3.8" fill="#FF8FA3" opacity="0.42"/>'
-        + '<ellipse cx="130" cy="120" rx="7.5" ry="3.8" fill="#FF8FA3" opacity="0.42"/>'
-    )
+    bw = 1.7 if girl else 2.5
+    b_left, b_right = _BROWS[preset["brow"]]
+    out = (f'<path d="{b_left}" fill="none" stroke="{brow}" stroke-width="{bw}" stroke-linecap="round"/>'
+           f'<path d="{b_right}" fill="none" stroke="{brow}" stroke-width="{bw}" stroke-linecap="round"/>')
+    (lx, rx_), cy = EYE_X, EYE_Y
+    kind = preset["eyes"]
+    left = _closed_eye(lx, cy) if kind == "happy" else _eye(lx, cy, iris, girl, -1, preset, skin)
+    right = _closed_eye(rx_, cy) if kind in ("happy", "wink") else _eye(rx_, cy, iris, girl, 1, preset, skin)
+    out += left + right
+    out += '<path d="M99.4 118 L100.4 119.2" stroke="#C99280" stroke-width="1.2" stroke-linecap="round"/>'
+    out += _MOUTHS[preset["mouth"]]
+    op = preset["blush"]
+    out += (f'<ellipse cx="72" cy="119" rx="7.5" ry="3.6" fill="{accent}" opacity="{op}"/>'
+            f'<ellipse cx="128" cy="119" rx="7.5" ry="3.6" fill="{accent}" opacity="{op}"/>')
+    if preset.get("lines"):  # てれ線
+        out += ('<path d="M67 117 L69 121 M71 117 L73 121 M75 117 L77 121 M123 117 L125 121 M127 117 L129 121 M131 117 L133 121" '
+                f'stroke="{shade(accent, 0.7)}" stroke-width="1.2" stroke-linecap="round" opacity="0.8"/>')
+    return out
 
 
 def _defs(eye_color: str) -> str:
@@ -428,7 +500,8 @@ def _defs(eye_color: str) -> str:
         f'<stop offset="0" stop-color="{shade(iris, 0.42)}"/><stop offset="0.55" stop-color="{iris}"/>'
         f'<stop offset="1" stop-color="{shade(iris, 1.55)}"/></linearGradient>'
         '<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFF7EA"/>'
-        '<stop offset="1" stop-color="#FDE7D2"/></linearGradient></defs>'
+        '<stop offset="1" stop-color="#FDE7D2"/></linearGradient>'
+        '<clipPath id="card"><rect x="0" y="0" width="200" height="300" rx="18"/></clipPath></defs>'
     )
 
 
@@ -450,20 +523,26 @@ def render_svg(skin_tone: str, parts: dict[str, Part | None], *, body_type: str 
     described = [f"{CATEGORY_LABELS[c]}: {p.name}" for c, p in parts.items() if p is not None and p.name]
     aria = escape(label + (" (" + "、".join(described) + ")" if described else ""))
     dims = f' width="{int(size)}" height="{int(size * 300 / 200)}"' if size else ""
-    bg = ('<rect x="0" y="0" width="200" height="300" rx="18" fill="url(#bg)"/>'
-          '<ellipse cx="100" cy="286" rx="48" ry="6" fill="#000000" opacity="0.08"/>') if background else ""
+    bg = ""
+    if background:
+        bg = layer("background") or '<rect x="0" y="0" width="200" height="300" rx="18" fill="url(#bg)"/>'
+        bg += '<ellipse cx="100" cy="286" rx="48" ry="6" fill="#000000" opacity="0.1"/>'
+    effect = parts.get("effect")
     body = "".join([
         _defs(eye_color),
+        EFFECT_CSS if effect is not None and effect.style in EFFECT else "",
         bg,
+        layer("effect", "back"),
         layer("hair", "back"),
         _body(skin),
         layer("shoes"),
         layer("bottom"),
         layer("top"),
         _head(skin),
-        _face(body_type, eye_color, brow),
+        _face(body_type, eye_color, brow, parts.get("face"), skin),
         layer("hair", "front"),
         layer("accessory"),
+        layer("effect", "front"),
     ])
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 300"{dims} role="img" aria-label="{aria}">'

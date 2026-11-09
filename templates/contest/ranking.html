@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}ランキング{% endblock %}
+{% block content %}
+<p><a href="{% url 'contest:detail' contest.pk %}">← {{ contest.title }}</a></p>
+<h1>ランキング</h1>
+{% if entry %}<p class="message message-info">あなたは <strong>{{ rank }}</strong> 位(高評価 {{ entry.likes }})</p>{% endif %}
+<p class="help">参加者だけのランキングです(BOT は含みません)。高評価が同じ場合は先にエントリーした人が上になります。</p>
+{% if rows %}
+<ol class="ranking-list">
+  {% for e in rows %}
+  <li class="ranking-item{% if entry and e.pk == entry.pk %} is-me{% endif %}">
+    <span class="rank-no" aria-label="{{ forloop.counter }} 位">{% if forloop.counter == 1 %}🥇{% elif forloop.counter == 2 %}🥈{% elif forloop.counter == 3 %}🥉{% else %}{{ forloop.counter }}{% endif %}</span>
+    <img src="{% url 'contest:entry_svg' e.pk %}" alt="" width="72" height="108" loading="lazy">
+    <span class="rank-name">{{ e.display_name }}{% if entry and e.pk == entry.pk %}(あなた){% endif %}</span>
+    <span class="rank-likes"><span aria-hidden="true">♥</span> {{ e.likes }}</span>
+  </li>
+  {% endfor %}
+</ol>
+{% else %}
+<p class="empty">まだエントリーがありません。</p>
+{% endif %}
+{% endblock %}

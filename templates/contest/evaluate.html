@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}評価 {{ round.round_no }}/{{ contest.rounds }}{% endblock %}
+{% block content %}
+<p><a href="{% url 'contest:detail' contest.pk %}">← {{ contest.title }}</a></p>
+<h1>いちばん好きなコーデは?</h1>
+<p class="contest-progress" aria-live="polite">評価 <strong>{{ round.round_no }}</strong> / {{ contest.rounds }} 回目</p>
+<progress class="contest-bar" max="{{ contest.rounds }}" value="{{ round.round_no|add:-1 }}">{{ round.round_no }}/{{ contest.rounds }}</progress>
+<p class="help">1 回につき 1 体まで「高評価」を送れます。名前は表示されません(見た目だけで選んでね)。</p>
+
+<form method="post" class="evaluate-form">
+  {% csrf_token %}
+  <input type="hidden" name="round" value="{{ round.pk }}">
+  <ul class="evaluate-grid">
+    {% for c in candidates %}
+    <li class="evaluate-card">
+      <img src="{% url 'contest:entry_svg' c.pk %}" alt="候補 {{ forloop.counter }} のアバター" width="180" height="270">
+      <button type="submit" name="choice" value="{{ c.pk }}" class="btn btn-accent btn-block">
+        <span aria-hidden="true">♥</span> 候補 {{ forloop.counter }} に高評価
+      </button>
+    </li>
+    {% endfor %}
+  </ul>
+  <button type="submit" name="choice" value="skip" class="btn btn-ghost btn-block">今回はどれも選ばない</button>
+</form>
+{% endblock %}

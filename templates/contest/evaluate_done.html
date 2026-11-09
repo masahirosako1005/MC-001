@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}評価ありがとう{% endblock %}
+{% block content %}
+<section class="hero">
+  <h1><span aria-hidden="true">🎉</span> 評価ありがとう!</h1>
+  <p class="lead">{{ contest.title }} の評価({{ contest.rounds }} 回)がすべて終わりました。結果はランキングで確認できます。</p>
+  <div class="hero-actions">
+    <a class="btn btn-primary btn-large" href="{% url 'contest:ranking' contest.pk %}"><span aria-hidden="true">🏆</span> ランキングを見る</a>
+    <a class="btn btn-ghost btn-large" href="{% url 'contest:detail' contest.pk %}">コンテストへ戻る</a>
+  </div>
+</section>
+{% endblock %}

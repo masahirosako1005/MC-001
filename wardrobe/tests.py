@@ -18,7 +18,8 @@ class AvatarRenderTests(SimpleTestCase):
             for style in styles:
                 svg = render_svg("tone3", {cat: Part(cat, style, "#123456", "x")})
                 self.assertTrue(svg.startswith("<svg"))
-                self.assertIn("#123456", svg)
+                # 指定色そのもの・暗い色・明るい色のどれかで描かれている
+                self.assertTrue(any(c in svg for c in ("#123456", shade("#123456", 0.68), shade("#123456", 1.45))), style)
 
     def test_invalid_color_is_neutralized(self):
         evil = '#000"/><script>alert(1)</script>'
@@ -116,7 +117,7 @@ class BodyTypeRenderTests(SimpleTestCase):
     def test_girl_has_lashes_boy_does_not(self):
         girl = render_svg("tone3", {}, body_type="girl")
         boy = render_svg("tone3", {}, body_type="boy")
-        self.assertEqual(girl.count("<path") - boy.count("<path"), 4)  # まつ毛 2 本 × 両目
+        self.assertEqual(girl.count("<path") - boy.count("<path"), 2)  # まつ毛 1 本 × 両目
 
     def test_unknown_values_fall_back(self):
         svg = render_svg("nope", {}, body_type="<x>", eye_color="<y>")
@@ -234,3 +235,52 @@ class BodyTypeEquipTests(TestCase):
         res = self.client.get(reverse("wardrobe:catalog"))
         self.assertContains(res, "女の子用")
         self.assertContains(res, "男の子用")
+
+
+class FaceSceneEffectTests(SimpleTestCase):
+    """顔パーツ・背景 20 種類・アニメーションするエフェクト。"""
+
+    def test_all_faces_backgrounds_effects_render(self):
+        from wardrobe.avatar import FACE
+        from wardrobe.scenes import BACKGROUND, EFFECT
+
+        self.assertEqual(len(FACE), 12)
+        self.assertEqual(len(BACKGROUND), 20)
+        self.assertGreaterEqual(len(EFFECT), 10)
+        for cat, styles in (("face", FACE), ("background", BACKGROUND), ("effect", EFFECT)):
+            for style in styles:
+                with self.subTest(cat=cat, style=style):
+                    svg = render_svg("tone3", {cat: Part(cat, style, "#E85A9A", "x")}, body_type="boy")
+                    self.assertTrue(svg.startswith("<svg") and svg.endswith("</svg>"))
+                    self.assertNotIn("{", svg.split("<style>")[0])  # テンプレートの埋め残しがない
+
+    def test_effect_is_animated_and_respects_reduced_motion(self):
+        svg = render_svg("tone3", {"effect": Part("effect", "hearts", "#F2508A")})
+        self.assertIn("@keyframes", svg)
+        self.assertIn("prefers-reduced-motion", svg)
+        self.assertNotIn("@keyframes", render_svg("tone3", {}))  # エフェクトなしなら CSS も入れない
+
+    def test_eyes_are_natural_size(self):
+        """目は顔に対して大きすぎない (横幅の合計が顔幅の半分以下)。"""
+        import re
+
+        svg = render_svg("tone3", {}, body_type="girl")
+        rx = [float(m) for m in re.findall(r'<ellipse cx="(?:82|118)" cy="104" rx="([\d.]+)"', svg)]
+        self.assertEqual(len(rx), 2)
+        self.assertLessEqual(sum(rx) * 2, 82 / 2)  # 顔の幅 = 82
+
+    def test_background_gradient_ids_unique_per_color(self):
+        a = render_svg("tone3", {"background": Part("background", "sky", "#111111")})
+        b = render_svg("tone3", {"background": Part("background", "sky", "#222222")})
+        self.assertIn("bg-sky-111111", a)
+        self.assertIn("bg-sky-222222", b)
+
+
+class CommonItemsTests(SimpleTestCase):
+    def test_counts(self):
+        from collections import Counter
+
+        from wardrobe.sample_items import COMMON_ITEMS
+
+        c = Counter(r[2] for r in COMMON_ITEMS)
+        self.assertEqual((c["face"], c["background"], c["effect"]), (12, 20, 10))

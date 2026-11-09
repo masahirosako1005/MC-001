@@ -122,4 +122,54 @@ BOY_ITEMS = [
     ("acc-foxmask-red", "きつねのお面", "accessory", "foxmask", "#C0392B", 4, False, "夜の神社のおまつり"),
 ]
 
-SAMPLE_ITEMS = [(*row, "girl") for row in GIRL_ITEMS] + [(*row, "boy") for row in BOY_ITEMS]
+# 顔・エフェクト・背景はどちらの体のタイプでも使える「共通」パーツ
+COMMON_ITEMS = [
+    # ---- 顔 (12)。色はほお紅・口もとの差し色 ----
+    ("c-face-standard", "ふつうの顔", "face", "standard", "#FF8FA3", 1, True, "いつもの笑顔"),
+    ("c-face-smile", "にっこり", "face", "smile", "#FF8FA3", 1, False, "楽しい旅のはじまり"),
+    ("c-face-cat", "ねこぐち", "face", "cat", "#FF9AB0", 2, False, "ちょっといたずら"),
+    ("c-face-tare", "たれ目", "face", "tare", "#FFA0A0", 2, False, "おっとり"),
+    ("c-face-tsuri", "つり目", "face", "tsuri", "#FF8F8F", 2, False, "きりっと"),
+    ("c-face-round", "まんまる目", "face", "round", "#FF9AB8", 2, False, "びっくり発見"),
+    ("c-face-sleepy", "ねむそう", "face", "sleepy", "#FFB0A0", 2, False, "温泉上がり"),
+    ("c-face-happy", "うれしい", "face", "happy", "#FF7A9A", 3, False, "みっけ大成功"),
+    ("c-face-cool", "クール", "face", "cool", "#E8A0A0", 3, False, "大人の街歩き"),
+    ("c-face-wink", "ウインク", "face", "wink", "#FF8FA3", 3, False, "ステージの決め顔"),
+    ("c-face-shy", "てれ", "face", "shy", "#FF6F8A", 4, False, "ほめられて"),
+    ("c-face-sparkle", "キラキラ瞳", "face", "sparkle", "#FF8FC8", 5, False, "夢見る瞳"),
+    # ---- エフェクト (10)。アバターのまわりで動く ----
+    ("c-fx-sparkle", "キラキラ", "effect", "sparkle", "#F2C440", 2, False, "まわりがきらめく"),
+    ("c-fx-hearts", "ふわふわハート", "effect", "hearts", "#F2508A", 3, False, "ハートが浮かぶ"),
+    ("c-fx-bubbles", "シャボン玉", "effect", "bubbles", "#7AC7FF", 2, False, "川べりの午後"),
+    ("c-fx-petals", "花びらの舞", "effect", "petals", "#F7A6C8", 3, False, "春の風"),
+    ("c-fx-snow", "粉雪", "effect", "snowfall", "#FFFFFF", 3, False, "冬の夜"),
+    ("c-fx-notes", "音符", "effect", "notes", "#8656D0", 3, False, "ごきげんな鼻歌"),
+    ("c-fx-stars", "くるくるスター", "effect", "stars", "#F2C440", 4, False, "スターの風格"),
+    ("c-fx-fireflies", "ほたる", "effect", "fireflies", "#C6F27A", 4, False, "夏の夜の水辺"),
+    ("c-fx-confetti", "紙ふぶき", "effect", "confetti", "#E8508A", 4, False, "おめでとう"),
+    ("c-fx-aura", "オーラ", "effect", "aura", "#F2C440", 5, False, "選ばれし旅人"),
+    # ---- 背景 (20) ----
+    ("c-bg-cream", "クリーム", "background", "cream", "#FFE0B2", 1, True, "いつもの背景"),
+    ("c-bg-sky", "青空", "background", "sky", "#8FD0FF", 1, False, "おでかけ日和"),
+    ("c-bg-dots", "水玉", "background", "dots", "#F49AC1", 1, False, "ポップに"),
+    ("c-bg-hearts", "ハート柄", "background", "hearts", "#F49AC1", 2, False, "かわいく"),
+    ("c-bg-sunset", "夕焼け", "background", "sunset", "#E8743B", 2, False, "川面に映る夕日"),
+    ("c-bg-sakura", "桜並木", "background", "sakura", "#F7C6D6", 2, False, "春の川沿い"),
+    ("c-bg-autumn", "紅葉", "background", "autumn", "#E8743B", 2, False, "秋の城跡"),
+    ("c-bg-snow", "雪景色", "background", "snow", "#BFDFFF", 2, False, "冬の朝"),
+    ("c-bg-beach", "海辺", "background", "beach", "#3A9AD9", 2, False, "夏休み"),
+    ("c-bg-cafe", "カフェ", "background", "cafe", "#F3E2C3", 2, False, "ひと休み"),
+    ("c-bg-forest", "森", "background", "forest", "#5E9A4E", 2, False, "森の小道"),
+    ("c-bg-river", "川べりの街", "background", "river", "#6AA6D8", 3, False, "京橋の川べり"),
+    ("c-bg-shrine", "神社", "background", "shrine", "#C0392B", 3, False, "朝の参道"),
+    ("c-bg-onsen", "温泉", "background", "onsen", "#9AD0E8", 3, False, "湯けむり"),
+    ("c-bg-castle", "お城", "background", "castle", "#6A7FA0", 3, False, "天守を見上げて"),
+    ("c-bg-night", "星空", "background", "night", "#3A3F8F", 3, False, "満天の星"),
+    ("c-bg-festival", "お祭り", "background", "festival", "#C0392B", 4, False, "夏祭りの夜"),
+    ("c-bg-city", "夜の街", "background", "city", "#3A3F6A", 4, False, "夜景の帰り道"),
+    ("c-bg-rainbow", "虹", "background", "rainbow", "#FFE8F0", 4, False, "雨上がり"),
+    ("c-bg-stage", "ステージ", "background", "stage", "#E85A9A", 5, False, "コンテストの舞台"),
+]
+
+SAMPLE_ITEMS = ([(*row, "girl") for row in GIRL_ITEMS] + [(*row, "boy") for row in BOY_ITEMS]
+                + [(*row, "any") for row in COMMON_ITEMS])

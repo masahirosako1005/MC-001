@@ -44,6 +44,7 @@
     <a href="{% url 'explore:spots' %}" {% if p == '/explore/' %}aria-current="page"{% endif %}><span aria-hidden="true">🗺️</span>スポット</a>
     <a href="{% url 'explore:camera' %}" class="tab-camera" {% if 'camera' in p %}aria-current="page"{% endif %}><span aria-hidden="true">📷</span>みっけ</a>
     <a href="{% url 'wardrobe:index' %}" {% if 'wardrobe' in p %}aria-current="page"{% endif %}><span aria-hidden="true">👕</span>きせかえ</a>
+    <a href="{% url 'contest:list' %}" {% if 'contest' in p %}aria-current="page"{% endif %}><span aria-hidden="true">🏆</span>コンテスト</a>
     <a href="{% url 'rewards:coupons' %}" {% if 'rewards' in p %}aria-current="page"{% endif %}><span aria-hidden="true">🎁</span>ごほうび</a>
     {% endwith %}
   </nav>

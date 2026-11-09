@@ -28,6 +28,12 @@
 | R20 | Must | 女性だけでなく男性のアバターも用意する |
 | R21 | Must | サンプルパーツを男女別に 50 種類ずつ用意する |
 | R22 | Must | 管理者は(パーツを)自由に選択できる |
+| R23 | Must | 目を顔に対して自然な大きさにする |
+| R24 | Must | 顔パーツ(目・口などのセット)を増やす |
+| R25 | Must | 背景を 20 種類程度用意する |
+| R26 | Must | アバターの周りに動くエフェクト(キラキラ・ハートが浮かぶ等)を付けられる |
+| R27 | Must | コンテスト ①エントリー ②評価モードへ遷移 ③3 体×3 回・各回 1 体まで高評価 |
+| R28 | Must | コンテスト ④表示回数が少ないアバターを優先 ⑤10 人まで BOT を含む・以降は非表示・BOT 評価はランキング対象外 |
 
 ## トレーサビリティ
 
@@ -54,6 +60,12 @@
 | R20 | `AvatarConfig.body_type`、`Item.body_type`、着せ替え画面のタイプ切り替え | `test_user_can_switch_body_type_freely` `test_user_cannot_wear_other_type_item` `test_starter_kit_matches_body_type` | ✅ |
 | R21 | `wardrobe/sample_items.py`(女の子用 50・男の子用 50)、`seed_mikke` | `test_fifty_each_and_valid` | ✅ |
 | R22 | `services.can_use_any_item / selectable_items / equip`、`/wardrobe/catalog/` | `test_staff_can_choose_any_item` `test_wardrobe_page_lists_by_role` `test_staff_preview_and_item_svg_for_unowned` `test_catalog_staff_only`、ブラウザで未所持・別タイプのパーツを管理者で保存 | ✅ |
+| R23 | `avatar._eye`(約 65% の面積に縮小) | `test_eyes_are_natural_size`、ブラウザで確認 | ✅ |
+| R24 | `avatar.FACE`(12 種類)、`AvatarConfig.face` | `test_all_faces_backgrounds_effects_render`、`CommonItemsTests` | ✅ |
+| R25 | `scenes.BACKGROUND`(20 種類)、`AvatarConfig.background` | 同上、ブラウザで全 20 種類を確認 | ✅ |
+| R26 | `scenes.EFFECT`(10 種類、SVG の CSS アニメーション)、`AvatarConfig.effect` | `test_effect_is_animated_and_respects_reduced_motion`、ブラウザで 2 コマ比較し動作を確認 | ✅ |
+| R27 | `contest/`(`enter` / `current_round` / `vote`、評価画面) | `EntryTests` `EvaluationTests` `test_full_flow_via_http`、ブラウザでエントリー→3 回評価→ランキングを確認 | ✅ |
+| R28 | `contest.services.pick_candidates / bots_visible`、`vote` の BOT 除外 | `SelectionTests`(低表示回数優先・偏り 2 以内・層内ランダム)、`BotTests`(9 人で BOT あり・10 人で BOT なし・BOT 評価は加算しない) | ✅ |
 | R18 | `maps/`(Range 配信)、`maps/tiles/kyobashi.pmtiles`、`scripts/extract_tiles.py`、`static/js/spotmap.js`(Leaflet + protomaps-leaflet) | `maps/tests.py`(Range・416・パストラバーサル・ログイン必須・外部 API を CSP で許可していない)、ブラウザで外部への通信がないことを確認 | ✅ |
 
 ## 未達・残課題

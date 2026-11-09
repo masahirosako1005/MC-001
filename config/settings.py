@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     "rewards",
     "explore",
     "maps",
+    "contest",
 ]
 
 MIDDLEWARE = [

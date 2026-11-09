@@ -55,7 +55,7 @@ def ensure_starter_kit(user, body_type: str = "girl") -> AvatarConfig:
         UserItem.objects.get_or_create(user=user, item=item)
     config, created = AvatarConfig.objects.get_or_create(user=user, defaults={"body_type": body_type})
     if created:
-        for cat in ("hair", "top", "bottom", "shoes"):
+        for cat in ("face", "hair", "top", "bottom", "shoes", "background"):
             first = next((i for i in starters if i.category == cat and i.fits(config.body_type)), None)
             setattr(config, cat, first)
         config.save()
@@ -123,6 +123,9 @@ def item_preview_svg(item: Item, skin_tone: str = "tone3", eye_color: str = "bro
     """アイテム単体を身につけたプレビュー。体のタイプはアイテムに合わせる。"""
     body = item.body_type if item.body_type in BODY_TYPES else "girl"
     parts = {c: (to_part(item) if c == item.category else None) for c in CATEGORIES}
-    if item.category != "hair":  # 髪以外のプレビューは、見本の髪型をのせて見やすくする
+    if item.category != "hair":  # 髪以外のプレビューは、見本の髪型と服をのせて見やすくする
         parts["hair"] = Part("hair", "bob" if body == "girl" else "short", "#6B4226")
+    if item.category in ("face", "effect", "background"):
+        parts["top"] = Part("top", "tshirt", "#F2F2F2")
+        parts["bottom"] = Part("bottom", "skirt" if body == "girl" else "pants", "#5A7FB5")
     return render_svg(skin_tone, parts, body_type=body, eye_color=eye_color, label=f"アイテム「{item.name}」")
