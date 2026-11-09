@@ -73,7 +73,8 @@ body:has(.ui-preview-bar) { --preview-h: 48px; }
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.15), transparent 30%, transparent 70%, rgba(36, 48, 74, 0.25)); }
 .gh > * { position: absolute; z-index: 2; }
 
-.gh-top { top: 8px; left: 8px; right: 8px; display: flex; gap: 6px; align-items: flex-start; }
+/* 上部バーはメニューのパネルを含むので、アバター・右側アイコン・セリフより手前に重ねる */
+.gh > .gh-top { top: 8px; left: 8px; right: 8px; display: flex; gap: 6px; align-items: flex-start; z-index: 20; }
 .gh-rank { display: grid; justify-items: center; width: 72px; padding: 4px 0 6px; text-decoration: none; color: #FFFFFF;
   background: radial-gradient(circle at 50% 30%, #6BC6FF, #1F6FD0); border: 3px solid #FFFFFF; border-radius: 16px; box-shadow: var(--shadow); }
 .gh-rank-label { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.1em; }
