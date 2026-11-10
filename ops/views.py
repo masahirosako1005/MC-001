@@ -8,6 +8,7 @@ from django.contrib.auth.views import LoginView
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Count, Q
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
@@ -22,7 +23,7 @@ from core.timeutil import SEASON_LABELS, SLOT_LABELS
 from rewards import stats as coupon_stats
 
 from . import analytics, charts
-from .forms import ManagerAccountForm, ManagerProfileForm
+from .forms import ManagerAccountForm, ManagerProfileForm, SignageForm
 
 FUNNEL = [("visitors", "付近に来た"), ("camera", "カメラ起動"), ("coord", "コーデ獲得")]
 
@@ -77,6 +78,27 @@ def dashboard(request):
     })
 
 
+# ---------------------------------------------------------------- 再訪率・アプリ利用率
+@operator_required
+@require_GET
+def engagement(request):
+    """再訪率 (異なる日にみっけ・クーポン利用) と、日ごとのアプリ利用率。"""
+    from . import engagement as eng
+
+    days = request.GET.get("days", str(eng.DEFAULT_DAYS))
+    days = int(days) if days in {str(d) for d, _ in eng.PERIODS} else eng.DEFAULT_DAYS
+    data = eng.summary(days)
+    return render(request, "ops/engagement.html", {
+        "data": data, "days": days, "periods": eng.PERIODS, "period_label": dict(eng.PERIODS)[days],
+        "bucket_chart": charts.grouped_vbar([{"label": b["label"], "users": b["users"]} for b in data["revisit"]["buckets"]],
+                                            [("users", "人数")], title="来た日数ごとの人数", unit="人"),
+        "monthly_chart": charts.rate_vbar(data["monthly"], key="rate", title="月ごとの再訪率", width=720),
+        "usage_chart": charts.daily_vbar(
+            data["usage"], key="rate", title="日ごとのアプリ利用率",
+            tip=lambda r: f"{r['label']}({r['weekday']}): {r['rate']}%({r['active']:,} / {r['registered']:,} 人)"),
+    })
+
+
 # ---------------------------------------------------------------- 店舗ごとのクーポン利用
 @operator_required
 @require_GET
@@ -93,6 +115,84 @@ def coupons(request):
                                           title="店舗ごとのクーポン使用枚数"),
         "chart_count": len(chart_rows),
     })
+
+
+# ---------------------------------------------------------------- まちのサイネージ
+@operator_required
+@require_GET
+def signage_list(request):
+    from signage.models import Signage
+
+    return render(request, "ops/signage_list.html", {"signs": Signage.objects.all()})
+
+
+@operator_required
+@require_http_methods(["GET", "POST"])
+def signage_edit(request, pk: int | None = None):
+    """サイネージの作成・編集。下に、いまのランキング 1 位で実際の見た目のプレビューを出す。"""
+    from signage import services as signage_services
+    from signage.models import Signage
+
+    signage = get_object_or_404(Signage, pk=pk) if pk else None
+    form = SignageForm(request.POST or None, instance=signage)
+    if request.method == "POST" and form.is_valid():
+        created = signage is None
+        saved = form.save(commit=False)
+        saved.updated_by = request.user
+        saved.save()
+        audit.record("signage.create" if created else "signage.update", request=request, target=saved,
+                     fields=sorted(form.changed_data))
+        messages.success(request, f"サイネージ「{saved.name}」を{'作成' if created else '保存'}しました。")
+        return redirect("ops:signage_edit", pk=saved.pk)
+    # 入力し直しのときは、form.instance に入力中の (正しく入力できた) 内容が入っているので、それでプレビューする
+    preview = form.instance
+    board = signage_services.board(preview, request.build_absolute_uri("/"), reverse("ops:signage_rank1_svg"))
+    board.pop("signage")  # テンプレートの signage は保存済みのもの (新規なら None)。プレビューは signage_preview
+    display_url = (request.build_absolute_uri(reverse("signage:display", args=[signage.display_key]))
+                   if signage else "")
+    return render(request, "ops/signage_form.html", {"form": form, "signage": signage, "display_url": display_url,
+                                                     **board, "signage_preview": preview})
+
+
+@operator_required
+@require_POST
+def signage_regenerate(request, pk: int):
+    """表示用の URL を作り直す (古い URL は表示されなくなる)。URL が漏れたときに使う。"""
+    from signage.models import Signage
+
+    signage = get_object_or_404(Signage, pk=pk)
+    signage.regenerate_key()
+    signage.updated_by = request.user
+    signage.save(update_fields=["display_key", "updated_by", "updated_at"])
+    audit.record("signage.regenerate_key", request=request, target=signage)
+    messages.success(request, "表示用の URL を作り直しました。サイネージの端末で新しい URL を開き直してください。")
+    return redirect("ops:signage_edit", pk=pk)
+
+
+@operator_required
+@require_POST
+def signage_delete(request, pk: int):
+    from signage.models import Signage
+
+    signage = get_object_or_404(Signage, pk=pk)
+    name = signage.name
+    audit.record("signage.delete", request=request, target=signage)
+    signage.delete()
+    messages.success(request, f"サイネージ「{name}」を削除しました。")
+    return redirect("ops:signage_list")
+
+
+@operator_required
+@require_GET
+def signage_rank1_svg(request):
+    """プレビュー用のランキング 1 位のアバター (運営者だけ)。"""
+    from contest.services import featured_contest, public_top, snapshot_svg
+    from core.http import svg_response
+
+    rows = public_top(featured_contest(), 1)
+    if not rows:
+        raise Http404
+    return svg_response(snapshot_svg(rows[0]["entry"].avatar, label="ランキング1位"), cache="private, no-cache")
 
 
 # ---------------------------------------------------------------- 運営者のアカウント

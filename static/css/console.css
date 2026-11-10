@@ -103,3 +103,6 @@ body.console .btn-primary, body.console .btn-primary:hover { color: var(--on-pri
 .store-info dt { font-weight: 700; color: var(--muted); }
 .store-info dd { margin: 0; }
 @media print { .console-header, .console-nav { display: none !important; } }
+/* サイネージのプレビュー (表示と同じ部品を小さく) */
+.signage-preview { max-width: 640px; }
+.signage-url { display: block; padding: 8px 10px; background: var(--surface-2); border-radius: 8px; overflow-wrap: anywhere; user-select: all; }

@@ -4,7 +4,10 @@
     {
       "name": "mikke",
       "runtimeExecutable": "C:\\AI-Sprint\\workspace\\MC-001\\.venv\\Scripts\\python.exe",
-      "runtimeArgs": ["scripts/devproxy.py", "run"],
+      "runtimeArgs": [
+        "scripts/serve.py",
+        "start"
+      ],
       "port": 8000,
       "autoPort": false,
       "url": "https://localhost:8000"

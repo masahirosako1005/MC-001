@@ -71,6 +71,10 @@ class Command(BaseCommand):
         if contest and opts["entries"] > 0:
             entered, votes = self._enter_and_vote(contest, group, opts["entries"])
             self.stdout.write(f"コンテスト「{contest.title}」: エントリー {entered} 人 / 投票 {votes} 回")
+        if created:
+            from django.core.management import call_command
+
+            call_command("link_item_symbols", stdout=self.stdout)  # 持たせたアイテムに「手に入れたシンボル」を付ける
         audit.record("demo.users_seeded", created=created, contest=contest.pk if contest else None)
         self.stdout.write(self.style.SUCCESS("完了"))
 

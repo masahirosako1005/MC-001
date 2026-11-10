@@ -11,4 +11,5 @@ urlpatterns = [
     path("<int:pk>/evaluate/", views.contest_evaluate, name="evaluate"),
     path("<int:pk>/ranking/", views.contest_ranking, name="ranking"),
     path("entries/<uuid:entry_id>.svg", views.entry_svg, name="entry_svg"),
+    path("top/<int:rank>.svg", views.top_svg, name="top_svg"),
 ]

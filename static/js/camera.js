@@ -20,7 +20,6 @@
   const btnStop = $("btn-stop");
   const btnCollect = $("btn-collect");
   const collectLabel = $("btn-collect-label");
-  const fileInput = $("file-input");
 
   const csrf = document.querySelector('meta[name="csrf-token"]').content;
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -33,7 +32,6 @@
   const dateFmt = new Intl.DateTimeFormat("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
   let stream = null;
-  let still = null;
   let rafId = 0;
   let lastScanAt = 0;
   let dpr = 1;
@@ -83,7 +81,7 @@
     return [src.naturalWidth || src.width, src.naturalHeight || src.height];
   }
 
-  // 写真モードは全体が見えるよう contain、カメラは画面いっぱいに cover
+  // カメラの映像は画面いっぱいに表示する (cover)
   function fitRect(sw, sh, cw, ch, cover) {
     const s = cover ? Math.max(cw / sw, ch / sh) : Math.min(cw / sw, ch / sh);
     return { s, dx: (cw - sw * s) / 2, dy: (ch - sh * s) / 2 };
@@ -91,18 +89,16 @@
 
   function frame(ts) {
     rafId = requestAnimationFrame(frame);
-    const src = still || (video.readyState >= 2 ? video : null);
+    const src = video.readyState >= 2 ? video : null;
     if (!src) return;
     resizeCanvas();
     const [sw, sh] = sourceSize(src);
     if (!sw || !sh) return;
-    const fit = fitRect(sw, sh, canvas.width, canvas.height, !still);
+    const fit = fitRect(sw, sh, canvas.width, canvas.height, true);
     ctx.fillStyle = "#101820";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(src, fit.dx, fit.dy, sw * fit.s, sh * fit.s);
-    if (still) {
-      if (target && target.fit !== fit.s) relocateStill(fit);
-    } else if (ts - lastScanAt > (imageRefs.length ? SCAN_INTERVAL_MS + 60 : SCAN_INTERVAL_MS)) {
+    if (ts - lastScanAt > (imageRefs.length ? SCAN_INTERVAL_MS + 60 : SCAN_INTERVAL_MS)) {
       lastScanAt = ts;
       if (!detect(src, sw, sh, fit, 640, "dontInvert")) {
         detectImage(src, sw, sh, fit, IMAGE_SCAN_EDGES[imageTick++ % IMAGE_SCAN_EDGES.length]);
@@ -155,7 +151,7 @@
     const frameF = window.MikkeImage.frameFeatures(window.MikkeImage.rasterize(src, w, h), maxEdge > 700 ? 600 : 420);
     // 追跡中のシンボルは全角度を優先し、それ以外は数件ずつ順番に照合する
     const candidates = target && target.imageId ? imageRefs.filter((r) => r.id === target.imageId) : [];
-    const n = Math.min(imageRefs.length, still ? imageRefs.length : IMAGE_CANDIDATES_PER_TICK);
+    const n = Math.min(imageRefs.length, IMAGE_CANDIDATES_PER_TICK);
     for (let i = 0; i < n; i++) {
       const r = imageRefs[(imageRR + i) % imageRefs.length];
       if (!candidates.includes(r)) candidates.push(r);
@@ -176,11 +172,6 @@
 
   const toDisplay = (raw, fit) => raw.map((p) => ({ x: p.x * fit.s + fit.dx, y: p.y * fit.s + fit.dy }));
 
-  function relocateStill(fit) {
-    target.pts = toDisplay(target.raw, fit);
-    target.fit = fit.s;
-  }
-
   function onDetected(payload, raw, fit, extra = null) {
     const now = performance.now();
     const pts = toDisplay(raw, fit);
@@ -197,7 +188,7 @@
   }
 
   function updateLost(ts) {
-    if (!target || still || busy) return;
+    if (!target || busy) return;
     if (ts - target.lastSeen > LOST_CLEAR_MS) {
       clearTarget();
       setStatus("シンボルをさがしています…");
@@ -229,8 +220,8 @@
     const edge = (Math.hypot(p[1].x - p[0].x, p[1].y - p[0].y) + Math.hypot(p[3].x - p[0].x, p[3].y - p[0].y)) / 2;
     const r = Math.max(34 * dpr, Math.min(edge * 0.42, 130 * dpr));
     const t = reduceMotion ? 0 : ts / 1000;
-    const age = still ? 0 : ts - target.lastSeen;
-    const alpha = still ? 1 : Math.max(0.25, 1 - Math.max(0, age - LOST_FADE_MS / 2) / LOST_FADE_MS);
+    const age = ts - target.lastSeen;
+    const alpha = Math.max(0.25, 1 - Math.max(0, age - LOST_FADE_MS / 2) / LOST_FADE_MS);
     const y = cy - r * 0.15 + Math.sin(t * 2.4) * 6 * dpr;
 
     ctx.save();
@@ -342,7 +333,7 @@
     if (!res.ok) {
       t.state = "unknown";
       setStatus(res.data.message || "このコードはみっけシンボルではないようです。");
-      if (t.imageId) setTimeout(() => { if (target === t && !still) clearTarget(); }, 1500);
+      if (t.imageId) setTimeout(() => { if (target === t) clearTarget(); }, 1500);
       return;
     }
     t.info = res.data;
@@ -436,14 +427,13 @@
   // ---------- 結果の表示は reward_dialog.js / finders.js ----------
   // 「これをみっけに行く」: カメラ中なら止めて地図 (①さがす) にもどる
   document.addEventListener("mikke:go-map", () => {
-    if (stream || still) stopCamera(true);
+    if (stream) stopCamera(true);
     else showCameraView(false);
   });
 
   // ---------- 近くにシンボルがあるときだけカメラを使える ----------
   // ①現在地の取得 → ②シンボル検索 は nearby.js が行い、その結果でボタンを切り替える。
   const skipEl = $("gps-skip"); // 管理者のテスト用
-  const fileLabel = $("file-label");
   const findView = $("mikke-find");
   const cameraView = $("mikke-camera");
   const PASS_MS = 3 * 60 * 1000; // 確認から 3 分以内なら、もう一度は調べない
@@ -463,8 +453,6 @@
   function setReady() {
     const ok = (nearbyOk || (skipEl && skipEl.checked)) && !searching;
     btnStart.disabled = !ok;
-    fileInput.disabled = !ok;
-    fileLabel.classList.toggle("is-disabled", !ok);
     if (reasonEl) {
       reasonEl.textContent = ok ? "" : startReason();
       reasonEl.hidden = ok;
@@ -505,13 +493,13 @@
     }
   }
 
-  // 分析用: カメラ (写真読み取り) を起動したことだけを送る。失敗しても探索は続ける
+  // 分析用: カメラを起動したことだけを送る。失敗しても探索は続ける
   function notifyCameraStart() {
     if (!root.dataset.cameraStartUrl) return;
     post(root.dataset.cameraStartUrl, {}).catch(() => {});
   }
 
-  // ---------- カメラ / 写真 ----------
+  // ---------- カメラ ----------
   async function startCamera() {
     if (typeof window.jsQR !== "function") {
       setStatus("読み取り機能を読み込めませんでした。ページを再読み込みしてください。");
@@ -522,7 +510,7 @@
     setReady();
     if (!ok) return; // 理由 (「ここにはなさそう・・・」など) は地図の上に出ている
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      $("nearby-status").textContent = "このブラウザではカメラを使えません。「写真から読み取る」をお使いください。";
+      $("nearby-status").textContent = "このブラウザではカメラを使えません。カメラが使えるブラウザ(Chrome・Safari など)でお試しください。";
       return;
     }
     btnStart.disabled = true;
@@ -537,16 +525,15 @@
     } catch (e) {
       const messages = {
         NotAllowedError: "カメラの利用が許可されていません。ブラウザの設定でカメラを許可してから、もう一度お試しください。",
-        NotFoundError: "カメラが見つかりません。「写真から読み取る」をお使いください。",
+        NotFoundError: "カメラが見つかりません。カメラのある端末でお試しください。",
         NotReadableError: "ほかのアプリがカメラを使用中のようです。そのアプリを閉じてからお試しください。",
       };
-      // 地図にもどして、「写真から読み取る」の近くに理由を出す
+      // 地図にもどして、理由を出す
       showCameraView(false);
-      $("nearby-status").textContent = messages[e.name] || "カメラを起動できませんでした。「写真から読み取る」をお使いください。";
+      $("nearby-status").textContent = messages[e.name] || "カメラを起動できませんでした。ページを読み込み直して、もう一度お試しください。";
       setReady();
       return;
     }
-    still = null;
     clearTarget();
     video.srcObject = stream;
     try { await video.play(); } catch (_) { /* 自動再生制限: ユーザー操作起点なので通常は成功 */ }
@@ -556,13 +543,12 @@
     if (!rafId) rafId = requestAnimationFrame(frame);
   }
 
-  /** カメラを止める。backToMap なら写真モードも終えて地図 (①さがす) にもどる。 */
+  /** カメラを止める。backToMap なら地図 (①さがす) にもどる。 */
   function stopCamera(backToMap = true) {
     if (stream) stream.getTracks().forEach((t) => t.stop());
     stream = null;
     video.srcObject = null;
     if (backToMap) {
-      still = null;
       cancelAnimationFrame(rafId);
       rafId = 0;
       clearTarget();
@@ -571,48 +557,9 @@
     }
   }
 
-  function loadStill(file) {
-    if (file.size > 15 * 1024 * 1024) {
-      setStatus("画像が大きすぎます(15MBまで)。");
-      return;
-    }
-    stopCamera(false);
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = async () => {
-      still = img;
-      showCameraView(true);
-      clearTarget();
-      resizeCanvas();
-      setStatus("写真からシンボルをさがしています…");
-      if (!rafId) rafId = requestAnimationFrame(frame);
-      const [sw, sh] = sourceSize(img);
-      const fit = fitRect(sw, sh, canvas.width, canvas.height, false);
-      let found = detect(img, sw, sh, fit, 1400, "attemptBoth");
-      if (!found) {
-        await ensureImageRefs();
-        for (const edge of IMAGE_SCAN_EDGES) {
-          if (found || still !== img) break;
-          found = detectImage(img, sw, sh, fit, edge);
-        }
-      }
-      if (!found && still === img) setStatus("シンボルが見つかりませんでした。シンボル全体が明るく写った写真を選んでください。");
-    };
-    img.onerror = () => setStatus("画像を読み込めませんでした。別の画像をお試しください。");
-    img.src = url;
-  }
-
   btnStart.addEventListener("click", startCamera);
   btnStop.addEventListener("click", () => stopCamera(true));
   btnCollect.addEventListener("click", collect);
-  fileInput.addEventListener("change", async () => {
-    const f = fileInput.files && fileInput.files[0];
-    fileInput.value = "";
-    if (!f) return;
-    if (!(await gpsGate())) return; // 理由は地図の上に出ている
-    notifyCameraStart();
-    loadStill(f);
-  });
   canvas.addEventListener("pointerdown", (ev) => {
     if (!markHit) return;
     const rect = canvas.getBoundingClientRect();

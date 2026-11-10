@@ -99,3 +99,16 @@ def entry_svg(request, entry_id):
     entry = get_object_or_404(ContestEntry, pk=entry_id, contest__is_active=True)
     # スナップショットなので変わらない
     return svg_response(services.snapshot_svg(entry.avatar), cache="private, max-age=3600")
+
+
+@require_GET
+def top_svg(request, rank: int):
+    """ログイン画面に出すランキング上位のアバター (ログイン不要。順位でしか取れず、エントリーの ID は出さない)。"""
+    from django.http import Http404
+
+    rows = services.public_top(services.featured_contest(), 3)
+    if not 1 <= rank <= len(rows):
+        raise Http404
+    row = rows[rank - 1]
+    return svg_response(services.snapshot_svg(row["entry"].avatar, label=f"ランキング{rank}位 {row['label']}"),
+                        cache="public, max-age=300")

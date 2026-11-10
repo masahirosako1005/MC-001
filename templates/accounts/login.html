@@ -1,6 +1,40 @@
-{% extends "base.html" %}
+{% extends "base.html" %}{% load static %}
 {% block title %}ログイン{% endblock %}
 {% block content %}
+{% if showcase or ranking %}
+{# いま、まちで手に入るコーデとコンテストのランキング上位を、右から左へ流して見せる (Ctrl なしで止められる「一時停止」付き) #}
+<section class="login-marquee" aria-labelledby="marquee-h">
+  <div class="marquee-head">
+    <h2 id="marquee-h">いま、まちで手に入るコーデ{% if ranking %}・ランキング{% endif %}</h2>
+    <button type="button" class="btn btn-ghost btn-small marquee-toggle" id="marquee-toggle" aria-pressed="false" hidden>一時停止</button>
+  </div>
+  <p class="muted">{{ mikke_season_label }}の{{ mikke_slot_label }}だけ、シンボルをみっけするともらえるかも。{% if ranking_contest and ranking %}「{{ ranking_contest.title }}」の上位のコーデも。{% endif %}</p>
+  <div class="marquee" id="marquee">
+    <div class="marquee-inner">
+      {% for copy in "1234" %}
+      <ul class="marquee-track"{% if not forloop.first %} aria-hidden="true"{% endif %}>
+        {% for c in showcase %}
+        <li class="coord-card">
+          <img src="{% url 'core:showcase_svg' c.n %}" alt="{% if forloop.parentloop.first %}「{{ c.name }}」を着たコーデの見本{% endif %}" width="120" height="180" loading="lazy">
+          <span class="badge coord-badge">{{ c.label }}</span>
+          <strong class="coord-name">{{ c.name }}</strong>
+          <span class="coord-spot"><span aria-hidden="true">📍</span>{% if forloop.parentloop.first %}<span class="visually-hidden">手に入るスポット:</span>{% endif %}{{ c.spot }}</span>
+        </li>
+        {% endfor %}
+        {% for r in ranking %}
+        <li class="coord-card rank-card rank-{{ r.rank }}">
+          <img src="{% url 'contest:top_svg' r.rank %}" alt="{% if forloop.parentloop.first %}ランキング{{ r.rank }}位のアバター{% endif %}" width="120" height="180" loading="lazy">
+          <span class="badge rank-badge"><span aria-hidden="true">{% if r.rank == 1 %}🥇{% elif r.rank == 2 %}🥈{% else %}🥉{% endif %}</span> ランキング{{ r.rank }}位</span>
+          <strong class="coord-name">{{ r.label }}</strong>
+          <span class="coord-spot"><span aria-hidden="true">♥</span>{% if forloop.parentloop.first %}<span class="visually-hidden">高評価</span>{% endif %} {{ r.likes }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
 <section class="narrow">
   <h1>ログイン</h1>
   <form method="post" novalidate class="form">
@@ -14,3 +48,4 @@
   <p class="center">はじめての方は <a href="{% url 'accounts:signup' %}">アカウントをつくる</a></p>
 </section>
 {% endblock %}
+{% block scripts %}<script src="{% static 'js/marquee.js' %}" defer></script>{% endblock %}

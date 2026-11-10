@@ -1,0 +1,61 @@
+{% extends "console/base.html" %}{% load mikke_format %}
+{% block title %}再訪率・アプリ利用率{% endblock %}
+{% block body_class %}page-ops{% endblock %}
+{% block content %}
+<h1>再訪率・アプリ利用率</h1>
+<p class="muted"><strong>再訪率</strong> = 期間の中で 2 日以上来た人 ÷ 1 日以上来た人 × 100。「来た日」は<strong>みっけした日</strong>か<strong>クーポンを使った日</strong>(同じ日に何回でも 1 日)。ログインしただけの日は数えません。
+  <strong>アプリ利用率</strong> = その日にアプリを使った利用者 ÷ その日までに登録していた利用者(ログインしただけの日も数えます)。管理者・サイト運営者・停止中の人は数えません。</p>
+
+<form method="get" class="filter-bar" aria-label="再訪率の期間">
+  <label>再訪率の期間 <select name="days">{% for d, label in periods %}<option value="{{ d }}"{% if days == d %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+  <button type="submit" class="btn btn-primary btn-small">表示</button>
+</form>
+
+<section aria-labelledby="kpi-h">
+  <h2 id="kpi-h" class="visually-hidden">主な数値</h2>
+  <ul class="kpi-row">
+    <li class="kpi kpi-hero"><span class="kpi-label">再訪率({{ period_label }})</span><span class="kpi-value">{% if data.revisit.rate is not None %}{{ data.revisit.rate }}<small>%</small>{% else %}—{% endif %}</span>
+      <span class="kpi-sub">{{ data.revisit.revisitors|num }} / {{ data.revisit.visitors|num }} 人</span></li>
+    <li class="kpi"><span class="kpi-label">再訪率(直近 1 年)</span><span class="kpi-value">{% if data.year.rate is not None %}{{ data.year.rate }}<small>%</small>{% else %}—{% endif %}</span>
+      <span class="kpi-sub">{{ data.year.revisitors|num }} / {{ data.year.visitors|num }} 人</span></li>
+    <li class="kpi"><span class="kpi-label">アプリ利用率(今日)</span><span class="kpi-value">{% if data.usage_today.rate is not None %}{{ data.usage_today.rate }}<small>%</small>{% else %}—{% endif %}</span>
+      <span class="kpi-sub">{{ data.usage_today.active|num }} / {{ data.usage_today.registered|num }} 人</span></li>
+    <li class="kpi"><span class="kpi-label">アプリ利用率(30 日の平均)</span><span class="kpi-value">{% if data.usage_avg is not None %}{{ data.usage_avg }}<small>%</small>{% else %}—{% endif %}</span>
+      <span class="kpi-sub">日ごとの利用率の平均</span></li>
+  </ul>
+</section>
+
+<section class="chart-card" aria-labelledby="usage-h">
+  <h2 id="usage-h">日ごとのアプリ利用率(直近 30 日)</h2>
+  {{ usage_chart }}
+  <p class="help">棒にマウスを乗せると、その日の利用者数と登録者数が出ます。</p>
+  <details><summary>表で見る</summary>
+    <div class="table-wrap"><table class="table num-table"><caption class="visually-hidden">日ごとのアプリ利用率</caption>
+      <thead><tr><th scope="col">日付</th><th scope="col">使った人</th><th scope="col">登録者</th><th scope="col">利用率</th></tr></thead>
+      <tbody>{% for r in data.usage reversed %}<tr><th scope="row">{{ r.date|date:"n/j" }}({{ r.weekday }})</th><td>{{ r.active|num }}</td><td>{{ r.registered|num }}</td><td>{% if r.rate is not None %}{{ r.rate }}%{% else %}—{% endif %}</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </details>
+</section>
+
+<section class="chart-card" aria-labelledby="monthly-h">
+  <h2 id="monthly-h">月ごとの再訪率(その月の中で 2 日以上来た人)</h2>
+  {{ monthly_chart }}
+  <details><summary>表で見る</summary>
+    <div class="table-wrap"><table class="table num-table"><caption class="visually-hidden">月ごとの再訪率</caption>
+      <thead><tr><th scope="col">月</th><th scope="col">来た人</th><th scope="col">再訪した人</th><th scope="col">再訪率</th></tr></thead>
+      <tbody>{% for m in data.monthly %}<tr><th scope="row">{{ m.label }}</th><td>{{ m.visitors|num }}</td><td>{{ m.revisitors|num }}</td><td>{% if m.rate is not None %}{{ m.rate }}%{% else %}—{% endif %}</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </details>
+</section>
+
+<section class="chart-card" aria-labelledby="bucket-h">
+  <h2 id="bucket-h">来た日数ごとの人数({{ period_label }})</h2>
+  <div class="chart-pair">
+    <div>{{ bucket_chart }}</div>
+    <table class="table num-table"><caption class="visually-hidden">来た日数ごとの人数</caption>
+      <thead><tr><th scope="col">来た日数</th><th scope="col">人数</th><th scope="col">割合</th></tr></thead>
+      <tbody>{% for b in data.revisit.buckets %}<tr><th scope="row">{{ b.label }}</th><td>{{ b.users|num }}</td><td>{% if b.share is not None %}{{ b.share }}%{% else %}—{% endif %}</td></tr>{% endfor %}</tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

@@ -22,6 +22,8 @@ htmlcov/
 *.log
 
 # --- 生成物 ---
+# ローカル HTTPS の証明書の書き出し先 (scripts/devproxy.py。PC ごとに違う)
+/certs/
 /symbols_out/
 /sbom.json
 

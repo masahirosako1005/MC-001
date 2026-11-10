@@ -27,26 +27,23 @@ class VersionConflict(EquipError):
     pass
 
 
-def can_use_any_item(user) -> bool:
-    """持っていないパーツや別の体のタイプのパーツも選べるか。
-
-    以前はサイト運営者がきせかえ画面で全パーツを試せたが、運営者は利用者の画面を開けなくなったため、
-    利用者の画面では常に False (パーツの確認は運営の画面の「アイテム一覧」で行う)。
-    """
-    return False
-
-
 def to_part(item: Item | None) -> Part | None:
     if item is None:
         return None
     return Part(category=item.category, style=item.style, color=item.color, name=item.name)
 
 
-def grant_item(user, item: Item) -> tuple[UserItem, bool]:
-    """アイテムを付与する。既に持っていれば入手回数を加算。戻り値の bool は新規入手か。"""
-    ui, created = UserItem.objects.get_or_create(user=user, item=item)
+def grant_item(user, item: Item, symbol=None) -> tuple[UserItem, bool]:
+    """アイテムを付与する。既に持っていれば入手回数を加算。戻り値の bool は新規入手か。
+
+    symbol: みっけで手に入れたときのシンボル。初めて手に入れたシンボルを UserItem.found_symbol に残す。
+    """
+    ui, created = UserItem.objects.get_or_create(user=user, item=item, defaults={"found_symbol": symbol})
     if not created:
-        UserItem.objects.filter(pk=ui.pk).update(obtained_count=F("obtained_count") + 1)
+        changes = {"obtained_count": F("obtained_count") + 1}
+        if symbol is not None and ui.found_symbol_id is None:
+            changes["found_symbol"] = symbol
+        UserItem.objects.filter(pk=ui.pk).update(**changes)
         ui.refresh_from_db()
     return ui, created
 
@@ -96,20 +93,17 @@ def get_config(user) -> AvatarConfig:
 
 
 def selectable_items(user):
-    """着せ替え画面に出すアイテム。管理者は全アイテム、それ以外は所持品のみ。"""
-    qs = Item.objects.filter(is_active=True)
-    if not can_use_any_item(user):
-        qs = qs.filter(owners__user=user)
-    return qs.order_by("category", "rarity", "code")
+    """着せ替えで選べるアイテム (持っているもの)。"""
+    return Item.objects.filter(is_active=True, owners__user=user).order_by("category", "rarity", "code")
 
 
 @transaction.atomic
 def equip(user, *, expected_version: int, skin_tone: str, selections: dict[str, int | None],
           body_type: str | None = None, eye_color: str | None = None) -> AvatarConfig:
     """着せ替えを保存する。サーバー側で次を検証する:
-    - 持っていないアイテムは着られない (管理者を除く)
+    - 持っていないアイテムは着られない
     - 部位が違うアイテムは着られない
-    - 体のタイプに合わないアイテムは着られない (管理者を除く)
+    - 体のタイプに合わないアイテムは着られない
     """
     config = AvatarConfig.objects.select_for_update().get(user=user)
     if config.version != expected_version:
@@ -118,7 +112,6 @@ def equip(user, *, expected_version: int, skin_tone: str, selections: dict[str, 
     eye_color = eye_color or config.eye_color
     if body_type not in BODY_TYPES or eye_color not in EYE_COLORS or skin_tone not in SKIN_TONES:
         raise EquipError("選択内容が正しくありません。")
-    free = can_use_any_item(user)
     ids = [v for v in selections.values() if v]
     usable = {i.pk: i for i in selectable_items(user).filter(pk__in=ids)}
     for cat in CATEGORIES:
@@ -131,7 +124,7 @@ def equip(user, *, expected_version: int, skin_tone: str, selections: dict[str, 
             raise EquipError("持っていないアイテムは身につけられません。")
         if item.category != cat:
             raise EquipError("アイテムの部位が正しくありません。")
-        if not free and not item.fits(body_type):
+        if not item.fits(body_type):
             raise EquipError(f"「{item.name}」は{'女の子' if item.body_type == 'girl' else '男の子'}用のアイテムです。")
         setattr(config, cat, item)
     config.skin_tone = skin_tone

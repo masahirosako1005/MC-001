@@ -22,7 +22,7 @@
     </ol>
     <p id="nearby-status" class="gps-gate" role="status" aria-live="polite">現在地のまわり {{ radius_m }}m にシンボルがあるか調べます。</p>
 
-    <div id="spot-map" class="spot-map" role="application" aria-label="スポットの地図(京橋付近)"
+    <div id="spot-map" class="spot-map" role="application" aria-label="シンボルの地図(京橋付近)"
          data-tiles="{{ map_tiles_url }}" data-secret-img="{% static 'img/secret.svg' %}"></div>
 
     <div class="mikke-actions">
@@ -32,10 +32,6 @@
         {# 押せないときは、その理由をボタンの中に書く #}
         <small id="btn-start-reason" class="btn-reason">近くにシンボルが見つかると押せます</small>
       </button>
-      <label class="btn btn-ghost file-btn is-disabled" id="file-label">
-        <span aria-hidden="true">🖼️</span> 写真から読み取る
-        <input type="file" id="file-input" accept="image/*" class="visually-hidden" disabled>
-      </label>
       {% if user.can_manage_spots %}
       <label class="toggle"><input type="checkbox" id="gps-skip"> 位置の確認を省略する(管理者・運営のテスト用)</label>
       {% endif %}
@@ -72,11 +68,18 @@
     <div id="reward-main">
       <h2 id="reward-title">みっけ!</h2>
       <p id="reward-spot" class="muted"></p>
-      <div id="reward-art" class="reward-art" hidden>
-        <img id="reward-img" alt="" width="150" height="202">
-        <img id="reward-zoom" class="reward-zoom" alt="" width="84" height="84" hidden>
-        <span id="reward-new" class="reward-new" hidden>NEW</span>
-        <span id="reward-rarity" class="reward-rarity" aria-hidden="true"></span>
+      <div id="reward-hero" class="reward-hero">
+        <div id="reward-art" class="reward-art" hidden>
+          <img id="reward-img" alt="" width="150" height="202">
+          <img id="reward-zoom" class="reward-zoom" alt="" width="84" height="84" hidden>
+          <span id="reward-new" class="reward-new" hidden>NEW</span>
+          <span id="reward-rarity" class="reward-rarity" aria-hidden="true"></span>
+        </div>
+        {# レア度の右: 同じアイテムを直近 (7 日以内) に手に入れた人 3 人 (表示を ON にしている人だけ)。押すとその人のコーデ #}
+        <section id="reward-also" class="reward-also" aria-labelledby="reward-also-h" hidden>
+          <h3 id="reward-also-h" class="reward-also-title">こんな人も<br>獲得しているよ</h3>
+          <ul id="reward-also-list" class="reward-also-list"></ul>
+        </section>
       </div>
       <p id="reward-text" class="reward-text"></p>
       <p id="reward-extra" class="help"></p>
@@ -111,7 +114,7 @@
     </div>
   </div>
 </dialog>
-{{ spot_points|json_script:"spot-data" }}
+{{ symbol_points|json_script:"symbol-data" }}
 {{ map_config|json_script:"map-config" }}
 {% endblock %}
 {% block scripts %}

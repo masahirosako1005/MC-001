@@ -124,3 +124,18 @@ def home(request):
         "contest_entered": bool(open_contest and ContestEntry.objects.filter(contest=open_contest, user=user).exists()),
         "photos": PHOTOS,
     })
+
+
+@require_GET
+def showcase_svg(request, n: int):
+    """ログイン画面の「いまだけ手に入るコーデ」の見本のアバター (ログイン不要。番号でしか取れない)。"""
+    from django.http import Http404
+
+    from core.http import svg_response
+
+    from .showcase import showcase_svg as render_showcase
+
+    svg = render_showcase(local_now(), n)
+    if svg is None:
+        raise Http404
+    return svg_response(svg, cache="public, max-age=300")

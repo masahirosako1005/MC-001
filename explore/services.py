@@ -526,7 +526,7 @@ def collect(user, ticket: str, idempotency_key: str, coords: tuple[float, float]
             # 衣装全振り: ドロップが未設定・条件外でも「何もなし」にはせず、ふだん用のコーデを 1 つ渡す
             item = fallback_outfit(user)
         if item is not None:
-            _, is_new = grant_item(user, item)
+            _, is_new = grant_item(user, item, symbol=symbol)
             result.reward_kind, result.label, result.is_new = "item", item.name, is_new
             result.item = {"code": item.code, "name": item.name, "category": item.get_category_display(),
                            "slot": item.category, "rarity": item.rarity, "new": is_new}

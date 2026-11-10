@@ -118,7 +118,10 @@ class FinderProfileTests(FinderBase):
         self.assertNotIn("森の社", items["top-x"]["obtained"])
         self.assertNotIn(":", items["hair-x"]["obtained"])  # 時刻は出さない
         # 「これをみっけに行く」用のスポット情報 (シークレット由来は伏せる)
-        self.assertEqual(items["hair-x"]["spot"], {"id": self.spot.pk, "name": "森の社", "lat": 34.69, "lng": 135.53})
+        spot = dict(items["hair-x"]["spot"])
+        target = spot.pop("symbol")  # 「これをみっけに行く」の目印 (手に入れたシンボル)
+        self.assertEqual(spot, {"id": self.spot.pk, "name": "森の社", "lat": 34.69, "lng": 135.53})
+        self.assertEqual(target["name"], "灯籠")
         self.assertIsNone(items["top-x"]["spot"])
         for url in (data["avatar"], items["hair-x"]["image"]):
             r = self.client.get(url)

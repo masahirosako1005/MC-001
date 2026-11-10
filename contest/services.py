@@ -180,6 +180,33 @@ def ranking(contest: Contest, limit: int = 50) -> list[ContestEntry]:
                 .order_by("-likes", "created_at")[:limit])
 
 
+def featured_contest(now=None) -> Contest | None:
+    """ログイン画面・サイネージに出すコンテスト: 開催中のもの (新しい順)、なければ直近に終わったもの。"""
+    now = now or timezone.now()
+    live = Contest.objects.filter(is_active=True, starts_at__lte=now, ends_at__gt=now).order_by("-starts_at").first()
+    if live is not None:
+        return live
+    return Contest.objects.filter(is_active=True, ends_at__lte=now).order_by("-ends_at").first()
+
+
+def public_top(contest: Contest | None, n: int = 3) -> list[dict]:
+    """ログイン前の画面やまちのサイネージに出すランキング上位 (BOT を除く)。
+
+    名前を出すのは「みっけ仲間に表示する」を ON にしている人だけ (コンテストの表示名)。
+    OFF の人は「1位のコーデ」のようにアバターだけを出す。順位はそのまま。
+    """
+    if contest is None:
+        return []
+    rows = []
+    entries = (ContestEntry.objects.filter(contest=contest, is_bot=False).select_related("user")
+               .order_by("-likes", "created_at")[:n])
+    for rank, e in enumerate(entries, start=1):
+        public = bool(e.user and e.user.share_activity and e.user.is_active)
+        rows.append({"rank": rank, "entry": e, "likes": e.likes, "name": e.display_name if public else "",
+                     "label": e.display_name if public else f"{rank}位のコーデ"})
+    return rows
+
+
 def rank_of(contest: Contest, entry: ContestEntry) -> int:
     """ランキングでの順位 (高評価が多い順、同数なら先にエントリーした順)。"""
     ahead = Q(likes__gt=entry.likes) | Q(likes=entry.likes, created_at__lt=entry.created_at)

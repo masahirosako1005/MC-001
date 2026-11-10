@@ -30,7 +30,10 @@ def _nice_max(v: float) -> float:
     return 10 * exp
 
 
-def _ticks(vmax: float, n: int = 4) -> list[float]:
+def _ticks(vmax: float, n: int | None = None) -> list[float]:
+    """目盛り。n を省くと、きりのよい間隔になる数 (4 か 5) を選ぶ (例: 50 → 0,10,…,50。12.5 刻みにしない)。"""
+    if n is None:
+        n = next((k for k in (4, 5) if (vmax / k) == int(vmax / k)), 4) if vmax >= 4 else 4
     step = vmax / n
     return [step * i for i in range(n + 1)]
 
@@ -149,6 +152,47 @@ def rate_vbar(rows: list[dict], *, key: str, title: str, width: int = 360, heigh
         else:
             parts.append(f'<text class="chart-tick" x="{cx:.1f}" y="{top + plot_h - 4}" text-anchor="middle">—</text>')
         parts.append(f'<text class="chart-label" x="{cx:.1f}" y="{height - 8}" text-anchor="middle">{_esc(r["label"])}</text>')
+    parts.append(f'<line class="chart-axis" x1="{left}" y1="{top + plot_h}" x2="{width - right}" y2="{top + plot_h}"/>')
+    parts.append("</svg>")
+    return mark_safe("".join(parts))
+
+
+def daily_vbar(rows: list[dict], *, key: str, title: str, unit: str = "%", width: int = 720, height: int = 220,
+               label_every: int = 5, tip=None) -> str:
+    """日ごとの細い棒グラフ (30 本ほど)。日付は label_every 本ごと、値はマウスを乗せると出る (表でも確認できる)。
+
+    tip: 行から <title> の文を作る関数 (省略時は「ラベル: 値」)。
+    """
+    left, right, top, bottom = 44, 8, 12, 28
+    plot_w, plot_h = width - left - right, height - top - bottom
+    n = max(len(rows), 1)
+    slot_w = plot_w / n
+    bar_w = max(2.0, min(14.0, slot_w - 2))  # 隣の棒とのあいだに 2px のすき間
+    values = [r[key] for r in rows if r[key] is not None]
+    vmax = _nice_max(max(values) if values else 0)
+    if unit == "%":
+        vmax = min(100, vmax) if vmax <= 100 else vmax
+    parts = [f'<svg class="chart" viewBox="0 0 {width} {height}" width="100%" role="img" '
+             f'aria-label="{_esc(title)}" xmlns="http://www.w3.org/2000/svg">']
+    for t in _ticks(vmax):
+        y = top + plot_h - plot_h * t / vmax
+        parts.append(f'<line class="chart-grid" x1="{left}" y1="{y:.1f}" x2="{width - right}" y2="{y:.1f}"/>')
+        parts.append(f'<text class="chart-tick" x="{left - 6}" y="{y + 4:.1f}" text-anchor="end">{_fmt(t, unit)}</text>')
+    for i, r in enumerate(rows):
+        v = r[key]
+        cx = left + i * slot_w + slot_w / 2
+        if v:
+            h = plot_h * v / vmax
+            x, y = cx - bar_w / 2, top + plot_h - h
+            rr = min(4, h / 2, bar_w / 2)
+            path = (f"M{x:.1f},{top + plot_h} V{y + rr:.1f} Q{x:.1f},{y:.1f} {x + rr:.1f},{y:.1f} "
+                    f"H{x + bar_w - rr:.1f} Q{x + bar_w:.1f},{y:.1f} {x + bar_w:.1f},{y + rr:.1f} "
+                    f"V{top + plot_h} Z")
+            text = tip(r) if tip else f"{r['label']}: {_fmt(v, unit)}"
+            parts.append(f'<path class="chart-bar series-1" d="{path}"><title>{_esc(text)}</title></path>')
+        if i % label_every == 0 or i == len(rows) - 1:
+            parts.append(f'<text class="chart-label" x="{cx:.1f}" y="{height - 8}" text-anchor="middle">'
+                         f'{_esc(r["label"])}</text>')
     parts.append(f'<line class="chart-axis" x1="{left}" y1="{top + plot_h}" x2="{width - right}" y2="{top + plot_h}"/>')
     parts.append("</svg>")
     return mark_safe("".join(parts))

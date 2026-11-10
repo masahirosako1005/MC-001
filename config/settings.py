@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     "maps",
     "contest",
     "ops",
+    "signage",
 ]
 
 MIDDLEWARE = [
@@ -73,6 +74,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "core.middleware.RoleAreaMiddleware",
+    "core.middleware.ActivityMiddleware",
     "core.middleware.ForcePasswordChangeMiddleware",
     "core.middleware.UiThemeMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -168,6 +170,14 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
+# DEBUG でないとき (nginx 経由・本番) は、静的ファイルの名前に内容のハッシュを付ける (例: mikke.3f2a1c9b8e7d.css)。
+# nginx は静的ファイルをブラウザに 7 日キャッシュさせるので、名前を変えないと更新した CSS・JS が届かないため。
+# collectstatic (scripts/devproxy.py run が実行する) で名前付きのファイルと対応表 (staticfiles.json) を作る
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage" if DEBUG
+                    else "django.contrib.staticfiles.storage.ManifestStaticFilesStorage"},
+}
 
 # キャッシュ (レート制限・ログインロック・みっけ仲間の表示 ID に使う)。
 # 既定のメモリキャッシュは 1 プロセス内だけで有効。複数プロセス / 複数台で動かすときは

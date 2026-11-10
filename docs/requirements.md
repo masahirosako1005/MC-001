@@ -72,7 +72,7 @@
 | R7 | `rewards/services.issue_coupon`、DropEntry.coupon、`rewards/views` | `test_coupon_drop`、`rewards/tests/test_rewards.py` | ✅ |
 | R8 | `rewards/models.Achievement`、`services.evaluate_achievements` | `test_achievement_unlocked_once` | ✅ |
 | R9 | `core/crypto.py`、`core/fields.py`、`scripts/localdb.py`(TLS/SCRAM)、settings のセキュリティ設定 | `core/tests/test_core.py`(暗号文で保存・改ざん検知・AAD・鍵ローテーション・ヘッダー)、`accounts/tests/test_accounts.py`(Argon2・ロック・CSRF) | ✅ |
-| R10 | 「写真から読み取る」、マークと同じ動作のボタン、`prefers-reduced-motion` | ブラウザで写真読み取りを確認 | 🔶 |
+| R10 | マークと同じ動作のボタン、`prefers-reduced-motion`(「写真から読み取る」は不要な機能として廃止) | ブラウザで確認 | 🔶 |
 | R11 | 各 `admin.py`、`/explore/symbols/print/`、`seed_mikke`、`createadmin` | `test_symbol_print_staff_only` | ✅ |
 | R12 | 署名付きチケット、Idempotency-Key、行ロック、クールダウン、位置情報判定、レート制限、画像シンボルの照合用パッチ(サーバーのみ保持) | `test_ticket_bound_to_user` `test_forged_ticket_rejected` `test_expired_ticket_rejected` `test_location_required` `test_rate_limit` `test_scan_with_wrong_patch` `test_catalog_does_not_leak_secrets` | ✅ |
 | R13 | `explore/image_symbols.py`、`services.register_image_symbol / scan_image`、`/explore/symbols/register/`、`static/js/imagematch.js`(jsfeat)、`symbol_register.js`、`camera.js:detectImage` | `explore/tests/test_image_symbols.py`、ブラウザで登録 → 合成した街の写真から検出 → 受け取り | ✅(検出精度は🔶手動・実機未確認) |
@@ -99,7 +99,7 @@
 | R35 | `services.obtainable_items`、`/explore/symbols/<id>/items/<code>.svg`、`spotmap.js`(★マーカー・ポップアップ・一覧) | `test_within_radius` `test_preview_image` `test_secret_and_unrelated_items_are_404` | ✅ |
 | R36 | `Symbol.is_secret`、`static/img/secret.svg`、API でのマスク、スポット一覧の「？？？」 | `test_secret_is_masked`(名前・ヒント・アイテムを応答に含めない) `SecretSpotListTests` | ✅ |
 | R37 | `camera.js:showReward`(全身 + 拡大図・NEW・レア度)、`wardrobe.services.item_zoom_svg`(`?zoom=1`)、`rewards/coupon_art.py` + `/rewards/coupons/<id>.svg` | `test_collect_grants_item_and_records`(`slot`) `test_item_zoom_crops_to_part` `CouponImageTests`(本人のみ・XSS エスケープ・使用済み・長文の切り詰め)、ブラウザで実際にみっけ → アイテムの絵、クーポン・何もなしの絵を確認 | ✅ |
-| R38 | `explore.views.mikke` + `templates/explore/mikke.html`(地図とカメラを 1 画面)、`camera.js`(検索結果でボタンを切り替え・同じ画面でカメラ)、ナビ・各ホームのリンク、`/explore/camera/` → 301 | `test_search_first_then_camera` `test_old_camera_url_redirects` `test_nav_has_single_mikke_tab`、ブラウザで 遠く → 起動不可 / 近く → 起動 → 地図にもどる / 写真読み取り を確認 | ✅ |
+| R38 | `explore.views.mikke` + `templates/explore/mikke.html`(地図とカメラを 1 画面)、`camera.js`(検索結果でボタンを切り替え・同じ画面でカメラ)、ナビ・各ホームのリンク、`/explore/camera/` → 301 | `test_search_first_then_camera` `test_old_camera_url_redirects` `test_nav_has_single_mikke_tab`、ブラウザで 遠く → 起動不可 / 近く → 起動 → 地図にもどる を確認 | ✅ |
 | R39 | `static/js/nearby.js`(① 現在地 → ② 検索、二重実行しない、`mikke:nearby` イベント)、`spotmap.js`(「現在地」も同じ処理) | ブラウザで「現在地」「近くのシンボルを探す」の両方で ①→②→結果 の順に表示されることを確認 | ✅(JS は🔶手動) |
 | R40 | `SHOW_SPOT_CARDS = False`、`explore/_spot_cards.html` | `test_spot_cards_hidden_and_secret_not_leaked` `test_spot_cards_can_be_shown_again` | ✅ |
 | R41 | `User.role`(利用者/管理者/サイト運営者、is_staff は role から自動)、`core/permissions.py`、`Spot.owner`、`explore/manage_views.py`(担当スポットだけ・シンボル設定とドロップ) | `RoleModelTests` `PermissionTests`(他店の URL は 404・自分のスポットとして作成・ドロップ設定) | ✅ |
@@ -118,7 +118,7 @@
 
 ## 未達・残課題
 
-- 実機スマートフォンでのカメラ検出は未確認(PC ブラウザで写真読み取り経路のみ確認)。スマホから試すには HTTPS 化が必要
+- 実機スマートフォンでのカメラ検出は未確認。スマホから試すには HTTPS 化が必要
 - 画像シンボルの実写での検出率(照明・距離・角度別)は未計測(合成写真での結果は ADR 0005)。看板が画面の 1/6 未満・逆光・大きく遮られた状態は苦手
 - 地図の収録範囲は京橋付近のみ(範囲外のスポットは緯度経度を数値で入力)
 - シンボル個別の位置は Django 管理画面で数値入力(地図で選ぶのはスポットのみ)。有効期限はスポット単位

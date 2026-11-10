@@ -1,0 +1,16 @@
+{% load static %}<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  {# ランキングが変わったら反映されるよう、運営者が決めた間隔で読み込み直す (スクリプトは使わない) #}
+  <meta http-equiv="refresh" content="{{ signage.refresh_seconds }}">
+  <title>{{ signage.headline }} | みっけ</title>
+  <link rel="icon" href="{% static 'img/icon.svg' %}" type="image/svg+xml">
+  <link rel="stylesheet" href="{% static 'css/signage.css' %}">
+</head>
+<body class="signage-page">
+  <main>{% include "signage/_board.html" %}</main>
+</body>
+</html>

@@ -5,16 +5,20 @@
     python scripts\\devproxy.py stop      # nginx を止める
     python scripts\\devproxy.py status
     python scripts\\devproxy.py cert      # 自己署名証明書を作り直す
+    python scripts\\devproxy.py trust     # 証明書を信頼済みにするコマンドと、いまの登録状態を表示する
 
 構成:
     ブラウザ ──https://localhost:8000── nginx ──http://127.0.0.1:8080── waitress + Django
 
-- 証明書・鍵・nginx の設定・ログは %LOCALAPPDATA%\\mikke\\proxy に置く (リポジトリには入れない)
+- 証明書・鍵・nginx の設定・ログは %LOCALAPPDATA%\\mikke\\proxy に置く
+- 信頼登録しやすいよう、証明書 (公開部分の .crt だけ) をプロジェクトの certs\\localhost.crt にも書き出す。
+  秘密鍵はプロジェクトには出さない。certs/ は .gitignore 済み (PC ごとに違うのでコミットしない)
 - 証明書は localhost / 127.0.0.1 / ::1 だけに使える自己署名。ブラウザの警告を消すには、利用者が
   証明書を「信頼されたルート証明機関」に登録する (README 参照。システムの設定変更なので本人が行う)
 - アプリ本体は 127.0.0.1 だけで待ち受ける (nginx を通らないと外からは届かない)
 
-環境変数: NGINX_HOME (既定 %LOCALAPPDATA%\\nginx-1.28.0)、MIKKE_PROXY_DIR、MIKKE_PROXY_PORT (8000)、MIKKE_APP_PORT (8080)
+環境変数: NGINX_HOME (既定 %LOCALAPPDATA%\\nginx-1.28.0)、MIKKE_PROXY_DIR、MIKKE_PROXY_PORT (8000)、MIKKE_APP_PORT (8080)、
+          MIKKE_CERT_EXPORT (証明書の書き出し先。既定はプロジェクトの certs\\localhost.crt)
 """
 
 from __future__ import annotations
@@ -36,6 +40,8 @@ APP_PORT = int(os.environ.get("MIKKE_APP_PORT", "8080"))
 CERT = PROXY_DIR / "certs" / "localhost.crt"
 KEY = PROXY_DIR / "certs" / "localhost.key"
 CONF = PROXY_DIR / "conf" / "nginx.conf"
+# 信頼登録用に書き出す証明書 (公開部分だけ。秘密鍵は書き出さない)
+EXPORT_CERT = Path(os.environ.get("MIKKE_CERT_EXPORT", str(BASE_DIR / "certs" / "localhost.crt")))
 
 
 def _posix(p: Path) -> str:
@@ -77,6 +83,53 @@ def write_cert() -> None:
                                       serialization.NoEncryption()))
     CERT.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
     print(f"証明書を作りました: {CERT}")
+    export_cert()
+
+
+def export_cert() -> bool:
+    """証明書 (.crt、公開部分だけ) を EXPORT_CERT に書き出す。中身が同じなら何もしない。書き出したら True。"""
+    if not CERT.exists():
+        return False
+    data = CERT.read_bytes()
+    if EXPORT_CERT.exists() and EXPORT_CERT.read_bytes() == data:
+        return False
+    EXPORT_CERT.parent.mkdir(parents=True, exist_ok=True)
+    EXPORT_CERT.write_bytes(data)
+    print(f"証明書を書き出しました: {EXPORT_CERT}")
+    return True
+
+
+def cert_thumbprint() -> str:
+    """証明書の SHA-1 拇印 (Windows の証明書ストアでの ID)。"""
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes
+
+    return x509.load_pem_x509_certificate(CERT.read_bytes()).fingerprint(hashes.SHA1()).hex().upper()  # noqa: S303
+
+
+def is_trusted() -> bool | None:
+    """いまの Windows ユーザーの「信頼されたルート証明機関」に、この証明書が入っているか (Windows 以外は None)。"""
+    if os.name != "nt" or not CERT.exists():
+        return None
+    res = subprocess.run(["certutil", "-user", "-store", "Root", cert_thumbprint()],  # noqa: S607
+                         capture_output=True, stdin=subprocess.DEVNULL)
+    return res.returncode == 0
+
+
+def trust_help() -> str:
+    """証明書を信頼済みにするコマンド。システムの設定変更なので、スクリプトでは実行せず利用者が実行する。"""
+    try:
+        rel = EXPORT_CERT.relative_to(BASE_DIR)
+    except ValueError:
+        rel = EXPORT_CERT
+    return "\n".join([
+        "ブラウザの警告を消すには、プロジェクトのフォルダで次を実行してください (確認の画面が出たら「はい」)。",
+        "PowerShell・コマンドプロンプトのどちらでも使えます。",
+        f'  certutil -user -addstore Root "{rel}"',
+        f"  (この PC での場所: {EXPORT_CERT})",
+        "登録したら、ブラウザ (Edge / Chrome) のウィンドウをすべて閉じてから開き直してください。",
+        "証明書を作り直した (cert) ときは、古いものを削除して登録し直してください。",
+    ])
 
 
 def render_config(template: str | None = None) -> str:
@@ -124,6 +177,7 @@ def is_running() -> bool:
 def cmd_start() -> None:
     if not CERT.exists() or not KEY.exists():
         write_cert()
+    export_cert()
     write_config()
     test = _nginx("-t")
     if test.returncode != 0:
@@ -134,6 +188,8 @@ def cmd_start() -> None:
     else:
         _nginx(wait=False)
         print(f"nginx を起動しました: https://localhost:{PROXY_PORT}/ → http://127.0.0.1:{APP_PORT}/")
+    if is_trusted() is False:
+        print("※ 証明書がまだ信頼済みに登録されていません。登録の手順: python scripts\\devproxy.py trust")
 
 
 def cmd_stop() -> None:
@@ -144,9 +200,28 @@ def cmd_stop() -> None:
         print("nginx は動いていません。")
 
 
+def _trust_line() -> str:
+    trusted = is_trusted()
+    if trusted is None:
+        return "信頼: (確認できません)"
+    return f"信頼: {'登録済み' if trusted else '未登録 (ブラウザが警告を出します)'} ・ 拇印 {cert_thumbprint()}"
+
+
 def cmd_status() -> None:
     print(f"nginx: {'起動中' if is_running() else '停止中'} (https://localhost:{PROXY_PORT}/)")
     print(f"証明書: {CERT} {'あり' if CERT.exists() else 'なし'}")
+    print(f"書き出し先: {EXPORT_CERT} {'あり' if EXPORT_CERT.exists() else 'なし'}")
+    if CERT.exists():
+        print(_trust_line())
+
+
+def cmd_trust() -> None:
+    if not CERT.exists():
+        write_cert()
+    export_cert()
+    print(_trust_line())
+    if not is_trusted():
+        print(trust_help())
 
 
 def cmd_run() -> None:
@@ -176,9 +251,10 @@ def cmd_run() -> None:
         cmd_stop()
 
 
-COMMANDS = {"run": cmd_run, "start": cmd_start, "stop": cmd_stop, "status": cmd_status, "cert": write_cert}
+COMMANDS = {"run": cmd_run, "start": cmd_start, "stop": cmd_stop, "status": cmd_status, "cert": write_cert,
+            "trust": cmd_trust}
 
 if __name__ == "__main__":
     if len(sys.argv) != 2 or sys.argv[1] not in COMMANDS:
-        raise SystemExit("使い方: python scripts\\devproxy.py run|start|stop|status|cert")
+        raise SystemExit("使い方: python scripts\\devproxy.py run|start|stop|status|cert|trust")
     COMMANDS[sys.argv[1]]()

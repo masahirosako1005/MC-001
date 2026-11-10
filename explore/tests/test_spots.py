@@ -184,25 +184,60 @@ class MikkePageTests(Base):
         res = self.client.get(reverse("explore:mikke"))
         self.assertTemplateUsed(res, "explore/mikke.html")
         body = res.content.decode()
-        # 地図・検索ボタン・カメラ・写真読み取りが 1 画面にある
+        # 地図・検索ボタン・カメラが 1 画面にある (「写真から読み取る」は廃止)
         for part in ('id="spot-map"', 'id="btn-nearby"', 'id="mikke-camera"', 'id="ar-video"', 'id="reward-dialog"',
                      reverse("explore:api_nearby"), reverse("explore:api_scan"), "js/nearby.js", "js/camera.js"):
             self.assertIn(part, body)
-        # 近くにシンボルがあると分かるまで、カメラと写真読み取りは押せない
+        # 近くにシンボルがあると分かるまで、カメラは押せない
         self.assertRegex(body, r'id="btn-start" disabled')
-        self.assertRegex(body, r'id="file-input"[^>]*disabled')
+        self.assertNotIn('id="file-input"', body)
+        self.assertNotIn("写真から読み取る", body)
         # スクリプトは nearby.js → spotmap.js → camera.js の順 (検索結果を地図とカメラが受け取る)
         self.assertLess(body.index("js/nearby.js"), body.index("js/spotmap.js"))
         self.assertLess(body.index("js/spotmap.js"), body.index("js/camera.js"))
 
-    def test_spot_cards_hidden_and_secret_not_leaked(self):
-        Discovery.objects.create(user=self.user, symbol=self.secret, reward_kind="none", reward_label="",
-                                 idempotency_key=uuid.uuid4())
+    def map_data(self, res):
+        import json
+        import re
+
+        m = re.search(r'<script id="symbol-data" type="application/json">(.*?)</script>', res.content.decode(), re.S)
+        self.assertIsNotNone(m)
+        return json.loads(m.group(1))
+
+    def test_map_shows_symbols_not_spots(self):
+        """地図にはスポットを出さず、シンボルだけを出す。シークレットは見つけるまで名前・ヒントを伏せる。"""
         self.client.force_login(self.user)
         res = self.client.get(reverse("explore:mikke"))
         self.assertNotContains(res, 'class="spot-card"')
-        for hidden in ("ひみつの狐", "夜の石段", "かっぱ", "足湯のそば"):
+        self.assertNotContains(res, 'id="spot-data"')
+        points = {p["id"]: p for p in self.map_data(res)}
+        self.assertEqual(set(points), {self.symbol.pk, self.secret.pk})
+        normal, secret = points[self.symbol.pk], points[self.secret.pk]
+        self.assertEqual((normal["name"], normal["hint"], normal["spot"]), ("かっぱ", "足湯のそば", "テスト温泉"))
+        self.assertEqual((normal["lat"], normal["lng"]), (35.0, 139.0))  # 位置がなければスポットの位置
+        self.assertEqual((secret["name"], secret["hint"], secret["masked"]), ("？？？", "", True))
+        self.assertEqual((secret["lat"], secret["lng"]), (35.0003, 139.0))  # シンボル自身の位置
+        for hidden in ("ひみつの狐", "夜の石段"):
             self.assertNotContains(res, hidden)
+
+    def test_found_secret_is_revealed_and_found_marked(self):
+        Discovery.objects.create(user=self.user, symbol=self.secret, reward_kind="none", reward_label="",
+                                 idempotency_key=uuid.uuid4())
+        self.client.force_login(self.user)
+        points = {p["id"]: p for p in self.map_data(self.client.get(reverse("explore:mikke")))}
+        secret = points[self.secret.pk]
+        self.assertEqual((secret["name"], secret["masked"], secret["found"]), ("ひみつの狐", False, True))
+        self.assertIsNotNone(secret["next_at"])  # クールダウン中は次にみっけできる日時
+
+    def test_hidden_or_expired_spots_and_inactive_symbols_are_not_on_map(self):
+        Symbol.objects.create(spot=self.spot, name="お休み中", is_active=False)
+        closed = Spot.objects.create(slug="c", name="閉店", latitude=Decimal("35.1"), longitude=Decimal("139.1"),
+                                     is_active=False)
+        Symbol.objects.create(spot=closed, name="閉店の看板")
+        self.client.force_login(self.user)
+        names = {p["name"] for p in self.map_data(self.client.get(reverse("explore:mikke")))}
+        self.assertNotIn("お休み中", names)
+        self.assertNotIn("閉店の看板", names)
 
     def test_spot_cards_can_be_shown_again(self):
         self.client.force_login(self.user)

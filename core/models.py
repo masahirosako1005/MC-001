@@ -78,3 +78,22 @@ class AuditLog(models.Model):
 
     def delete(self, *args, **kwargs):
         raise ValueError("監査ログは削除できません")
+
+
+class DailyActivity(models.Model):
+    """アプリを使った日 (利用者ごとに 1 日 1 行)。運営者の分析の「アプリ利用率」(日ごと) に使う。
+
+    ログインしただけ・画面を開いただけでも 1 日として数える (みっけやクーポンの利用は「再訪率」の方で数える)。
+    残すのは日付だけ (時刻・IP・見た画面は残さない)。
+    """
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="daily_activity")
+    date = models.DateField("利用日")
+
+    class Meta:
+        verbose_name = verbose_name_plural = "アプリの利用日"
+        constraints = [models.UniqueConstraint(fields=["user", "date"], name="dailyactivity_once_per_day")]
+        indexes = [models.Index(fields=["date"], name="dailyactivity_date_idx")]
+
+    def __str__(self) -> str:
+        return f"{self.user_id} {self.date}"

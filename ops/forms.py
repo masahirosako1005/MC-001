@@ -3,6 +3,7 @@ from __future__ import annotations
 from django import forms
 
 from accounts.models import ManagerProfile, User, email_hash_of
+from signage.models import Signage
 
 
 class ManagerAccountForm(forms.Form):
@@ -53,3 +54,28 @@ class ManagerProfileForm(forms.ModelForm):
         if code and len(code) == 7 and code.isdigit():
             code = f"{code[:3]}-{code[3:]}"
         return code
+
+
+class SignageForm(forms.ModelForm):
+    """まちのサイネージの内容 (見出し・宣伝の文・QR コード・更新間隔)。"""
+
+    class Meta:
+        model = Signage
+        fields = ["name", "headline", "message", "show_qr", "qr_url", "refresh_seconds", "is_active"]
+        widgets = {
+            "message": forms.Textarea(attrs={"rows": 4, "maxlength": 200,
+                                             "placeholder": "例: 京橋のまちを歩いて、季節のコーデをみっけしよう!"}),
+            "qr_url": forms.URLInput(attrs={"placeholder": "https://…"}),
+        }
+
+    def clean_qr_url(self):
+        url = (self.cleaned_data.get("qr_url") or "").strip()
+        if url and not url.lower().startswith(("https://", "http://")):
+            raise forms.ValidationError("http:// か https:// で始まる URL を入れてください。")
+        return url
+
+    def clean_message(self):
+        msg = (self.cleaned_data.get("message") or "").replace("\r\n", "\n").strip()
+        if len(msg) > 200:
+            raise forms.ValidationError("宣伝の文は 200 文字以内にしてください。")
+        return msg

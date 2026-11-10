@@ -4,6 +4,7 @@
 リクエストがすべて https への 301 になってしまう。テストの間だけ HTTPS への転送を止める
 (転送そのものは nginx 経由の確認と Django のミドルウェアの責務)。
 キャッシュも MIKKE_CACHE (db / redis) によらず、テストごとに独立したメモリキャッシュにする。
+静的ファイルも、collectstatic をしていなくても動くよう、名前にハッシュを付けない保存方法にする。
 """
 
 from django.test.runner import DiscoverRunner
@@ -16,6 +17,8 @@ class MikkeTestRunner(DiscoverRunner):
         self._overrides = override_settings(
             SECURE_SSL_REDIRECT=False,
             CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "mikke-test"}},
+            STORAGES={"default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+                      "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"}},
         )
         self._overrides.enable()
 

@@ -320,6 +320,21 @@ progress { flex: 1; height: 12px; accent-color: var(--primary); }
 }
 .reward-rarity:not(:empty) { position: absolute; top: -8px; right: -10px; padding: 1px 8px; border-radius: 999px; white-space: nowrap;
   background: #FFFFFF; color: #FFB400; font-size: 0.95rem; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2); }
+/* 結果の絵と、その右の「こんな人も獲得しているよ」 */
+.reward-hero { display: flex; align-items: center; justify-content: center; gap: 30px; }
+.reward-hero .reward-art { margin-left: 0; margin-right: 0; }
+.reward-hero.has-also .reward-art img:not(.reward-zoom) { max-width: min(48vw, 210px); }
+.reward-also { flex: none; width: 84px; display: grid; gap: 4px; justify-items: center; }
+.reward-also[hidden] { display: none; }
+.reward-also-title { margin: 0; font-size: 0.75rem; line-height: 1.3; color: var(--muted); text-align: center; }
+.reward-also-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.also-chip { display: grid; justify-items: center; gap: 0; width: 84px; min-height: 44px; padding: 3px 2px; border: 1px solid var(--border);
+  border-radius: 12px; background: var(--surface); color: var(--text); font: inherit; cursor: pointer; }
+.also-chip:hover { background: var(--surface-2); }
+.reward-dialog .also-chip img { margin: 0; width: 40px; height: 60px; border-radius: 8px; background: #FFFFFF; }
+.also-chip-name { font-size: 0.75rem; font-weight: 700; max-width: 78px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.also-chip-ago { font-size: 0.75rem; color: var(--muted); }
+@media (max-width: 360px) { .reward-hero { gap: 22px; } .reward-also, .also-chip { width: 72px; } }
 @keyframes reward-pop { from { transform: scale(0.3) rotate(-8deg); opacity: 0; } to { transform: scale(1) rotate(0); opacity: 1; } }
 .reward-achievements li { display: grid; gap: 4px; justify-items: center; margin-top: 6px; }
 .reward-gift { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 0.9rem; }
@@ -596,6 +611,12 @@ details > summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
   font-size: 22px; font-weight: 900; border: 3px solid #FFFFFF; box-shadow: 0 0 0 0 rgba(196, 90, 0, 0.6); animation: focus-pulse 1.6s ease-out infinite; }
 @keyframes focus-pulse { 0% { box-shadow: 0 0 0 0 rgba(196, 90, 0, 0.55); } 100% { box-shadow: 0 0 0 22px rgba(196, 90, 0, 0); } }
 @media (prefers-reduced-motion: reduce) { .focus-marker { animation: none; box-shadow: 0 0 0 6px rgba(196, 90, 0, 0.35); } }
+/* 「これをみっけに行く」の目印・ヒント・出る条件 */
+.focus-hints { display: grid; grid-template-columns: max-content 1fr; gap: 2px 8px; margin: 6px 0; padding: 6px 8px;
+  background: var(--surface-2); border-radius: 8px; font-size: 0.85rem; }
+.focus-hints dt { font-weight: 800; color: var(--muted); }
+.focus-hints dd { margin: 0; overflow-wrap: anywhere; }
+.focus-not-now { color: var(--warn); }
 .focus-popup-lead { margin: 0; font-size: 0.75rem; font-weight: 900; color: var(--primary); }
 
 /* ---------------------------------------------------------------- 表: スマホではカード表示 */
@@ -630,6 +651,12 @@ details > summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
 .mikke-steps li.is-done .step-mark { font-size: 0; }
 .mikke-steps li.is-done .step-mark::after { content: "✓"; font-size: 0.85rem; }
 .mikke-steps li.is-current { box-shadow: 0 0 0 3px rgba(196, 90, 0, 0.25); }
+/* 地図のシンボルの印 (★ 未みっけ / ✓ みっけ済み / ? シークレット)。色だけでなく記号でも区別する */
+.symbol-marker { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; font-size: 15px; font-weight: 900;
+  background: #FFC94D; color: #3D2A00; border: 2px solid #FFFFFF; box-shadow: 0 1px 5px rgba(0, 0, 0, 0.35); }
+.symbol-marker.is-found { background: #1D7A46; color: #FFFFFF; }
+.symbol-marker.is-secret { background: #5A3F8F; color: #FFFFFF; }
+.symbol-found { color: var(--ok); font-weight: 700; }
 .spot-cluster { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: #1A5FD0; color: #FFFFFF;
   font-weight: 900; font-size: 0.95rem; border: 3px solid #FFFFFF; box-shadow: 0 0 0 3px rgba(26, 95, 208, 0.35), 0 2px 6px rgba(0, 0, 0, 0.3); }
 
@@ -652,3 +679,28 @@ details > summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
 /* 1 画面完結のホームでは、警告帯で下のボタンが押し出されないよう上に重ねる (開発時だけ表示される) */
 .page-game-home .debug-bar, .page-title-screen .debug-bar { position: fixed; top: 0; left: 0; right: 0; z-index: 60; padding: 1px 8px;
   font-size: 0.75rem; opacity: 0.85; pointer-events: none; }
+
+/* ---- ログイン画面の「いま、まちで手に入るコーデ・ランキング」(右から左へ流れる) ---- */
+.login-marquee { max-width: 640px; margin: 16px auto 8px; padding: 12px 0 10px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--radius); text-align: center; overflow: hidden; }
+.marquee-head { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0 12px; flex-wrap: wrap; }
+.login-marquee h2 { margin: 0; font-size: 1.1rem; }
+.login-marquee > p { margin: 2px 12px 10px; font-size: 0.9rem; }
+.marquee { overflow: hidden; }
+.marquee-inner { display: flex; width: max-content; animation: marquee-scroll 36s linear infinite; }
+.marquee:hover .marquee-inner, .marquee:focus-within .marquee-inner, .marquee.is-paused .marquee-inner { animation-play-state: paused; }
+.marquee-track { list-style: none; margin: 0; padding: 0 6px; display: flex; gap: 12px; }
+@keyframes marquee-scroll { from { transform: translateX(0); } to { transform: translateX(-25%); } }
+.coord-card { display: grid; justify-items: center; align-content: start; gap: 2px; width: 120px; flex: none; }
+.coord-card img { width: 100px; height: 150px; border-radius: 12px; background: var(--surface-2); }
+.coord-badge, .rank-badge { font-size: 0.75rem; white-space: nowrap; }
+.rank-badge { background: #FFE9A8; color: #5A3E00; }
+.rank-card.rank-1 img { box-shadow: 0 0 0 3px #F2B300; }
+.coord-name { font-size: 0.85rem; line-height: 1.3; overflow-wrap: anywhere; }
+.coord-spot { font-size: 0.75rem; color: var(--muted); line-height: 1.3; overflow-wrap: anywhere; }
+/* 動きを減らす設定: 流さず、指やスクロールで横に動かして見る */
+@media (prefers-reduced-motion: reduce) {
+  .marquee { overflow-x: auto; }
+  .marquee-inner { animation: none; }
+  .marquee-track[aria-hidden="true"] { display: none; }
+}

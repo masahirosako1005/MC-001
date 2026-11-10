@@ -26,6 +26,15 @@ class MikkeLoginView(LoginView):
     def get_default_redirect_url(self):
         return resolve_url(home_url_name(self.request.user))
 
+    def get_context_data(self, **kwargs):
+        from contest.services import featured_contest, public_top
+        from core.showcase import showcase
+        from core.timeutil import local_now
+
+        contest = featured_contest()
+        return {**super().get_context_data(**kwargs), "showcase": showcase(local_now()),
+                "ranking": public_top(contest, 3), "ranking_contest": contest}
+
 
 @require_http_methods(["GET", "POST"])
 def signup(request):

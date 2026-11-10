@@ -45,6 +45,9 @@ class RoleAreaMiddleware:
     """
 
     MANAGER_ALLOWED = {"accounts:logout", "accounts:password_change", "accounts:login", "accounts:password_help"}
+    # ログインに関係なく見られる公開の画像・画面 (ログイン画面のコーデ・ランキング、まちのサイネージ)
+    PUBLIC = {"core:showcase_svg", "contest:top_svg"}
+    PUBLIC_NAMESPACES = {"signage"}
 
     def __init__(self, get_response):
         self.get_response = get_response
@@ -64,7 +67,8 @@ class RoleAreaMiddleware:
                 return self._away(request, "ops:dashboard")
             elif user.is_manager:
                 name, namespace = _url_name(request)
-                if name is not None and namespace != "manage" and name not in self.MANAGER_ALLOWED:
+                if (name is not None and namespace not in ("manage", *self.PUBLIC_NAMESPACES)
+                        and name not in self.MANAGER_ALLOWED and name not in self.PUBLIC):
                     return self._away(request, "manage:home")
         return self.get_response(request)
 
@@ -76,6 +80,34 @@ class RoleAreaMiddleware:
         if _wants_json(request):
             return JsonResponse({"error": "wrong_area", "message": "この画面は利用者専用です。"}, status=403)
         return redirect(url_name)
+
+
+class ActivityMiddleware:
+    """利用者が利用者の画面を使った日を記録する (1 人 1 日 1 行、2 回目からはキャッシュで書き込みを省く)。
+
+    運営者・管理者・未ログイン・運営側の画面・静的ファイルは数えない。記録するのは日付だけ。
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        user = getattr(request, "user", None)
+        if (user is not None and user.is_authenticated and user.role == "user"
+                and getattr(request, "session_realm", None) != "ops" and response.status_code < 400):
+            from django.core.cache import cache
+
+            from .timeutil import local_now
+
+            today = local_now().date()
+            key = f"mikke:act:{user.pk}:{today.isoformat()}"
+            if not cache.get(key):
+                from .models import DailyActivity
+
+                DailyActivity.objects.bulk_create([DailyActivity(user_id=user.pk, date=today)], ignore_conflicts=True)
+                cache.set(key, 1, 60 * 60 * 26)
+        return response
 
 
 class ForcePasswordChangeMiddleware:

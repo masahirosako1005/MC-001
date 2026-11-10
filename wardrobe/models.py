@@ -65,6 +65,10 @@ class UserItem(models.Model):
     item = models.ForeignKey(Item, on_delete=models.PROTECT, related_name="owners")
     obtained_count = models.PositiveIntegerField("入手回数", default=1)
     first_obtained_at = models.DateTimeField("初入手", auto_now_add=True)
+    # どのシンボルでみっけして手に入れたか (はじめから持っているもの・実績のごほうびは空)。
+    # 「こんな人が獲得しているよ」でコーデを押したとき、どこで手に入れたかを出すのに使う
+    found_symbol = models.ForeignKey("explore.Symbol", null=True, blank=True, on_delete=models.SET_NULL,
+                                     related_name="+", verbose_name="手に入れたシンボル")
 
     class Meta:
         verbose_name = verbose_name_plural = "所持アイテム"

@@ -50,7 +50,11 @@ def operator_nav(current: str) -> list[dict]:
     return _groups(current, [
         ("分析", [
             (("利用状況", "ops:dashboard"), {}),
+            (("再訪率・アプリ利用率", "ops:engagement"), {}),
             (("店舗ごとのクーポン利用", "ops:coupons"), {"also": ("ops_manage:coupon_stats",)}),
+        ]),
+        ("まちの宣伝", [
+            (("サイネージ", "ops:signage_list"), {"also": ("ops:signage_create", "ops:signage_edit")}),
         ]),
         ("利用者", [
             (("利用者管理", "ops:users"), {"also": ("ops:manager_edit", "ops:user_reset_password",

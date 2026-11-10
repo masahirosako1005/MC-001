@@ -22,4 +22,6 @@ urlpatterns = [
     path("rewards/", include("rewards.urls")),
     path("maps/", include("maps.urls")),
     path("contest/", include("contest.urls")),
+    # まちのサイネージの表示 (ログイン不要。推測できない表示キーの URL でだけ開ける)
+    path("signage/", include("signage.urls")),
 ]

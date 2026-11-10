@@ -1,0 +1,32 @@
+{# サイネージ 1 枚分。表示画面 (signage/display.html) と運営コンソールのプレビューで共通。大きさは .signage-frame の幅に合わせて変わる #}
+{% load static %}
+<div class="signage-frame">
+  <div class="signage-board">
+    <div class="sg-left">
+      <p class="sg-headline">{{ signage.headline }}</p>
+      {% if top %}
+      <div class="sg-avatar-card">
+        <span class="sg-crown" aria-hidden="true">👑</span>
+        <img class="sg-avatar" src="{{ avatar_url }}" alt="ランキング1位のアバター">
+      </div>
+      <p class="sg-name"><span class="sg-rank">1位</span> {{ top.label }}</p>
+      <p class="sg-sub">{% if contest %}{{ contest.title }} ・ {% endif %}<span aria-hidden="true">♥</span><span class="visually-hidden">高評価</span> {{ top.likes }}</p>
+      {% else %}
+      <div class="sg-avatar-card sg-empty"><img class="sg-logo" src="{% static 'img/icon.svg' %}" alt=""></div>
+      <p class="sg-name">ランキング集計中</p>
+      <p class="sg-sub">コーデコンテストに参加して、1位をめざそう</p>
+      {% endif %}
+    </div>
+    <div class="sg-right">
+      <p class="sg-brand"><img src="{% static 'img/icon.svg' %}" alt="" class="sg-brand-icon"> みっけ</p>
+      {% if signage.message %}<p class="sg-message">{{ signage.message|linebreaksbr }}</p>{% endif %}
+      {% if qr %}
+      <div class="sg-qr">
+        <div class="sg-qr-code" role="img" aria-label="みっけのサイトの QR コード">{{ qr }}</div>
+        <p class="sg-qr-caption">スマホで読み取って<br>まちで <strong>みっけ</strong> をはじめよう</p>
+      </div>
+      {% endif %}
+      <p class="sg-foot">{{ season }}の{{ slot }} ・ 季節と時間でもらえるコーデが変わるよ</p>
+    </div>
+  </div>
+</div>

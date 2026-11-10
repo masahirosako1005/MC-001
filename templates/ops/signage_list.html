@@ -1,0 +1,29 @@
+{% extends "console/base.html" %}
+{% block title %}サイネージ{% endblock %}
+{% block body_class %}page-ops{% endblock %}
+{% block content %}
+<h1>まちのサイネージ</h1>
+<p class="muted">駅やお店のデジタルサイネージに、<strong>コーデコンテストのランキング 1 位</strong>と、ここで書いた<strong>宣伝の文</strong>・サイトの QR コードを表示します。
+  作ったら「表示用の URL」をサイネージの端末のブラウザで開いておくだけです(ログイン不要。ランキングが変わると自動で更新されます)。</p>
+<p class="muted">1 位の人の名前は、本人が「みっけ仲間に表示する」を ON にしているときだけ出ます(OFF なら「1位のコーデ」とアバターだけ)。</p>
+<p><a class="btn btn-primary" href="{% url 'ops:signage_create' %}">＋ サイネージを作る</a></p>
+<div class="table-wrap">
+<table class="table">
+  <caption class="visually-hidden">サイネージの一覧</caption>
+  <thead><tr><th scope="col">名前</th><th scope="col">見出し・宣伝の文</th><th scope="col">状態</th><th scope="col">更新</th><th scope="col">操作</th></tr></thead>
+  <tbody>
+  {% for s in signs %}
+  <tr>
+    <th scope="row">{{ s.name }}</th>
+    <td><strong>{{ s.headline }}</strong><br><span class="muted">{{ s.message|truncatechars:60 }}</span></td>
+    <td><span class="badge">{% if s.is_active %}表示中{% else %}停止中{% endif %}</span></td>
+    <td>{{ s.updated_at|date:"Y/n/j H:i" }}</td>
+    <td class="actions"><a href="{% url 'ops:signage_edit' s.pk %}">編集・プレビュー</a></td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="5">サイネージはまだありません。</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

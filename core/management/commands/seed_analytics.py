@@ -110,6 +110,7 @@ class Command(BaseCommand):
         users = list(User.objects.filter(groups__name=DEMO_USER_GROUP).values_list("pk", flat=True))
         n_visits, n_disc = self._behaviour(spots, users, opts["days"])
         n_issued, n_used = self._coupons(spots, users, opts["days"])
+        call_command("link_item_symbols", stdout=self.stdout)  # 持たせたアイテムに「手に入れたシンボル」を付ける
         audit.record("demo.analytics_seeded", spots=len(spots), users=len(users), visits=n_visits, discoveries=n_disc,
                      coupons_issued=n_issued, coupons_used=n_used)
         self.stdout.write(self.style.SUCCESS(f"行動データ: 付近の来訪 {n_visits} 件 / みっけ {n_disc} 件 / "

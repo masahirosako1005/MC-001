@@ -75,21 +75,36 @@ def mikke(request):
                             # シークレットは、見つけるまで名前とヒントを隠す
                             "masked": s.is_secret and last is None})
         rows.append({"spot": spot, "visit_days": visit_days.get(spot.pk, 0), "symbols": symbols})
-    points = [
-        {"id": r["spot"].pk, "name": r["spot"].name, "area": r["spot"].area,
-         "lat": float(r["spot"].latitude), "lng": float(r["spot"].longitude),
-         "visit_days": r["visit_days"], "symbols": len(r["symbols"]),
-         "found": sum(1 for s in r["symbols"] if s["found"])}
-        for r in rows if r["spot"].latitude is not None and r["spot"].longitude is not None
-    ]
+    # 地図にはスポットではなくシンボルを出す (シンボル自身の位置、なければスポットの位置)。
+    # シークレットは見つけるまで「？」だけ (名前・ヒントは出さない)
+    points = []
+    for r in rows:
+        for sym in r["symbols"]:
+            loc = sym["symbol"].location
+            if loc is None:
+                continue
+            masked = sym["masked"]
+            points.append({
+                "id": sym["symbol"].pk, "spot_id": r["spot"].pk, "spot": r["spot"].name,
+                "name": "？？？" if masked else sym["symbol"].name, "hint": "" if masked else sym["symbol"].hint,
+                "secret": sym["symbol"].is_secret, "masked": masked, "lat": loc[0], "lng": loc[1],
+                "found": sym["found"],
+                "next_at": _short_time(sym["next_at"]) if sym["next_at"] else None,
+            })
     return render(request, "explore/mikke.html", {
         "rows": rows,
         "show_spot_cards": settings.MIKKE_SHOW_SPOT_CARDS,
-        "spot_points": points,
+        "symbol_points": points,
         **_map_context(),
         "nearby_url": reverse("explore:api_nearby"),
         "radius_m": SiteSetting.current().camera_radius_m,
     })
+
+
+def _short_time(t) -> str:
+    """「11/10 18:30」のような短い日時 (Windows でも動くよう strftime の %-m は使わない)。"""
+    t = timezone.localtime(t)
+    return f"{t.month}/{t.day} {t:%H:%M}"
 
 
 def _map_context(tiles_url: str | None = None) -> dict:
@@ -153,7 +168,7 @@ def api_nearby(request):
 @require_POST
 @api_login_required
 def api_camera_start(request):
-    """カメラ (または写真読み取り) を起動したことを記録する (分析用)。直前に付近に来たスポットに数える。"""
+    """カメラを起動したことを記録する (分析用)。直前に付近に来たスポットに数える。"""
     if not ratelimit.hit(f"camstart:{request.user.pk}", 30, 60):
         return JsonResponse({"error": "rate_limited"}, status=429)
     n = services.record_camera_start(request.user)
@@ -227,6 +242,9 @@ def api_collect(request):
     payload = result.as_dict()
     symbol = Symbol.objects.filter(pk=result.symbol_id).first()
     payload["recent_finders"] = finders.recent_finders(symbol, request.user) if symbol else []
+    item = payload.get("item") or {}
+    payload["item_finders"] = (finders.item_finders(item.get("code", ""), request.user)
+                               if payload.get("reward_kind") == "item" else [])
     return JsonResponse(payload)
 
 

@@ -235,8 +235,24 @@ def cmd_start() -> None:
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
+        **detached_console_kwargs(),
     )
     print(f"[start] 起動しました (ログ: {log})")
+
+
+def detached_console_kwargs() -> dict:
+    """Windows で、起動した側のコンソールから切り離して PostgreSQL を動かすための subprocess の引数。
+
+    起動した側 (コマンドプロンプトのウィンドウ・エディタのターミナルなど) のコンソールを postgres が使い続けると、
+    そのウィンドウを閉じたあとに新しい接続用のプロセスが作れなくなり (例外 0xC0000142)、サーバーが止まってしまう。
+    専用の見えないコンソールで起動して、起動した側を閉じても動き続けるようにする。
+    """
+    if os.name != "nt":
+        return {}
+    info = subprocess.STARTUPINFO()
+    info.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    info.wShowWindow = 0  # SW_HIDE
+    return {"creationflags": subprocess.CREATE_NEW_CONSOLE | subprocess.CREATE_NEW_PROCESS_GROUP, "startupinfo": info}
 
 
 def cmd_stop() -> None:

@@ -142,12 +142,42 @@
     // カメラ中なら止めて、地図 (①さがす) にもどってからスポットを表示する (camera.js)
     document.dispatchEvent(new CustomEvent("mikke:go-map"));
     document.dispatchEvent(new CustomEvent("mikke:focus-spot", {
-      detail: { id: target.id, name: target.name, lat: target.lat, lng: target.lng, item: target.item },
+      detail: { id: target.id, name: target.name, lat: target.lat, lng: target.lng, item: target.item,
+                symbol: target.symbol || null },
     }));
   });
 
 
+  // ---------- レア度の右の「こんな人も獲得しているよ」(同じアイテムを直近に手に入れた人) ----------
+  const alsoSection = $("reward-also");
+  const alsoList = $("reward-also-list");
+  const hero = $("reward-hero");
+
+  function renderAlso(list) {
+    if (!alsoSection) return;
+    alsoList.replaceChildren();
+    alsoSection.hidden = !list.length;
+    if (hero) hero.classList.toggle("has-also", list.length > 0);
+    for (const f of list) {
+      const li = el("li");
+      const b = el("button", "also-chip");
+      b.type = "button";
+      const img = el("img");
+      img.src = finderUrl(f.token, "avatar.svg");
+      img.alt = "";
+      img.width = 40;
+      img.height = 60;
+      img.loading = "lazy";
+      b.append(img, el("span", "also-chip-name", f.nickname), el("span", "also-chip-ago", f.ago));
+      b.setAttribute("aria-label", `${f.nickname}さん(${f.ago}に獲得)のコーデを見る`);
+      b.addEventListener("click", () => openFinder(f, b));
+      li.appendChild(b);
+      alsoList.appendChild(li);
+    }
+  }
+
   document.addEventListener("mikke:reward-shown", (ev) => {
+    renderAlso(ev.detail.item_finders || []);
     renderFinders(ev.detail.recent_finders || []);
     showFinderView(false);
   });

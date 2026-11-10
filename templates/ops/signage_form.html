@@ -1,0 +1,53 @@
+{% extends "console/base.html" %}{% load static %}
+{% block title %}{% if signage %}サイネージの編集{% else %}サイネージを作る{% endif %}{% endblock %}
+{% block body_class %}page-ops{% endblock %}
+{% block head %}<link rel="stylesheet" href="{% static 'css/signage.css' %}">{% endblock %}
+{% block scripts %}<script src="{% static 'js/confirm.js' %}" defer></script>{% endblock %}
+{% block content %}
+<p><a href="{% url 'ops:signage_list' %}">← サイネージの一覧</a></p>
+<h1>{% if signage %}「{{ signage.name }}」{% else %}サイネージを作る{% endif %}</h1>
+
+{% if signage %}
+<section class="chart-card" aria-labelledby="url-h">
+  <h2 id="url-h">表示用の URL</h2>
+  {% if signage.is_active %}
+  <p>サイネージの端末のブラウザでこの URL を開き、全画面表示(F11 など)にしてください。ログインは不要です。</p>
+  <p><code class="signage-url">{{ display_url }}</code></p>
+  <p><a class="btn btn-ghost btn-small" href="{{ display_url }}" target="_blank" rel="noopener">表示を開く</a></p>
+  {% else %}
+  <p class="message message-warning">いまは「表示する」がオフのため、この URL を開いても何も出ません。</p>
+  {% endif %}
+  <form method="post" action="{% url 'ops:signage_regenerate' signage.pk %}" data-confirm="表示用の URL を作り直すと、いまの URL では表示されなくなります。サイネージの端末で新しい URL を開き直してください。よろしいですか?">
+    {% csrf_token %}<button type="submit" class="btn btn-ghost btn-small">URL を作り直す(漏れたとき)</button>
+  </form>
+</section>
+{% endif %}
+
+<div class="console-cards">
+  <form method="post" class="form" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="errors" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+    {% include "includes/field.html" with field=form.name %}
+    {% include "includes/field.html" with field=form.headline %}
+    {% include "includes/field.html" with field=form.message %}
+    <label class="toggle">{{ form.show_qr }} {{ form.show_qr.label }}</label>
+    {% include "includes/field.html" with field=form.qr_url %}
+    {% include "includes/field.html" with field=form.refresh_seconds %}
+    <label class="toggle">{{ form.is_active }} {{ form.is_active.label }}</label>
+    <button type="submit" class="btn btn-primary btn-block">{% if signage %}保存{% else %}作る{% endif %}</button>
+  </form>
+
+  <section aria-labelledby="preview-h">
+    <h2 id="preview-h">プレビュー</h2>
+    <p class="help">いまのランキング 1 位で表示しています。{% if form.is_bound %}入力中の内容です(まだ保存していません)。{% endif %}</p>
+    <div class="signage-preview">{% with signage=signage_preview %}{% include "signage/_board.html" %}{% endwith %}</div>
+    {% if not top %}<p class="help">開催中・直近のコンテストに参加者がいないため、「ランキング集計中」と表示されます。</p>{% endif %}
+  </section>
+</div>
+
+{% if signage %}
+<form method="post" action="{% url 'ops:signage_delete' signage.pk %}" class="form" data-confirm="サイネージ「{{ signage.name }}」を削除します。表示用の URL も使えなくなります。よろしいですか?">
+  {% csrf_token %}<button type="submit" class="btn btn-ghost btn-small">このサイネージを削除</button>
+</form>
+{% endif %}
+{% endblock %}

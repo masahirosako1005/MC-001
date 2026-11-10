@@ -1,0 +1,30 @@
+/* まちのサイネージ (16:9)。大きさは .signage-frame の幅に合わせる (コンテナクエリの単位 cqw)。
+   表示画面では画面いっぱい、運営コンソールではプレビューとして小さく出す */
+.signage-page { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #0F1626;
+  font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", sans-serif; }
+.signage-page main { width: min(100vw, calc(100vh * 16 / 9)); }
+.signage-frame { container-type: inline-size; width: 100%; }
+.signage-board {
+  aspect-ratio: 16 / 9; display: grid; grid-template-columns: 1fr 1fr; gap: 3cqw; padding: 3cqw 4cqw; box-sizing: border-box;
+  border-radius: 1.2cqw; overflow: hidden; color: #1F2A44;
+  background: radial-gradient(circle at 25% 40%, #FFF6D6 0 30%, #FFE08A 60%, #FFB84D 100%);
+}
+.sg-left, .sg-right { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-width: 0; }
+.sg-headline { margin: 0 0 1cqw; font-size: 4.2cqw; font-weight: 900; letter-spacing: 0.05em; color: #B34700; }
+.sg-avatar-card { position: relative; background: #FFFFFF; border-radius: 2cqw; padding: 1cqw; box-shadow: 0 0 0 0.5cqw #F2B300, 0 1cqw 3cqw rgba(0, 0, 0, 0.2); }
+.sg-avatar { display: block; width: 17cqw; height: 25.5cqw; }
+.sg-crown { position: absolute; top: -3.4cqw; left: 50%; transform: translateX(-50%); font-size: 4.5cqw; }
+.sg-empty { display: grid; place-items: center; width: 17cqw; height: 25.5cqw; }
+.sg-logo { width: 10cqw; height: 10cqw; }
+.sg-name { margin: 1.6cqw 0 0.4cqw; font-size: 3.2cqw; font-weight: 800; overflow-wrap: anywhere; }
+.sg-rank { display: inline-block; padding: 0.2cqw 1.2cqw; border-radius: 99cqw; background: #F2B300; color: #3D2A00; font-size: 2.4cqw; vertical-align: middle; }
+.sg-sub { margin: 0; font-size: 1.7cqw; color: #4F4A3A; }
+.sg-brand { margin: 0 0 1.5cqw; display: flex; align-items: center; gap: 1cqw; font-size: 3.6cqw; font-weight: 900; }
+.sg-brand-icon { width: 4.4cqw; height: 4.4cqw; }
+.sg-message { margin: 0 0 2cqw; font-size: 2.6cqw; font-weight: 700; line-height: 1.5; overflow-wrap: anywhere;
+  background: rgba(255, 255, 255, 0.75); border-radius: 1.4cqw; padding: 1.4cqw 2cqw; }
+.sg-qr { display: flex; align-items: center; gap: 2cqw; }
+.sg-qr-code svg { display: block; width: 15cqw; height: 15cqw; border-radius: 0.8cqw; background: #FFFFFF; }
+.sg-qr-caption { margin: 0; font-size: 1.9cqw; line-height: 1.5; text-align: left; }
+.sg-foot { margin: 2cqw 0 0; font-size: 1.5cqw; color: #5A4A1F; }
+.visually-hidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
