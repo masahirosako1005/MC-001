@@ -1,10 +1,9 @@
-{% extends "base.html" %}{% load static %}
+{% extends "console/base.html" %}{% load static %}
 {% block title %}{% if manager %}管理者の編集{% else %}管理者を追加{% endif %}{% endblock %}
 {% block body_class %}page-ops{% endblock %}
 {% block scripts %}<script src="{% static 'js/confirm.js' %}" defer></script>{% endblock %}
 {% block content %}
 <h1>{% if manager %}管理者「{{ manager.manager_profile.display_name }}」{% else %}管理者を追加{% endif %}</h1>
-{% include "ops/_nav.html" with active=manager|yesno:",manager_new" %}
 {% if manager %}
 <p class="muted">管理者 ID: <strong>{{ manager.manager_profile.manager_code }}</strong> ・ 登録 {{ manager.manager_profile.created_at|date:"Y/n/j" }}
   ・ {% if manager.is_active %}利用中{% else %}<strong>停止中</strong>{% endif %}</p>
@@ -43,7 +42,7 @@
 {% if manager %}
 <section aria-labelledby="spots-h">
   <h2 id="spots-h">担当のスポット({{ spots|length }})</h2>
-  {% if spots %}<ul class="list">{% for s in spots %}<li><a href="{% url 'explore:manage_spot_edit' s.pk %}">{{ s.name }}</a>(シンボル {{ s.n_symbols }})</li>{% endfor %}</ul>
+  {% if spots %}<ul class="list">{% for s in spots %}<li><a href="{% url 'ops_manage:spot_edit' s.pk %}">{{ s.name }}</a>(シンボル {{ s.n_symbols }})</li>{% endfor %}</ul>
   {% else %}<p class="empty">まだありません。スポットの編集画面で「担当の管理者」を選ぶと割り当てられます。</p>{% endif %}
 </section>
 <section aria-labelledby="pw-h">

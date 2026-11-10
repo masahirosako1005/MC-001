@@ -7,7 +7,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.views import LoginView
 from django.db import transaction
-from django.shortcuts import redirect, render
+from django.shortcuts import redirect, render, resolve_url
 from django.views.decorators.http import require_GET, require_http_methods
 
 from core import audit
@@ -22,6 +22,9 @@ class MikkeLoginView(LoginView):
     template_name = "accounts/login.html"
     authentication_form = ThrottledLoginForm
     redirect_authenticated_user = True
+
+    def get_default_redirect_url(self):
+        return resolve_url(home_url_name(self.request.user))
 
 
 @require_http_methods(["GET", "POST"])
@@ -60,9 +63,23 @@ def account(request):
     return render(request, "accounts/account.html", {"form": form})
 
 
+def home_url_name(user) -> str:
+    """ログイン後・パスワード変更後に戻る画面 (利用者・管理者・サイト運営者で別の画面)。"""
+    if user.is_operator:
+        return "ops:dashboard"
+    if user.is_manager:
+        return "manage:home"
+    return "core:home"
+
+
 @login_required
 @require_http_methods(["GET", "POST"])
 def password_change(request):
+    return change_password(request)
+
+
+def change_password(request):
+    """パスワード変更 (利用者側・運営側の両方から使う。権限の確認は呼び出し側で行う)。"""
     form = PasswordChangeForm(request.user, request.POST or None)
     if request.method == "POST" and form.is_valid():
         user = form.save()
@@ -72,7 +89,7 @@ def password_change(request):
         update_session_auth_hash(request, user)  # ほかの端末のログインは切れ、この端末はそのまま
         audit.record("account.password_change", request=request, target=user)
         messages.success(request, "パスワードを変更しました。")
-        return redirect("ops:dashboard" if user.is_operator else "core:home")
+        return redirect(home_url_name(user))
     return render(request, "accounts/password_change.html", {
         "form": form, "forced": request.user.must_change_password,
     })

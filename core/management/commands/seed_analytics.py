@@ -33,9 +33,17 @@ from core.demo import DEMO_DOMAIN, DEMO_MANAGER_GROUP, DEMO_USER_GROUP
 from core.ids import temp_password
 from core.timeutil import season_of, slot_of
 from explore.models import Discovery, DropEntry, NearbyVisit, Spot, SpotVisit, Symbol
+from rewards.models import CouponTemplate, UserCoupon, redeem_hash_of
+from rewards.services import new_redeem_code
 from wardrobe.models import CATEGORY_CHOICES, Item, UserItem
 
 DEMO_SPOT_PREFIX = "demo-spot-"
+DEMO_COUPON_PREFIX = "demo-cp-"
+COUPON_KINDS = [  # (タイトル, 特典内容, 1 枚あたりの金額)
+    ("ドリンク 100 円引き", "ドリンク全品 100 円引き", 100), ("お会計 5% オフ", "お会計から 5% オフ (平均 150 円相当)", 150),
+    ("ソフトクリーム 1 個サービス", "ソフトクリームを 1 個サービス", 300), ("記念品プレゼント", "オリジナル缶バッジを 1 個", 200),
+    ("入場料 50 円引き", "入場料から 50 円引き", 50), ("ランチ 500 円引き", "ランチメニュー 500 円引き", 500),
+]
 # 以前のバージョンが確認用アカウントに設定していた固定パスワード。見つけたら仮パスワードに置き換える
 LEGACY_TEST_PASSWORD = "test1234"  # noqa: S105
 _rng = secrets.SystemRandom()
@@ -101,8 +109,11 @@ class Command(BaseCommand):
         call_command("seed_demo_users", users=opts["users"], entries=0, stdout=self.stdout)
         users = list(User.objects.filter(groups__name=DEMO_USER_GROUP).values_list("pk", flat=True))
         n_visits, n_disc = self._behaviour(spots, users, opts["days"])
-        audit.record("demo.analytics_seeded", spots=len(spots), users=len(users), visits=n_visits, discoveries=n_disc)
-        self.stdout.write(self.style.SUCCESS(f"行動データ: 付近の来訪 {n_visits} 件 / みっけ {n_disc} 件"))
+        n_issued, n_used = self._coupons(spots, users, opts["days"])
+        audit.record("demo.analytics_seeded", spots=len(spots), users=len(users), visits=n_visits, discoveries=n_disc,
+                     coupons_issued=n_issued, coupons_used=n_used)
+        self.stdout.write(self.style.SUCCESS(f"行動データ: 付近の来訪 {n_visits} 件 / みっけ {n_disc} 件 / "
+                                             f"クーポン 配布 {n_issued} 枚・使用 {n_used} 枚"))
 
     # ------------------------------------------------------------ 直近のみっけ (確認用)
     @transaction.atomic
@@ -139,9 +150,53 @@ class Command(BaseCommand):
                                          [c for c, _ in CATEGORY_CHOICES], batch_size=500)
         return len(out)
 
+    # ------------------------------------------------------------ クーポン (店舗ごとの利用実績の確認用)
+    @transaction.atomic
+    def _coupons(self, spots: list[Spot], user_ids: list[int], days: int) -> tuple[int, int]:
+        """担当スポットのある管理者ごとにクーポンを 1〜2 種類作り、配布・使用の記録を作る。"""
+        now = timezone.now()
+        by_owner: dict[int, list[Spot]] = {}
+        for sp in spots:
+            if sp.owner_id:
+                by_owner.setdefault(sp.owner_id, []).append(sp)
+        templates = []
+        for owner_id, owned in sorted(by_owner.items()):
+            for n in range(1 + owner_id % 2):
+                title, benefit, value = COUPON_KINDS[(owner_id + n) % len(COUPON_KINDS)]
+                spot = owned[n % len(owned)]
+                tpl, _ = CouponTemplate.objects.update_or_create(
+                    code=f"{DEMO_COUPON_PREFIX}{owner_id}-{n}", defaults=dict(
+                        title=title, shop_name=spot.name[:80], benefit=benefit, value_yen=value, spot=spot,
+                        owner_id=owner_id, valid_days=30, is_active=True,
+                        description="※分析確認用の架空のクーポンです。",
+                        created_at=now - dt.timedelta(days=days)))
+                templates.append(tpl)
+        UserCoupon.objects.filter(template__in=templates).delete()
+        rows, used = [], 0
+        for tpl in templates:
+            popularity = _rng.uniform(0.3, 1.0)
+            for uid in _rng.sample(user_ids, k=min(len(user_ids), int(_rng.randrange(40, 220) * popularity))):
+                issued = now - dt.timedelta(days=_rng.uniform(0, days), minutes=_rng.randrange(0, 60))
+                expires = issued + dt.timedelta(days=tpl.valid_days)
+                used_at = None
+                if _rng.random() < 0.25 + popularity * 0.35:
+                    used_at = issued + dt.timedelta(hours=_rng.uniform(1, tpl.valid_days * 24 * 0.6))
+                    if used_at >= now:
+                        used_at = None
+                code = new_redeem_code()
+                rows.append(UserCoupon(user_id=uid, template=tpl, redeem_code=code, redeem_hash=redeem_hash_of(code),
+                                       source="デモ (分析確認用)", issued_at=issued, expires_at=expires,
+                                       used_at=used_at, used_value_yen=tpl.value_yen if used_at else None))
+                used += used_at is not None
+        UserCoupon.objects.bulk_create(rows, batch_size=2000, ignore_conflicts=True)
+        return len(rows), used
+
     # ------------------------------------------------------------ 削除
     @transaction.atomic
     def _delete(self, managers: bool):
+        demo_coupons = CouponTemplate.objects.filter(code__startswith=DEMO_COUPON_PREFIX)
+        UserCoupon.objects.filter(template__in=demo_coupons).delete()
+        demo_coupons.delete()
         spots = Spot.objects.filter(slug__startswith=DEMO_SPOT_PREFIX)
         Discovery.objects.filter(symbol__spot__in=spots).delete()
         SpotVisit.objects.filter(spot__in=spots).delete()

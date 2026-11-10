@@ -5,7 +5,7 @@
 | [design.md](design.md) | **設計書**(全体構成・権限・機能・データ・API・フロントエンド・セキュリティ・運用) |
 | [requirements.md](requirements.md) | 要件(R1〜)と実装・テストの対応表(トレーサビリティ) |
 | [api.md](api.md) | JSON API・画像エンドポイントの仕様 |
-| [adr/](adr/) | 設計判断の記録(ADR 0001〜0012) |
+| [adr/](adr/) | 設計判断の記録(ADR 0001〜0013) |
 | [reviews/](reviews/) | 評価レポートと対応状況 |
 
 ## ADR
@@ -23,3 +23,4 @@
 | [0010](adr/0010-roles-and-analytics.md) | 権限の分離(利用者・管理者・サイト運営者)と運営向け分析 |
 | [0011](adr/0011-recent-finders-and-coupons.md) | 「こんな人が獲得しているよ」・管理者のクーポン登録・衣装全振り |
 | [0012](adr/0012-local-https-reverse-proxy.md) | nginx のリバースプロキシと自己署名証明書でローカルを HTTPS にする |
+| [0013](adr/0013-console-separation-and-coupon-amounts.md) | 利用者 / 管理者 / サイト運営者の画面とセッションの分離・クーポンの使用金額 |

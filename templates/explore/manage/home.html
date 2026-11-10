@@ -1,0 +1,43 @@
+{% extends "console/base.html" %}{% load mikke_format %}
+{% block title %}ホーム{% endblock %}
+{% block content %}
+<h1>{{ user.manager_profile.display_name|default:user.nickname }} さんの管理画面</h1>
+<p class="muted">担当のスポット・シンボル・クーポンの状況です(直近 30 日)。利用者向けの画面(きせかえ・みっけ など)は、この管理者アカウントでは開けません。</p>
+
+<section aria-labelledby="kpi-h">
+  <h2 id="kpi-h" class="visually-hidden">直近 30 日の数</h2>
+  <ul class="kpi-row">
+    <li class="kpi"><span class="kpi-label">付近に来た人</span><span class="kpi-value">{{ total.visitors }}<small>人</small></span><span class="kpi-sub">カメラ起動 {{ total.camera }} 人</span></li>
+    <li class="kpi"><span class="kpi-label">コーデを獲得した人</span><span class="kpi-value">{{ total.coord }}<small>人</small></span><span class="kpi-sub">獲得 {{ total.coord_count }} 回</span></li>
+    <li class="kpi"><span class="kpi-label">クーポンの使用</span><span class="kpi-value">{{ coupon_totals.used|num }}<small>枚</small></span><span class="kpi-sub">配布 {{ coupon_totals.issued|num }} 枚</span></li>
+    <li class="kpi kpi-hero"><span class="kpi-label">クーポンの使用金額</span><span class="kpi-value">{{ coupon_totals.amount|num }}<small>円</small></span><span class="kpi-sub">使用枚数 × 1 枚あたりの金額</span></li>
+  </ul>
+</section>
+
+<div class="console-cards">
+  <section class="chart-card" aria-labelledby="spots-h">
+    <div class="card-head"><h2 id="spots-h">スポット</h2><a href="{% url 'manage:spots' %}">スポットの設定</a></div>
+    <p class="muted">公開中 {{ n_spots_open }} / {{ n_spots }} スポット ・ 公開中のシンボル {{ n_symbols }} 個</p>
+    {% if top_spots %}
+    <table class="table num-table">
+      <caption class="visually-hidden">付近に来た人が多いスポット</caption>
+      <thead><tr><th scope="col">スポット</th><th scope="col">付近に来た人</th><th scope="col">カメラ起動</th><th scope="col">コーデ獲得</th></tr></thead>
+      <tbody>{% for r in top_spots %}<tr><th scope="row">{{ r.spot.name }}</th><td>{{ r.visitors }}</td><td>{{ r.camera }}</td><td>{{ r.coord }}</td></tr>{% endfor %}</tbody>
+    </table>
+    {% elif n_spots %}<p class="empty">直近 30 日に付近に来た人はまだいません。</p>
+    {% else %}<p class="empty">担当のスポットはまだありません。<a href="{% url 'manage:spot_create' %}">スポットを追加</a>するか、サイト運営者に担当の割り当てを依頼してください。</p>{% endif %}
+  </section>
+
+  <section class="chart-card" aria-labelledby="coupons-h">
+    <div class="card-head"><h2 id="coupons-h">クーポン</h2><a href="{% url 'manage:coupon_stats' %}">クーポンの実績</a></div>
+    <p class="muted">配布中 {{ n_coupons_active }} 種類</p>
+    {% if coupon_rows %}
+    <table class="table num-table">
+      <caption class="visually-hidden">使用金額の多いクーポン</caption>
+      <thead><tr><th scope="col">クーポン</th><th scope="col">配布</th><th scope="col">使用</th><th scope="col">金額</th></tr></thead>
+      <tbody>{% for r in coupon_rows %}<tr><th scope="row">{{ r.coupon.title }}</th><td>{{ r.issued|num }}</td><td>{{ r.used|num }}</td><td>{{ r.amount|num }} 円</td></tr>{% endfor %}</tbody>
+    </table>
+    {% else %}<p class="empty">クーポンはまだありません。<a href="{% url 'manage:coupon_create' %}">クーポンを登録</a>しましょう。</p>{% endif %}
+  </section>
+</div>
+{% endblock %}

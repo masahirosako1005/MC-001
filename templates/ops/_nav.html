@@ -1,6 +1,0 @@
-<nav class="subnav" aria-label="運営メニュー">
-  <a href="{% url 'ops:dashboard' %}" {% if active == "dashboard" %}aria-current="page"{% endif %}>分析</a>
-  <a href="{% url 'ops:users' %}" {% if active == "users" %}aria-current="page"{% endif %}>利用者管理</a>
-  <a href="{% url 'ops:manager_create' %}" {% if active == "manager_new" %}aria-current="page"{% endif %}>管理者を追加</a>
-  <a href="{% url 'explore:manage_spots' %}">スポット・シンボル</a>
-</nav>

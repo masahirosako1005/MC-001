@@ -15,6 +15,7 @@ from django.utils import timezone
 
 from accounts.models import ManagerProfile, User
 from core.models import AuditLog
+from core.testing import ops_login
 from explore import services
 from explore.models import Discovery, DropEntry, NearbyVisit, Spot, SpotVisit, Symbol
 from ops import analytics, charts
@@ -87,10 +88,21 @@ class LoginSeparationTests(Base):
         self.assertNotIn("_auth_user_id", self.client.session)
 
     def test_operator_login_page(self):
+        from django.conf import settings
+        from django.contrib.sessions.backends.db import SessionStore
+
         res = self.login(reverse("ops:login"), "op@example.com")
         self.assertRedirects(res, reverse("ops:dashboard"))
-        self.assertLessEqual(self.client.session.get_expiry_age(), 4 * 3600)
+        # 運営者のログインは運営側専用の Cookie にだけ入る (利用者側のセッション Cookie は作らない)
+        self.assertNotIn(settings.SESSION_COOKIE_NAME, res.cookies)
+        ops_session = SessionStore(self.client.cookies[settings.OPS_SESSION_COOKIE_NAME].value)
+        self.assertEqual(ops_session.get("_auth_user_id"), str(self.op.pk))
+        self.assertLessEqual(ops_session.get_expiry_age(), 4 * 3600)
         self.assertTrue(AuditLog.objects.filter(action="ops.login").exists())
+        # そのまま利用者の画面を開いても、ログインしていない状態 (利用者の機能は使えない)
+        res = self.client.get(reverse("wardrobe:index"))
+        self.assertEqual(res.status_code, 302)
+        self.assertTrue(res["Location"].startswith(reverse("accounts:login")))
 
     def test_others_cannot_use_operator_login(self):
         for email in ("u@example.com", "m@example.com"):
@@ -121,48 +133,52 @@ class PermissionTests(Base):
             self.assertEqual(res.status_code, 302)
             self.assertTrue(res["Location"].startswith(reverse("ops:login")))
         for who in (self.user, self.manager):
+            # 利用者側のログインは運営側では読まれない (未ログインと同じく運営者のログインへ)
             self.client.force_login(who)
             for u in urls:
-                self.assertEqual(self.client.get(u).status_code, 404, (who, u))  # 存在も見せない
-        self.client.force_login(self.op)
+                res = self.client.get(u)
+                self.assertEqual(res.status_code, 302, (who, u))
+                self.assertTrue(res["Location"].startswith(reverse("ops:login")))
+            self.client.logout()
+        ops_login(self.client, self.op)
         for u in urls:
             self.assertEqual(self.client.get(u).status_code, 200, u)
 
     def test_user_cannot_manage_spots(self):
         self.client.force_login(self.user)
-        for u in (reverse("explore:manage_spots"), reverse("explore:symbol_register"), reverse("explore:symbol_print"),
-                  reverse("explore:manage_symbol_create")):
+        for u in (reverse("manage:spots"), reverse("manage:symbol_register"), reverse("manage:symbols"),
+                  reverse("manage:symbol_create")):
             self.assertEqual(self.client.get(u).status_code, 403)
 
     def test_manager_sees_only_own_spots(self):
         self.client.force_login(self.manager)
-        res = self.client.get(reverse("explore:manage_spots"))
+        res = self.client.get(reverse("manage:spots"))
         self.assertContains(res, "わたしの店")
         self.assertNotContains(res, "よその店")
         self.assertNotContains(res, "運営のスポット")
-        self.assertEqual(self.client.get(reverse("explore:manage_spot_edit", args=[self.theirs.pk])).status_code, 404)
-        self.assertEqual(self.client.get(reverse("explore:manage_spot_delete", args=[self.theirs.pk])).status_code, 404)
-        self.assertEqual(self.client.get(reverse("explore:manage_symbol_edit", args=[self.sym_theirs.pk])).status_code, 404)
-        self.assertEqual(self.client.get(reverse("explore:symbol_svg", args=[self.sym_theirs.pk])).status_code, 404)
-        res = self.client.get(reverse("explore:symbol_print"))
+        self.assertEqual(self.client.get(reverse("manage:spot_edit", args=[self.theirs.pk])).status_code, 404)
+        self.assertEqual(self.client.get(reverse("manage:spot_delete", args=[self.theirs.pk])).status_code, 404)
+        self.assertEqual(self.client.get(reverse("manage:symbol_edit", args=[self.sym_theirs.pk])).status_code, 404)
+        self.assertEqual(self.client.get(reverse("manage:symbol_svg", args=[self.sym_theirs.pk])).status_code, 404)
+        res = self.client.get(reverse("manage:symbols"))
         self.assertContains(res, "看板")
         self.assertNotContains(res, "よその看板")
         # 画像シンボル登録で選べるのも自分のスポットだけ
-        res = self.client.get(reverse("explore:symbol_register"))
+        res = self.client.get(reverse("manage:symbol_register"))
         self.assertContains(res, "わたしの店")
         self.assertNotContains(res, "よその店")
 
     def test_manager_creates_spot_as_owner(self):
         self.client.force_login(self.manager)
-        res = self.client.post(reverse("explore:manage_spot_create"), {
+        res = self.client.post(reverse("manage:spot_create"), {
             "name": "新店舗", "area": "", "description": "", "latitude": "34.69", "longitude": "135.53",
             "radius_m": "200", "is_active": "on", "no_expiry": "on", "owner": str(self.other_manager.pk)})
         self.assertEqual(res.status_code, 302)
         self.assertEqual(Spot.objects.get(name="新店舗").owner, self.manager)  # 担当は自分 (ほかの人にはできない)
 
     def test_operator_assigns_owner(self):
-        self.client.force_login(self.op)
-        self.client.post(reverse("explore:manage_spot_edit", args=[self.ops_spot.pk]), {
+        ops_login(self.client, self.op)
+        self.client.post(reverse("ops_manage:spot_edit", args=[self.ops_spot.pk]), {
             "name": "運営のスポット", "area": "", "description": "", "latitude": "34.695", "longitude": "135.535",
             "radius_m": "300", "is_active": "on", "no_expiry": "on", "owner": str(self.manager.pk)})
         self.ops_spot.refresh_from_db()
@@ -170,7 +186,7 @@ class PermissionTests(Base):
 
     def test_manager_symbol_settings_with_drops(self):
         self.client.force_login(self.manager)
-        url = reverse("explore:manage_symbol_create")
+        url = reverse("manage:symbol_create")
         data = {"spot": str(self.mine.pk), "name": "新しい看板", "hint": "入口", "cooldown_hours": "20",
                 "is_active": "on", "is_secret": "on", "latitude": "", "longitude": "",
                 "drops-TOTAL_FORMS": "2", "drops-INITIAL_FORMS": "0", "drops-MIN_NUM_FORMS": "0",
@@ -181,7 +197,7 @@ class PermissionTests(Base):
                 "drops-1-time_slot": "any", "drops-1-min_visit_days": "1"}
         res = self.client.post(url, data)
         sym = Symbol.objects.get(name="新しい看板")
-        self.assertRedirects(res, reverse("explore:manage_symbol_edit", args=[sym.pk]))
+        self.assertRedirects(res, reverse("manage:symbol_edit", args=[sym.pk]))
         self.assertTrue(sym.is_secret)
         self.assertEqual(sym.kind, Symbol.KIND_QR)
         self.assertEqual(list(sym.drops.values_list("item__code", "time_slot")), [("hair-z", "night")])
@@ -193,7 +209,7 @@ class PermissionTests(Base):
 
     def test_drop_requires_exactly_one_reward(self):
         self.client.force_login(self.manager)
-        res = self.client.post(reverse("explore:manage_symbol_edit", args=[self.sym_mine.pk]), {
+        res = self.client.post(reverse("manage:symbol_edit", args=[self.sym_mine.pk]), {
             "spot": str(self.mine.pk), "name": "看板", "hint": "", "cooldown_hours": "20", "is_active": "on",
             "latitude": "", "longitude": "",
             "drops-TOTAL_FORMS": "1", "drops-INITIAL_FORMS": "0", "drops-MIN_NUM_FORMS": "0", "drops-MAX_NUM_FORMS": "60",
@@ -207,7 +223,7 @@ class PermissionTests(Base):
 class UserManagementTests(Base):
     def setUp(self):
         super().setUp()
-        self.client.force_login(self.op)
+        ops_login(self.client, self.op)
 
     def manager_data(self, **over):
         data = {"email": "new@example.com", "nickname": "新しい店", "organization": "新商店", "store_name": "本店",
@@ -246,11 +262,11 @@ class UserManagementTests(Base):
         password = res.context["password"]
         self.client.logout()
         self.client.post(reverse("accounts:login"), {"username": "new@example.com", "password": password})
-        self.assertRedirects(self.client.get(reverse("explore:manage_spots")), reverse("accounts:password_change"))
+        self.assertRedirects(self.client.get(reverse("manage:spots")), reverse("accounts:password_change"))
         new = "kawa-sora-hoshi-umi-2026"
         self.client.post(reverse("accounts:password_change"),
                          {"old_password": password, "new_password1": new, "new_password2": new})
-        self.assertEqual(self.client.get(reverse("explore:manage_spots")).status_code, 200)
+        self.assertEqual(self.client.get(reverse("manage:spots")).status_code, 200)
 
     def test_edit_manager_and_reset_password(self):
         res = self.client.post(reverse("ops:manager_edit", args=[self.manager.pk]),
@@ -308,10 +324,11 @@ class WithdrawTests(Base):
         self.assertEqual(log.detail, {"user_id": uid})
 
     def test_manager_and_operator_cannot_withdraw_themselves(self):
-        for who in (self.manager, self.op):
+        # 管理者・運営者は利用者の画面 (退会を含む) を開けず、それぞれの画面に戻される
+        for who, home in ((self.manager, reverse("manage:home")), (self.op, reverse("ops:dashboard"))):
             self.client.force_login(who)
             res = self.client.post(reverse("accounts:withdraw"), {"password": PW, "confirm": "on"})
-            self.assertEqual(res.status_code, 403)
+            self.assertRedirects(res, home, fetch_redirect_response=False)
             self.assertTrue(User.objects.filter(pk=who.pk).exists())
 
 
@@ -404,7 +421,7 @@ class AnalyticsTests(Base):
         self.assertEqual((f.days, f.season, f.slot, f.owner, f.sort), (30, "", "night", "", "rate"))
 
     def test_dashboard_renders_charts_and_tables(self):
-        self.client.force_login(self.op)
+        ops_login(self.client, self.op)
         res = self.client.get(reverse("ops:dashboard"), {"days": "30"})
         self.assertContains(res, '<svg class="chart"', count=5)
         self.assertContains(res, "わたしの店")

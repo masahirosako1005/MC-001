@@ -14,10 +14,12 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 
 from accounts.forms import OperatorLoginForm
 from accounts.models import ManagerProfile, User, email_hash_of
+from accounts.views import change_password
 from core import audit
 from core.ids import temp_password
 from core.permissions import operator_required
 from core.timeutil import SEASON_LABELS, SLOT_LABELS
+from rewards import stats as coupon_stats
 
 from . import analytics, charts
 from .forms import ManagerAccountForm, ManagerProfileForm
@@ -73,6 +75,31 @@ def dashboard(request):
         "season_rate_chart": charts.rate_vbar(data["by_season"], key="rate", title="季節ごとの利用割合"),
         "chart_count": len(top),
     })
+
+
+# ---------------------------------------------------------------- 店舗ごとのクーポン利用
+@operator_required
+@require_GET
+def coupons(request):
+    """店舗 (管理者) ごとの、クーポンの配布・使用枚数と使用金額。"""
+    period = coupon_stats.Period.from_query(request.GET)
+    rows = coupon_stats.store_rows(period)
+    chart_rows = [r for r in rows if r["amount"] or r["used"]][:15]
+    return render(request, "ops/coupons.html", {
+        "period": period, "periods": coupon_stats.PERIODS, "rows": rows, "totals": coupon_stats.totals(rows),
+        "amount_chart": charts.grouped_hbar(chart_rows, [("amount", "使用金額")], unit="円",
+                                            title="店舗ごとのクーポン使用金額"),
+        "used_chart": charts.grouped_hbar(chart_rows, [("used", "使用枚数")], unit="枚",
+                                          title="店舗ごとのクーポン使用枚数"),
+        "chart_count": len(chart_rows),
+    })
+
+
+# ---------------------------------------------------------------- 運営者のアカウント
+@operator_required
+@require_http_methods(["GET", "POST"])
+def password_change(request):
+    return change_password(request)
 
 
 # ---------------------------------------------------------------- 利用者管理

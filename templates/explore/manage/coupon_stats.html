@@ -1,0 +1,66 @@
+{% extends "console/base.html" %}{% load mikke_format %}
+{% block title %}クーポンの実績{% endblock %}
+{% block content %}
+{% if console_role == "operator" %}<p><a href="{% url 'ops:coupons' %}?days={{ period.days }}">← 店舗ごとのクーポン利用</a></p>{% endif %}
+<h1>クーポンの実績{% if store %}: {{ store }}{% endif %}</h1>
+<p class="muted">使用金額 = 使用枚数 × 使った時点の「1 枚あたりの金額」。使用率 = 期間内に配った枚数のうち、使用済みになった割合。
+  {% if console_role == "manager" %}自分が登録したクーポンと、担当スポットのクーポンだけを表示しています。{% endif %}</p>
+
+<form method="get" class="filter-bar" aria-label="絞り込み">
+  <label>期間 <select name="days">{% for d, label in periods %}<option value="{{ d }}"{% if period.days == d %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+  {% if owner %}<input type="hidden" name="owner" value="{{ owner }}">{% endif %}
+  <button type="submit" class="btn btn-primary btn-small">表示</button>
+</form>
+
+<section aria-labelledby="kpi-h">
+  <h2 id="kpi-h" class="visually-hidden">{{ period.label }}の合計</h2>
+  <ul class="kpi-row">
+    <li class="kpi"><span class="kpi-label">配布枚数</span><span class="kpi-value">{{ totals.issued|num }}<small>枚</small></span><span class="kpi-sub">{{ period.label }}</span></li>
+    <li class="kpi"><span class="kpi-label">使用枚数</span><span class="kpi-value">{{ totals.used|num }}<small>枚</small></span><span class="kpi-sub">{{ period.label }}</span></li>
+    <li class="kpi kpi-hero"><span class="kpi-label">使用金額</span><span class="kpi-value">{{ totals.amount|num }}<small>円</small></span><span class="kpi-sub">{{ period.label }}</span></li>
+  </ul>
+</section>
+
+<section class="chart-card" aria-labelledby="list-h">
+  <h2 id="list-h">クーポンごと</h2>
+  {% if rows %}
+  <div class="table-wrap">
+  <table class="table num-table">
+    <caption class="visually-hidden">クーポンごとの配布・使用枚数と使用金額({{ period.label }})</caption>
+    <thead><tr><th scope="col">クーポン</th>{% if console_role == "operator" and not owner %}<th scope="col">店舗</th>{% endif %}<th scope="col">1 枚の金額</th><th scope="col">配布</th><th scope="col">使用</th><th scope="col">使用率</th><th scope="col">使用金額</th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+    <tr>
+      <th scope="row"><a href="{% url 'manage:coupon_edit' r.coupon.pk %}">{{ r.coupon.title }}</a><br><span class="muted"><code>{{ r.coupon.coupon_id }}</code> ・ {{ r.coupon.status_label }}</span></th>
+      {% if console_role == "operator" and not owner %}<td>{{ r.store }}</td>{% endif %}
+      <td>{% if r.coupon.value_yen %}{{ r.coupon.value_yen|num }} 円{% else %}<span class="muted">未設定</span>{% endif %}</td>
+      <td>{{ r.issued|num }}</td><td>{{ r.used|num }}</td>
+      <td>{% if r.rate is not None %}{{ r.rate }}%{% else %}—{% endif %}</td>
+      <td>{{ r.amount|num }} 円</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+    <tfoot><tr><th scope="row">合計</th>{% if console_role == "operator" and not owner %}<td></td>{% endif %}<td></td><td>{{ totals.issued|num }}</td><td>{{ totals.used|num }}</td><td></td><td>{{ totals.amount|num }} 円</td></tr></tfoot>
+  </table>
+  </div>
+  {% if rows|length and not totals.amount and totals.used %}<p class="help">使用金額が 0 円のときは、クーポンの編集画面で「1 枚あたりの金額」を設定してください(設定したあとに使われた分から数えます)。</p>{% endif %}
+  {% else %}<p class="empty">クーポンはまだありません。</p>{% endif %}
+</section>
+
+<div class="chart-pair">
+  <section class="chart-card" aria-labelledby="m-used-h">
+    <h2 id="m-used-h">月ごとの使用枚数(直近 12 か月)</h2>
+    {{ used_chart }}
+  </section>
+  <section class="chart-card" aria-labelledby="m-amount-h">
+    <h2 id="m-amount-h">月ごとの使用金額(直近 12 か月)</h2>
+    {{ amount_chart }}
+  </section>
+</div>
+<details class="chart-card"><summary>月ごとの数値を表で見る</summary>
+  <table class="table num-table"><caption class="visually-hidden">月ごとの使用枚数と使用金額</caption>
+    <thead><tr><th scope="col">月</th><th scope="col">使用枚数</th><th scope="col">使用金額</th></tr></thead>
+    <tbody>{% for m in months %}<tr><th scope="row">{{ m.label }}</th><td>{{ m.used|num }}</td><td>{{ m.amount|num }} 円</td></tr>{% endfor %}</tbody>
+  </table>
+</details>
+{% endblock %}

@@ -13,6 +13,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from accounts.models import User
+from core.testing import ops_login
 from explore import services
 from explore.models import Discovery, DropEntry, Spot, SpotVisit, Symbol
 from explore.symbols import render_symbol_svg
@@ -403,10 +404,10 @@ class PageTests(Base):
 
     def test_symbol_print_staff_only(self):
         self.client.force_login(self.user)
-        self.assertEqual(self.client.get(reverse("explore:symbol_svg", args=[self.symbol.pk])).status_code, 403)
+        self.assertEqual(self.client.get(reverse("manage:symbol_svg", args=[self.symbol.pk])).status_code, 403)
         staff = User.objects.create_user("s@example.com", PW, "スタッフ", role="operator")
-        self.client.force_login(staff)
-        res = self.client.get(reverse("explore:symbol_svg", args=[self.symbol.pk]))
+        ops_login(self.client, staff)
+        res = self.client.get(reverse("ops_manage:symbol_svg", args=[self.symbol.pk]))
         self.assertEqual(res.status_code, 200)
         self.assertIn(b"<svg", res.content)
 

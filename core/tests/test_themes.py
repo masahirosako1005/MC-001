@@ -15,6 +15,7 @@ from django.utils import timezone
 from accounts.models import User
 from contest.models import Contest
 from core.models import AuditLog, SiteSetting
+from core.testing import ops_login
 from core.themes import THEMES
 from core.views import PHOTOS, travel_rank
 from wardrobe.models import Item
@@ -79,33 +80,22 @@ class ThemeSwitchTests(TestCase):
             self.assertContains(res, text)
         self.assertNotContains(res, 'class="site-header"')  # 1 画面ホームは上部ステータスバーに置き換え
 
-    def test_staff_can_preview_only_for_themselves(self):
-        self.client.force_login(self.staff)
-        res = self.client.get("/?ui=magazine")
-        self.assertTemplateUsed(res, "core/home_magazine.html")
-        self.assertContains(res, "管理者プレビュー")
-        self.assertTemplateUsed(self.client.get("/"), "core/home_magazine.html")  # セッションに残る
-        self.assertEqual(SiteSetting.current().ui_theme, "standard")  # 全体設定は変わらない
-        self.assertTemplateUsed(self.client.get("/?ui=reset"), "core/home_standard.html")
-
-    def test_non_staff_cannot_preview(self):
+    def test_preview_param_is_ignored(self):
+        # 以前の「管理者が ?ui= で自分だけ試す」は廃止 (運営者は利用者の画面を開けない)。誰が付けても無視する
         self.client.force_login(self.user)
         res = self.client.get("/?ui=game")
         self.assertTemplateUsed(res, "core/home_standard.html")
         self.assertNotContains(res, "管理者プレビュー")
+        self.assertTemplateUsed(self.client.get("/?ui=../../evil"), "core/home_standard.html")
         self.client.logout()
         self.assertTemplateUsed(self.client.get("/?ui=game"), "core/landing_standard.html")
 
-    def test_unknown_theme_param_ignored(self):
-        self.client.force_login(self.staff)
-        self.assertTemplateUsed(self.client.get("/?ui=../../evil"), "core/home_standard.html")
-
     def test_admin_switches_theme_for_everyone(self):
-        self.client.force_login(self.staff)
+        ops_login(self.client, self.staff)
         url = reverse("admin:core_sitesetting_change", args=[SiteSetting.current().pk])
         page = self.client.get(url)
         self.assertContains(page, "ゲームホーム")
-        self.assertContains(page, "自分だけ試す")
+        self.assertNotContains(page, "自分だけ試す")
         self.assertContains(page, "camera_radius_m")
         # カメラ起動の距離 (範囲外は保存しない)
         self.assertEqual(self.client.post(url, {"ui_theme": "game", "camera_radius_m": "5"}).status_code, 200)
@@ -119,7 +109,7 @@ class ThemeSwitchTests(TestCase):
         self.assertTemplateUsed(self.client.get("/"), "core/landing_game.html")  # 未ログインの人にも反映
 
     def test_admin_singleton(self):
-        self.client.force_login(self.staff)
+        ops_login(self.client, self.staff)
         SiteSetting.current()
         self.assertEqual(self.client.get(reverse("admin:core_sitesetting_add")).status_code, 403)
         changelist = self.client.get(reverse("admin:core_sitesetting_changelist"))

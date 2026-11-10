@@ -18,6 +18,7 @@ from django.urls import reverse
 
 from accounts.models import User
 from core.models import AuditLog
+from core.testing import ops_login
 from explore import services
 from explore.image_symbols import (
     MASK_BYTES,
@@ -288,21 +289,21 @@ class ImageSymbolViewTests(TestCase):
             data[f"{angle}_mask"] = b64(mask)
         return data
 
-    def post_register(self, angles=("front",), **kw):
+    def post_register(self, angles=("front",), ns="ops_manage", **kw):
         data = {"spot": self.spot.pk, "name": "看板", "hint": "入口", "cooldown_hours": 20, "angles": ",".join(angles)}
         for i, a in enumerate(angles):
             data.update(self.view_files(a, seed=7 + i, **kw))
-        return self.client.post(reverse("explore:symbol_register"), data)
+        return self.client.post(reverse(f"{ns}:symbol_register"), data)
 
     def test_register_requires_staff(self):
         self.client.force_login(self.user)
-        self.assertEqual(self.client.get(reverse("explore:symbol_register")).status_code, 403)
-        self.assertEqual(self.post_register().status_code, 403)
+        self.assertEqual(self.client.get(reverse("manage:symbol_register")).status_code, 403)
+        self.assertEqual(self.post_register(ns="manage").status_code, 403)
         self.assertFalse(Symbol.objects.filter(kind="image").exists())
 
     def test_register_multi_angle_with_mask(self):
-        self.client.force_login(self.staff)
-        page = self.client.get(reverse("explore:symbol_register"))
+        ops_login(self.client, self.staff)
+        page = self.client.get(reverse("ops_manage:symbol_register"))
         self.assertContains(page, "右上から")
         mask = mask_bits(lambda x, y: x >= 24)
         res = self.post_register(angles=("front", "left", "up_right"), mask=mask)
@@ -313,7 +314,7 @@ class ImageSymbolViewTests(TestCase):
         self.assertTrue(AuditLog.objects.filter(action="symbol.register_image").exists())
 
     def test_register_rejects_bad_input(self):
-        self.client.force_login(self.staff)
+        ops_login(self.client, self.staff)
         cases = {
             "few_features": dict(features=fake_features(n=5)),
             "not_jpeg": dict(jpeg=b"\x89PNG\r\n\x1a\n" + b"x" * 100),
@@ -324,24 +325,24 @@ class ImageSymbolViewTests(TestCase):
                 res = self.post_register(**kw)
                 self.assertEqual(res.status_code, 400)
                 self.assertTrue(res.json()["errors"])
-        bad_angle = self.client.post(reverse("explore:symbol_register"), {
+        bad_angle = self.client.post(reverse("ops_manage:symbol_register"), {
             "spot": self.spot.pk, "name": "看板", "cooldown_hours": 20, "angles": "behind", **self.view_files("behind")})
         self.assertEqual(bad_angle.status_code, 400)
-        no_views = self.client.post(reverse("explore:symbol_register"), {
+        no_views = self.client.post(reverse("ops_manage:symbol_register"), {
             "spot": self.spot.pk, "name": "看板", "cooldown_hours": 20, "angles": ""})
         self.assertEqual(no_views.status_code, 400)
         self.assertFalse(Symbol.objects.filter(kind="image").exists())
 
     def test_register_requires_csrf(self):
         client = self.client_class(enforce_csrf_checks=True)
-        client.force_login(self.staff)
-        self.assertEqual(client.post(reverse("explore:symbol_register"), {"spot": self.spot.pk}).status_code, 403)
+        ops_login(client, self.staff)
+        self.assertEqual(client.post(reverse("ops_manage:symbol_register"), {"spot": self.spot.pk}).status_code, 403)
 
     def test_edit_views(self):
-        self.client.force_login(self.staff)
+        ops_login(self.client, self.staff)
         self.post_register(angles=("front", "right"))
         sym = Symbol.objects.get(kind="image")
-        url = reverse("explore:symbol_views", args=[sym.pk])
+        url = reverse("ops_manage:symbol_views", args=[sym.pk])
         page = self.client.get(url)
         self.assertContains(page, "撮り直")
         self.assertContains(page, 'data-existing="1"', count=2)
@@ -352,15 +353,15 @@ class ImageSymbolViewTests(TestCase):
         self.assertEqual(last.status_code, 400)
         self.assertEqual(sym.views.count(), 2)
         self.client.force_login(self.user)
-        self.assertEqual(self.client.get(url).status_code, 403)
+        self.assertEqual(self.client.get(reverse("manage:symbol_views", args=[sym.pk])).status_code, 403)
 
     def test_qr_symbol_has_no_views_page(self):
-        self.client.force_login(self.staff)
+        ops_login(self.client, self.staff)
         qr = Symbol.objects.create(spot=self.spot, name="QR")
-        self.assertEqual(self.client.get(reverse("explore:symbol_views", args=[qr.pk])).status_code, 404)
+        self.assertEqual(self.client.get(reverse("ops_manage:symbol_views", args=[qr.pk])).status_code, 404)
 
     def test_catalog_api(self):
-        self.client.force_login(self.staff)
+        ops_login(self.client, self.staff)
         self.post_register(angles=("front", "right"))
         self.assertEqual(self.client_class().get(reverse("explore:api_image_symbols")).status_code, 401)
         self.client.force_login(self.user)
@@ -368,7 +369,7 @@ class ImageSymbolViewTests(TestCase):
         self.assertEqual([s["view"] for s in res.json()["symbols"]], ["front", "right"])
 
     def test_scan_api_with_image(self):
-        self.client.force_login(self.staff)
+        ops_login(self.client, self.staff)
         self.post_register()
         sym = Symbol.objects.get(kind="image")
         self.client.force_login(self.user)
@@ -382,22 +383,26 @@ class ImageSymbolViewTests(TestCase):
         self.assertEqual(ng.status_code, 404)
 
     def test_view_photo_is_staff_only(self):
-        self.client.force_login(self.staff)
+        ops_login(self.client, self.staff)
         self.post_register()
         sym = Symbol.objects.get(kind="image")
-        url = reverse("explore:symbol_view_image", args=[sym.pk, "front"])
+        url = reverse("ops_manage:symbol_view_image", args=[sym.pk, "front"])
         res = self.client.get(url)
         self.assertEqual((res.status_code, res["Content-Type"]), (200, "image/jpeg"))
-        self.assertEqual(self.client.get(reverse("explore:symbol_view_image", args=[sym.pk, "left"])).status_code, 404)
-        self.assertEqual(self.client.get(reverse("explore:symbol_svg", args=[sym.pk])).status_code, 404)
+        self.assertEqual(self.client.get(reverse("ops_manage:symbol_view_image", args=[sym.pk, "left"])).status_code, 404)
+        self.assertEqual(self.client.get(reverse("ops_manage:symbol_svg", args=[sym.pk])).status_code, 404)
         self.client.force_login(self.user)
-        self.assertEqual(self.client.get(url).status_code, 403)
+        self.assertEqual(self.client.get(reverse("manage:symbol_view_image", args=[sym.pk, "front"])).status_code, 403)
+        # 利用者のセッションは運営側の URL では読まれない (運営者のログインへ)
+        only_user = self.client_class()
+        only_user.force_login(self.user)
+        self.assertEqual(only_user.get(url).status_code, 302)
 
     def test_print_page_lists_both_kinds(self):
-        self.client.force_login(self.staff)
+        ops_login(self.client, self.staff)
         self.post_register(angles=("front", "left"))
         Symbol.objects.create(spot=self.spot, name="QR")
-        res = self.client.get(reverse("explore:symbol_print"))
+        res = self.client.get(reverse("ops_manage:symbols"))
         self.assertContains(res, "画像シンボル・2 角度")
         self.assertContains(res, "QR シンボル")
 

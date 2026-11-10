@@ -17,7 +17,7 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 from core import audit, ratelimit
 from core.http import svg_response, too_many_requests
 from core.models import SiteSetting
-from core.permissions import managed_spots, managed_symbols, manager_required
+from core.permissions import manage_url, managed_spots, managed_symbols, manager_required
 from wardrobe.models import CATEGORY_CHOICES
 from wardrobe.services import config_svg, get_config, item_preview_svg, item_zoom_svg
 
@@ -92,10 +92,10 @@ def mikke(request):
     })
 
 
-def _map_context() -> dict:
+def _map_context(tiles_url: str | None = None) -> dict:
     cfg = settings.MIKKE_MAP
     return {
-        "map_tiles_url": reverse("maps:pmtiles", args=[cfg["tiles"]]),
+        "map_tiles_url": tiles_url or reverse("maps:pmtiles", args=[cfg["tiles"]]),
         "map_config": {k: cfg[k] for k in ("bounds", "center", "zoom", "max_data_zoom")},
     }
 
@@ -309,7 +309,7 @@ def symbol_register(request):
     if request.method == "GET":
         return render(request, "explore/symbol_register.html", {
             "form": ImageSymbolInfoForm(spots=spots), "angles": _angle_grid(), "mode": "new",
-            "api": reverse("explore:symbol_register"),
+            "api": manage_url(request, "symbol_register"),
         })
     form = ImageSymbolInfoForm(request.POST, spots=spots)
     if not form.is_valid():
@@ -327,7 +327,7 @@ def symbol_register(request):
                  angles=sorted(uploads))
     messages.success(request, f"画像シンボル「{symbol.name}」を {len(uploads)} 角度で登録しました。"
                               "続けて、手に入るコーデやクーポン (ドロップ) を設定してください。")
-    return JsonResponse({"ok": True, "id": symbol.pk, "redirect": reverse("explore:manage_symbol_edit", args=[symbol.pk])})
+    return JsonResponse({"ok": True, "id": symbol.pk, "redirect": manage_url(request, "symbol_edit", symbol.pk)})
 
 
 @manager_required
@@ -339,7 +339,7 @@ def symbol_views(request, pk: int):
         existing = {v.angle: v for v in symbol.views.only("angle", "keypoint_count", "symbol_id")}
         return render(request, "explore/symbol_register.html", {
             "symbol": symbol, "angles": _angle_grid(existing), "mode": "edit",
-            "api": reverse("explore:symbol_views", args=[symbol.pk]),
+            "api": manage_url(request, "symbol_views", symbol.pk),
         })
     try:
         uploads, delete = collect_view_uploads(request.POST, request.FILES)
@@ -350,7 +350,7 @@ def symbol_views(request, pk: int):
         return _json_errors([str(exc)])
     audit.record("symbol.update_views", request=request, target=symbol, saved=sorted(uploads), deleted=sorted(delete))
     messages.success(request, f"画像シンボル「{symbol.name}」の角度を更新しました。")
-    return JsonResponse({"ok": True, "id": symbol.pk, "redirect": reverse("explore:symbol_print")})
+    return JsonResponse({"ok": True, "id": symbol.pk, "redirect": manage_url(request, "symbols")})
 
 
 @manager_required

@@ -38,8 +38,6 @@
         <a href="{% url 'explore:history' %}">みっけ履歴</a>
         <a href="{% url 'rewards:achievements' %}">実績</a>
         <a href="{% url 'contest:list' %}">コンテスト</a>
-        {% if user.can_manage_spots %}<a href="{% url 'explore:manage_spots' %}">スポット・シンボルの設定</a>{% endif %}
-        {% if user.is_operator %}<a href="{% url 'ops:dashboard' %}">運営メニュー(利用者管理・分析)</a>{% endif %}
         <a href="{% url 'accounts:account' %}">アカウント(パスワード・退会)</a>
         <form method="post" action="{% url 'accounts:logout' %}">{% csrf_token %}<button type="submit">ログアウト</button></form>
       </div>

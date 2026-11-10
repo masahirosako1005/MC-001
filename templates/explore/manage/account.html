@@ -1,0 +1,25 @@
+{% extends "console/base.html" %}
+{% block title %}店舗・会社の情報{% endblock %}
+{% block content %}
+<section class="narrow">
+  <h1>店舗・会社の情報</h1>
+  <p class="muted">登録されている情報です。変更が必要なときは、サイト運営者に連絡してください。</p>
+  {% if profile %}
+  <dl class="store-info">
+    <dt>管理者 ID</dt><dd><code>{{ profile.manager_code }}</code></dd>
+    <dt>会社・団体名</dt><dd>{{ profile.organization }}</dd>
+    {% if profile.store_name %}<dt>店舗・施設名</dt><dd>{{ profile.store_name }}</dd>{% endif %}
+    <dt>業種</dt><dd>{{ profile.get_industry_display }}</dd>
+    <dt>担当者名</dt><dd>{{ profile.contact_name }}</dd>
+    {% if profile.postal_code or profile.address %}<dt>住所</dt><dd>{% if profile.postal_code %}〒{{ profile.postal_code }} {% endif %}{{ profile.address }}</dd>{% endif %}
+    {% if profile.phone %}<dt>電話番号</dt><dd>{{ profile.phone }}</dd>{% endif %}
+    {% if profile.website %}<dt>Web サイト</dt><dd>{{ profile.website }}</dd>{% endif %}
+    <dt>ログイン用メール</dt><dd>{{ user.email }}</dd>
+  </dl>
+  {% else %}
+  <p class="empty">店舗・会社の情報はまだ登録されていません。サイト運営者に登録を依頼してください。</p>
+  {% endif %}
+  <p><a class="btn btn-ghost" href="{% url 'accounts:password_change' %}">パスワードを変更する</a></p>
+  <p class="help">管理者のアカウントは、サイト運営者が停止・削除します(自分で退会はできません)。</p>
+</section>
+{% endblock %}

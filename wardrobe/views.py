@@ -22,7 +22,6 @@ from .models import Item, UserItem
 from .services import (
     EquipError,
     VersionConflict,
-    can_use_any_item,
     config_svg,
     equip,
     get_config,
@@ -67,7 +66,6 @@ def index(request):
             messages.success(request, "着せ替えを保存しました。")
         return redirect("wardrobe:index")
 
-    staff = can_use_any_item(request.user)
     owned_ids = set(UserItem.objects.filter(user=request.user).values_list("item_id", flat=True))
     items = list(selectable_items(request.user))
     all_active = list(Item.objects.filter(is_active=True).values_list("category", "body_type"))
@@ -97,7 +95,6 @@ def index(request):
         "eye_choices": EYE_COLOR_CHOICES,
         "owned_count": len(owned_ids),
         "total_count": len(all_active),
-        "staff": staff,
     })
 
 
@@ -150,8 +147,22 @@ def item_svg(request, code: str):
 
 @operator_required
 @require_GET
+def catalog_item_svg(request, code: str):
+    """運営向け: パーツ一覧の絵 (持っているかに関係なく、標準の肌・目の色で描く)。"""
+    from .models import AvatarConfig
+
+    item = Item.objects.filter(code=code).first()
+    if item is None:
+        raise Http404
+    skin = AvatarConfig._meta.get_field("skin_tone").default
+    eye = AvatarConfig._meta.get_field("eye_color").default
+    return _svg_response(item_preview_svg(item, skin, eye), cacheable=True)
+
+
+@operator_required
+@require_GET
 def catalog(request):
-    """運営向け: 全パーツの一覧 (体のタイプ別・部位別)。"""
+    """運営向け: 全パーツの一覧 (体のタイプ別・部位別)。運営者の画面 (ops:item_catalog) に置く。"""
     items = list(Item.objects.order_by("category", "rarity", "code"))
     sections = []
     for bt, bt_label in ITEM_BODY_CHOICES:

@@ -71,6 +71,9 @@ class SpotForm(forms.ModelForm):
         for f in ("starts_at", "expires_at"):
             self.fields[f].input_formats = ["%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M"]
 
+    def clean_value_yen(self):
+        return self.cleaned_data.get("value_yen") or 0
+
     def clean(self):
         data = super().clean()
         if data.get("no_expiry"):
@@ -106,7 +109,7 @@ class CouponForm(forms.ModelForm):
 
     class Meta:
         model = CouponTemplate
-        fields = ["title", "shop_name", "benefit", "description", "spot", "valid_days", "available_until", "is_active"]
+        fields = ["title", "shop_name", "benefit", "value_yen", "description", "spot", "valid_days", "available_until", "is_active"]
         widgets = {
             "description": forms.Textarea(attrs={"rows": 3, "placeholder": "例: お一人様 1 回限り。ほかの割引との併用不可。"}),
             "benefit": forms.TextInput(attrs={"placeholder": "例: ドリンク 50 円引き"}),
@@ -121,10 +124,15 @@ class CouponForm(forms.ModelForm):
         self.fields["spot"].required = False
         self.fields["available_until"].input_formats = ["%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M"]
         self.fields["valid_days"].widget.attrs.update(min=1, max=365)
+        self.fields["value_yen"].widget.attrs.update(min=0, max=1_000_000, inputmode="numeric")
+        self.fields["value_yen"].required = False  # 空欄は 0 円 (金額換算しないクーポン)
         if self.instance.pk:
             self.fields["no_expiry"].initial = self.instance.available_until is None
         elif user is not None and user.is_manager and hasattr(user, "manager_profile"):
             self.fields["shop_name"].initial = user.manager_profile.display_name[:80]
+
+    def clean_value_yen(self):
+        return self.cleaned_data.get("value_yen") or 0
 
     def clean(self):
         data = super().clean()

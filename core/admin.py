@@ -29,15 +29,12 @@ class SiteSettingAdmin(admin.ModelAdmin):
     readonly_fields = ("theme_guide", "updated_by", "updated_at")
     fields = ("ui_theme", "theme_guide", "camera_radius_m", "updated_by", "updated_at")
 
-    @admin.display(description="各テーマの説明と試し見")
+    @admin.display(description="各テーマの説明")
     def theme_guide(self, obj):
-        rows = format_html_join(
-            "", '<li><strong>{}</strong> — {} '
-                '(<a href="/?ui={}" target="_blank" rel="noopener">自分だけ試す</a>)</li>',
-            ((t.label, t.description, t.key) for t in THEMES.values()),
-        )
-        return format_html('<ul>{}</ul>'
-                           '<p>試し見を終えるときは <a href="/?ui=reset" target="_blank" rel="noopener">こちら</a></p>', rows)
+        rows = format_html_join("", "<li><strong>{}</strong> — {}</li>",
+                                ((t.label, t.description) for t in THEMES.values()))
+        return format_html("<ul>{}</ul><p>利用者の画面での見え方は、利用者のアカウントでログインして確認してください"
+                           "(運営者のアカウントでは利用者の画面は開けません)。</p>", rows)
 
     def has_add_permission(self, request):
         return not SiteSetting.objects.exists()

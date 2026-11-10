@@ -55,7 +55,9 @@ def use_coupon(coupon: UserCoupon, *, now: dt.datetime | None = None) -> UserCou
     # 期限の判定は UserCoupon.effective_expires_at に一本化 (クーポン自体の期限が後から短くされた場合も含む)
     if coupon.used_at is None and coupon.is_expired(now):
         raise CouponUnavailable("このクーポンは有効期限が切れています。")
-    updated = UserCoupon.objects.filter(pk=coupon.pk, used_at__isnull=True, expires_at__gt=now).update(used_at=now)
+    value = CouponTemplate.objects.filter(pk=coupon.template_id).values_list("value_yen", flat=True).first() or 0
+    updated = UserCoupon.objects.filter(pk=coupon.pk, used_at__isnull=True, expires_at__gt=now).update(
+        used_at=now, used_value_yen=value)
     coupon.refresh_from_db()
     if not updated and coupon.used_at is None:
         raise CouponUnavailable("このクーポンは有効期限が切れています。")

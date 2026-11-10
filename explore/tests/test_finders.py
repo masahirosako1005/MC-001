@@ -264,8 +264,8 @@ class ManagerCouponTests(TestCase):
 
     def test_create_with_expiry(self):
         until = (timezone.localtime() + dt.timedelta(days=60)).strftime("%Y-%m-%dT%H:%M")
-        res = self.client.post(reverse("explore:manage_coupon_create"), self.data(no_expiry=None, available_until=until))
-        self.assertRedirects(res, reverse("explore:manage_coupons"))
+        res = self.client.post(reverse("manage:coupon_create"), self.data(no_expiry=None, available_until=until))
+        self.assertRedirects(res, reverse("manage:coupons"))
         tpl = CouponTemplate.objects.get(title="ドリンク割引")
         self.assertEqual(tpl.owner, self.manager)
         self.assertIsNotNone(tpl.available_until)
@@ -273,27 +273,27 @@ class ManagerCouponTests(TestCase):
         self.assertRegex(tpl.coupon_id, r"^CP-")
 
     def test_unlimited_and_validation(self):
-        self.client.post(reverse("explore:manage_coupon_create"), self.data(available_until="2030-01-01T00:00"))
+        self.client.post(reverse("manage:coupon_create"), self.data(available_until="2030-01-01T00:00"))
         self.assertIsNone(CouponTemplate.objects.get(title="ドリンク割引").available_until)  # 無期限が優先
         past = (timezone.localtime() - dt.timedelta(days=1)).strftime("%Y-%m-%dT%H:%M")
         for bad in ({"no_expiry": None, "available_until": past}, {"valid_days": "0"}, {"title": ""}):
-            res = self.client.post(reverse("explore:manage_coupon_create"), self.data(title="ちがう", **bad)
+            res = self.client.post(reverse("manage:coupon_create"), self.data(title="ちがう", **bad)
                                    if "title" not in bad else self.data(**bad))
             self.assertEqual(res.status_code, 200, bad)
 
     def test_manager_sees_only_own_coupons(self):
-        res = self.client.get(reverse("explore:manage_coupons"))
+        res = self.client.get(reverse("manage:coupons"))
         self.assertNotContains(res, "よそのクーポン")
-        self.assertEqual(self.client.get(reverse("explore:manage_coupon_edit", args=[self.their_coupon.pk])).status_code, 404)
+        self.assertEqual(self.client.get(reverse("manage:coupon_edit", args=[self.their_coupon.pk])).status_code, 404)
         # ドロップの選択肢にも出ない
         sym = Symbol.objects.create(spot=self.spot, name="看板")
-        res = self.client.get(reverse("explore:manage_symbol_edit", args=[sym.pk]))
+        res = self.client.get(reverse("manage:symbol_edit", args=[sym.pk]))
         self.assertNotContains(res, "よそのクーポン")
 
     def test_users_cannot_register_coupons(self):
         user = User.objects.create_user("u@example.com", PW, "ゆーざ")
         self.client.force_login(user)
-        self.assertEqual(self.client.get(reverse("explore:manage_coupons")).status_code, 403)
+        self.assertEqual(self.client.get(reverse("manage:coupons")).status_code, 403)
 
 
 class CouponRegressionTests(TestCase):
@@ -311,7 +311,7 @@ class CouponRegressionTests(TestCase):
 
     def test_symbol_with_unselectable_coupon_can_still_be_saved(self):
         self.client.force_login(self.manager)
-        res = self.client.post(reverse("explore:manage_symbol_edit", args=[self.symbol.pk]), {
+        res = self.client.post(reverse("manage:symbol_edit", args=[self.symbol.pk]), {
             "spot": str(self.spot.pk), "name": "看板(改)", "hint": "", "cooldown_hours": "20", "is_active": "on",
             "latitude": "", "longitude": "",
             "drops-TOTAL_FORMS": "2", "drops-INITIAL_FORMS": "1", "drops-MIN_NUM_FORMS": "0", "drops-MAX_NUM_FORMS": "60",
@@ -325,21 +325,21 @@ class CouponRegressionTests(TestCase):
         self.assertEqual(self.symbol.drops.count(), 2)
         # 新しい行では、選べないクーポンは選べないまま
         other = Symbol.objects.create(spot=self.spot, name="別の看板")
-        res = self.client.get(reverse("explore:manage_symbol_edit", args=[other.pk]))
+        res = self.client.get(reverse("manage:symbol_edit", args=[other.pk]))
         self.assertNotContains(res, "運営のクーポン")
 
     def test_regenerate_token_only_for_own_symbols(self):
         other_manager = User.objects.create_user("m2@example.com", PW, "別の管理者", role="manager")
         self.client.force_login(other_manager)
-        res = self.client.post(reverse("explore:manage_symbol_token", args=[self.symbol.pk]))
+        res = self.client.post(reverse("manage:symbol_token", args=[self.symbol.pk]))
         self.assertEqual(res.status_code, 404)
         before = self.symbol.token
         self.client.force_login(self.manager)
-        res = self.client.post(reverse("explore:manage_symbol_token", args=[self.symbol.pk]))
+        res = self.client.post(reverse("manage:symbol_token", args=[self.symbol.pk]))
         self.assertEqual(res.status_code, 302)
         self.symbol.refresh_from_db()
         self.assertNotEqual(self.symbol.token, before)
-        self.assertEqual(self.client.get(reverse("explore:manage_symbol_token", args=[self.symbol.pk])).status_code, 405)
+        self.assertEqual(self.client.get(reverse("manage:symbol_token", args=[self.symbol.pk])).status_code, 405)
 
     def test_coupon_stopped_between_draw_and_issue_is_not_500(self):
         viewer = User.objects.create_user("u@example.com", PW, "ゆーざ")

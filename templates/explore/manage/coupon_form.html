@@ -1,11 +1,10 @@
-{% extends "base.html" %}{% load static %}
+{% extends "console/base.html" %}{% load static %}
 {% block title %}{% if coupon %}クーポンの編集{% else %}クーポンを登録{% endif %}{% endblock %}
 {% block content %}
 <h1>{% if coupon %}「{{ coupon.title }}」{% else %}クーポンを登録{% endif %}</h1>
-{% include "explore/manage/_nav.html" with active="coupons" %}
 {% if coupon %}
 <p class="muted">クーポン ID: <strong><code>{{ coupon.coupon_id }}</code></strong> ・ {{ coupon.status_label }}
-  ・ 配布 {{ stats.issued }} 枚 / 使用 {{ stats.used }} 枚</p>
+  ・ 配布 {{ stats.issued }} 枚 / 使用 {{ stats.used }} 枚 ・ <a href="{% url 'manage:coupon_stats' %}">実績を見る</a></p>
 {% endif %}
 <form method="post" class="form coupon-form" novalidate>
   {% csrf_token %}
@@ -15,6 +14,7 @@
     {% include "includes/field.html" with field=form.title %}
     {% include "includes/field.html" with field=form.shop_name %}
     {% include "includes/field.html" with field=form.benefit %}
+    {% include "includes/field.html" with field=form.value_yen %}
     {% include "includes/field.html" with field=form.description %}
     {% include "includes/field.html" with field=form.spot %}
   </fieldset>
@@ -32,7 +32,7 @@
 {% if coupon %}
 <section aria-labelledby="drops-h">
   <h2 id="drops-h">配布しているシンボル</h2>
-  {% if stats.drops %}<ul class="list">{% for d in stats.drops %}<li><a href="{% url 'explore:manage_symbol_edit' d.symbol.pk %}">{{ d.symbol.spot.name }} / {{ d.symbol.name }}</a>(出やすさ {{ d.weight }})</li>{% endfor %}</ul>
+  {% if stats.drops %}<ul class="list">{% for d in stats.drops %}<li><a href="{% url 'manage:symbol_edit' d.symbol.pk %}">{{ d.symbol.spot.name }} / {{ d.symbol.name }}</a>(出やすさ {{ d.weight }})</li>{% endfor %}</ul>
   {% else %}<p class="empty">まだどのシンボルにも設定されていません。シンボルの設定の「手に入るもの」でこのクーポンを選んでください。</p>{% endif %}
 </section>
 {% endif %}

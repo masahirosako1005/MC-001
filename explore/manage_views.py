@@ -1,11 +1,13 @@
-"""スポット・シンボルの設定画面 (管理者とサイト運営者)。
+"""管理者の画面 (/manage/) と、スポット・シンボル・クーポンの設定画面 (管理者とサイト運営者)。
 
-- 管理者 (店舗・会社の担当者) は、自分が担当のスポットとそのシンボルだけを扱える
-- サイト運営者は、すべてのスポットを扱え、担当の管理者を割り当てられる
+- 管理者 (店舗・会社の担当者) は、自分が担当のスポットとそのシンボル・自分のクーポンだけを扱える
+- サイト運営者は、すべてのスポットを扱え、担当の管理者を割り当てられる (運営者の URL の下で開く)
+- ダッシュボード・アカウントは管理者だけの画面 (運営者は運営の画面に戻す)
 """
 
 from __future__ import annotations
 
+from django.conf import settings
 from django.contrib import messages
 from django.db import transaction
 from django.db.models import Count, Q
@@ -14,13 +16,92 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from core import audit
-from core.permissions import managed_coupons, managed_spots, managed_symbols, manager_required
+from core.permissions import manage_url, managed_coupons, managed_spots, managed_symbols, manager_required
+from core.sessions import REALM_OPS
+from rewards import stats
 from rewards.models import CouponTemplate, distributable_coupons_q
 
 from . import services
 from .forms import CouponForm, DropFormSet, SpotForm, SymbolSettingsForm
-from .models import Discovery, NearbyVisit, Spot, SpotVisit, Symbol
+from .models import Discovery, NearbyVisit, Spot, SpotVisit, Symbol, spot_available_q
 from .views import _map_context
+
+
+def _is_ops(request) -> bool:
+    return getattr(request, "session_realm", None) == REALM_OPS
+
+
+# ---------------------------------------------------------------- 管理者のホーム
+@manager_required
+@require_GET
+def home(request):
+    """管理者のダッシュボード: 担当スポットの利用状況 (直近 30 日) とクーポンの実績。"""
+    if _is_ops(request):
+        return redirect("ops:dashboard")
+    from ops import analytics  # 分析の集計を、自分のスポットに絞って使う
+
+    user = request.user
+    now = timezone.now()
+    period = stats.Period(30)
+    spots = managed_spots(user)
+    data = analytics.compute(analytics.Filters(days=30, owner=str(user.pk)), now=now)
+    coupons = managed_coupons(user)
+    coupon_rows = stats.coupon_rows(coupons, period, now)
+    return render(request, "explore/manage/home.html", {
+        "period": period,
+        "total": data["total"],
+        "top_spots": [r for r in data["spots"] if r["visitors"] or r["coord"]][:5],
+        "n_spots": spots.count(),
+        "n_spots_open": spots.filter(spot_available_q("", now)).count(),
+        "n_symbols": managed_symbols(user).filter(is_active=True).count(),
+        "n_coupons_active": coupons.filter(distributable_coupons_q(now=now)).count(),
+        "coupon_rows": coupon_rows[:5],
+        "coupon_totals": stats.totals(coupon_rows),
+    })
+
+
+@manager_required
+@require_GET
+def account(request):
+    """管理者のアカウント: 登録されている店舗・会社の情報 (変更はサイト運営者に依頼) とパスワード変更への入口。"""
+    if _is_ops(request):
+        return redirect("ops:dashboard")
+    return render(request, "explore/manage/account.html", {"profile": getattr(request.user, "manager_profile", None)})
+
+
+@manager_required
+@require_GET
+def coupon_stats(request):
+    """クーポンの実績: クーポンごとの配布・使用枚数・使用率・使用金額と、月ごとの使用。"""
+    from ops import charts
+
+    period = stats.Period.from_query(request.GET)
+    coupons = managed_coupons(request.user)
+    owner = request.GET.get("owner", "")
+    store = None
+    if _is_ops(request) and owner:  # サイト運営者は店舗 (管理者) ごとに絞り込める
+        if owner == "none":
+            coupons = coupons.filter(owner__isnull=True, spot__owner__isnull=True)
+            store = stats.OPERATOR_STORE
+        elif owner.isdigit():
+            coupons = coupons.filter(Q(owner_id=int(owner)) | Q(owner__isnull=True, spot__owner_id=int(owner)))
+            from accounts.models import User
+
+            m = User.objects.filter(pk=int(owner), role=User.ROLE_MANAGER).select_related("manager_profile").first()
+            store = (getattr(m, "manager_profile", None) and m.manager_profile.display_name) or (m and m.nickname)
+        else:
+            owner = ""
+    rows = stats.coupon_rows(coupons, period)
+    months = stats.monthly(coupons)
+    return render(request, "explore/manage/coupon_stats.html", {
+        "period": period, "periods": stats.PERIODS, "rows": rows, "totals": stats.totals(rows),
+        "owner": owner, "store": store,
+        "used_chart": charts.grouped_vbar(months, [("used", "使用枚数")], title="月ごとの使用枚数", width=720,
+                                          unit="枚"),
+        "amount_chart": charts.grouped_vbar(months, [("amount", "使用金額")], title="月ごとの使用金額", width=720,
+                                            unit="円"),
+        "months": months,
+    })
 
 
 def deletion_blockers(spot: Spot) -> list[str]:
@@ -51,10 +132,11 @@ def _edit(request, spot: Spot | None):
         audit.record("spot.create" if created else "spot.update", request=request, target=saved,
                      owner=saved.owner_id, expires_at=saved.expires_at.isoformat() if saved.expires_at else None)
         messages.success(request, f"スポット「{saved.name}」を{'追加' if created else '更新'}しました。")
-        return redirect("explore:manage_spots")
+        return redirect(manage_url(request, "spots"))
     symbols = Symbol.objects.filter(spot=spot).order_by("pk") if spot else []
+    tiles = manage_url(request, "tiles", settings.MIKKE_MAP["tiles"])
     return render(request, "explore/manage/spot_form.html",
-                  {"form": form, "spot": spot, "symbols": symbols, **_map_context()})
+                  {"form": form, "spot": spot, "symbols": symbols, **_map_context(tiles)})
 
 
 @manager_required
@@ -85,13 +167,13 @@ def spot_delete(request, pk: int):
                 Symbol.objects.filter(spot=spot).delete()  # ドロップ設定・画像の見え方も一緒に消える
                 spot.delete()
             messages.success(request, f"スポット「{name}」を削除しました。")
-            return redirect("explore:manage_spots")
+            return redirect(manage_url(request, "spots"))
         if action == "hide":
             spot.is_active = False
             spot.save(update_fields=["is_active"])
             audit.record("spot.hide", request=request, target=spot)
             messages.success(request, f"スポット「{spot.name}」を非公開にしました。記録はそのまま残ります。")
-            return redirect("explore:manage_spots")
+            return redirect(manage_url(request, "spots"))
         if action == "expire":
             now = timezone.now()
             if spot.starts_at and spot.starts_at >= now:
@@ -100,7 +182,7 @@ def spot_delete(request, pk: int):
             spot.save(update_fields=["expires_at", "starts_at"])
             audit.record("spot.expire", request=request, target=spot)
             messages.success(request, f"スポット「{spot.name}」を今すぐ期限切れにしました。")
-            return redirect("explore:manage_spots")
+            return redirect(manage_url(request, "spots"))
         messages.error(request, "このスポットは削除できません。非公開か期限切れにしてください。")
     return render(request, "explore/manage/spot_delete.html", {
         "spot": spot, "blockers": blockers, "symbols": spot.symbols.all(),
@@ -136,7 +218,7 @@ def _symbol_form(request, symbol: Symbol | None, initial_spot: int | None = None
         audit.record("symbol.create" if created else "symbol.update", request=request, target=saved,
                      spot=saved.spot_id, secret=saved.is_secret, drops=saved.drops.count())
         messages.success(request, f"シンボル「{saved.name}」を{'追加' if created else '保存'}しました。")
-        return redirect("explore:manage_symbol_edit", pk=saved.pk)
+        return redirect(manage_url(request, "symbol_edit", saved.pk))
     return render(request, "explore/manage/symbol_form.html", {
         "form": form, "drops": drops, "symbol": symbol, "is_new": symbol is None,
     })
@@ -163,7 +245,7 @@ def symbol_regenerate_token(request, pk: int):
     services.regenerate_token(symbol)
     audit.record("symbol.token_regenerate", request=request, target=symbol, spot=symbol.spot_id)
     messages.success(request, f"「{symbol.name}」の QR を作り直しました。新しい印刷用 SVG を掲示してください (古い QR は使えません)。")
-    return redirect("explore:manage_symbol_edit", pk=symbol.pk)
+    return redirect(manage_url(request, "symbol_edit", symbol.pk))
 
 
 # ---------------------------------------------------------------- クーポンの登録
@@ -188,7 +270,7 @@ def _coupon_form(request, coupon):
                      if saved.available_until else None, active=saved.is_active)
         messages.success(request, f"クーポン「{saved.title}」({saved.coupon_id})を{'登録' if created else '保存'}しました。"
                          + ("シンボルの設定で「手に入るもの」に追加すると配布されます。" if created else ""))
-        return redirect("explore:manage_coupons")
+        return redirect(manage_url(request, "coupons"))
     stats = None
     if coupon is not None:
         issued = coupon.issued.all()

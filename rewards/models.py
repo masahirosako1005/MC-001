@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 
 from django.conf import settings
+from django.core.validators import MaxValueValidator
 from django.db import models
 from django.utils import timezone
 
@@ -33,6 +34,9 @@ class CouponTemplate(models.Model):
     description = models.TextField("利用条件", blank=True)
     spot = models.ForeignKey("explore.Spot", null=True, blank=True, on_delete=models.SET_NULL,
                              related_name="coupon_templates", verbose_name="関連スポット")
+    value_yen = models.PositiveIntegerField(
+        "1 枚あたりの金額 (円)", default=0, validators=[MaxValueValidator(1_000_000)],
+        help_text="値引き額や特典の金額換算。分析の「使用金額」は 使用枚数 × この金額 (使った時点の金額で記録)")
     valid_days = models.PositiveSmallIntegerField("有効日数", default=30,
                                                   help_text="受け取ってから使えるまでの日数")
     available_until = models.DateTimeField(
@@ -98,6 +102,8 @@ class UserCoupon(models.Model):
     issued_at = models.DateTimeField("発行日時", default=timezone.now)
     expires_at = models.DateTimeField("有効期限")
     used_at = models.DateTimeField("使用日時", null=True, blank=True)
+    # 使った時点のクーポンの金額 (あとからクーポンの金額を変えても、過去の使用金額は変わらない)
+    used_value_yen = models.PositiveIntegerField("使用時の金額 (円)", null=True, blank=True, editable=False)
 
     class Meta:
         verbose_name = verbose_name_plural = "発行済みクーポン"

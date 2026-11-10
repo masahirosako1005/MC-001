@@ -8,10 +8,6 @@
 <p class="message message-info first-hint" role="note"><span aria-hidden="true">👗</span> まずは<strong>髪と服</strong>を選んでみよう。
   下のパーツを押すと左の絵がすぐ変わります。決まったら「この服装で保存」を押してね。</p>
 {% endif %}
-{% if staff %}
-<p class="message message-info staff-note"><span aria-hidden="true">🛠️</span> 管理者モード: 持っていないパーツも含め、すべてのパーツを自由に選べます。
-  <a href="{% url 'wardrobe:catalog' %}">パーツ一覧</a></p>
-{% endif %}
 
 <form method="post" class="wardrobe" id="wardrobe-form" data-preview-url="{% url 'wardrobe:preview_svg' %}">
   {% csrf_token %}
@@ -30,9 +26,6 @@
         {% endfor %}
       </div>
       <p class="help">どちらのタイプも自由に選べます。タイプに合ったパーツが表示されます。</p>
-      {% if staff %}
-      <label class="toggle"><input type="checkbox" id="show-all-types"> ほかのタイプのパーツも表示する(管理者)</label>
-      {% endif %}
     </fieldset>
 
     <fieldset class="option-group">
@@ -78,15 +71,11 @@
           </span>
         </label>
         {% endwith %}{% endfor %}
-        {% if not staff %}
         {% for bt, slots in g.locked_slots.items %}{% for _ in slots %}
         <span class="item-card item-locked" data-body="{{ bt }}" data-locked="1" aria-hidden="true"><span class="item-none">?</span><span class="item-name">未発見</span></span>
         {% endfor %}{% endfor %}
-        {% endif %}
       </div>
-      {% if not staff %}
       {% for bt, n in g.locked.items %}{% if n %}<p class="help" data-body="{{ bt }}" data-locked="1">未発見の{{ g.label }}があと {{ n }} 種類あります。</p>{% endif %}{% endfor %}
-      {% endif %}
     </fieldset>
     {% endfor %}
   </div>

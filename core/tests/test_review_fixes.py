@@ -15,6 +15,7 @@ from django.utils import timezone
 
 from accounts.models import ManagerProfile, User
 from core import net
+from core.testing import ops_login
 from core.views import rank_info, season_countdown
 from explore import services
 from explore.models import Discovery, DropEntry, Spot, Symbol
@@ -45,7 +46,7 @@ class CorrectnessTests(TestCase):
         tpl = CouponTemplate.objects.create(code="ops", title="運営のクーポン", shop_name="運営", benefit="-",
                                             spot=self.spot)  # 担当スポットに紐づくので管理者も編集できる
         self.client.force_login(self.manager)
-        res = self.client.post(reverse("explore:manage_coupon_edit", args=[tpl.pk]), self.coupon_data(title="改"))
+        res = self.client.post(reverse("manage:coupon_edit", args=[tpl.pk]), self.coupon_data(title="改"))
         self.assertEqual(res.status_code, 302)
         tpl.refresh_from_db()
         self.assertEqual(tpl.title, "改")
@@ -53,13 +54,14 @@ class CorrectnessTests(TestCase):
 
     def test_manager_cannot_post_other_managers_coupon_but_operator_can(self):  # M1
         tpl = CouponTemplate.objects.create(code="b", title="Bのクーポン", shop_name="B", benefit="-", owner=self.other)
-        url = reverse("explore:manage_coupon_edit", args=[tpl.pk])
+        url = reverse("manage:coupon_edit", args=[tpl.pk])
         self.client.force_login(self.manager)
         self.assertEqual(self.client.post(url, self.coupon_data(title="のっとり")).status_code, 404)
         tpl.refresh_from_db()
         self.assertEqual(tpl.title, "Bのクーポン")
-        self.client.force_login(self.op)
-        self.assertEqual(self.client.post(url, self.coupon_data(title="運営が修正")).status_code, 302)
+        ops_login(self.client, self.op)  # 運営者は運営側の URL で同じ画面を使う
+        ops_url = reverse("ops_manage:coupon_edit", args=[tpl.pk])
+        self.assertEqual(self.client.post(ops_url, self.coupon_data(title="運営が修正")).status_code, 302)
         tpl.refresh_from_db()
         self.assertEqual((tpl.title, tpl.owner), ("運営が修正", self.other))
 
@@ -218,7 +220,7 @@ class UsabilityTests(TestCase):
         self.assertContains(self.client.get(reverse("accounts:login")), reverse("accounts:password_help"))
         self.assertContains(self.client.get(reverse("accounts:password_help")), "仮パスワード")
         op = User.objects.create_user("op@example.com", PW, "運営", role=User.ROLE_OPERATOR)
-        self.client.force_login(op)
+        ops_login(self.client, op)
         res = self.client.post(reverse("ops:user_reset_password", args=[self.user.pk]))
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password(res.context["password"]))

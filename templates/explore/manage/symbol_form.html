@@ -1,15 +1,14 @@
-{% extends "base.html" %}
+{% extends "console/base.html" %}
 {% load static %}
 {% block title %}{% if is_new %}QR シンボルを追加{% else %}シンボルの設定{% endif %}{% endblock %}
 {% block content %}
 <h1>{% if is_new %}QR シンボルを追加{% else %}「{{ symbol.name }}」の設定{% endif %}</h1>
-{% include "explore/manage/_nav.html" with active=is_new|yesno:"symbol_new," %}
 {% if symbol %}
 <p class="muted">{{ symbol.get_kind_display }} ・ {{ symbol.spot.name }}
-  {% if symbol.kind == "qr" %} ・ <a href="{% url 'explore:symbol_svg' symbol.pk %}?download=1">印刷用 SVG をダウンロード</a>
-  {% else %} ・ <a href="{% url 'explore:symbol_views' symbol.pk %}">撮影した角度を編集</a>{% endif %}</p>
+  {% if symbol.kind == "qr" %} ・ <a href="{% url 'manage:symbol_svg' symbol.pk %}?download=1">印刷用 SVG をダウンロード</a>
+  {% else %} ・ <a href="{% url 'manage:symbol_views' symbol.pk %}">撮影した角度を編集</a>{% endif %}</p>
 {% else %}
-<p class="muted">印刷して掲示する QR シンボルを追加します。看板や像などの写真をシンボルにする場合は「<a href="{% url 'explore:symbol_register' %}">画像シンボル登録</a>」から撮影してください。</p>
+<p class="muted">印刷して掲示する QR シンボルを追加します。看板や像などの写真をシンボルにする場合は「<a href="{% url 'manage:symbol_register' %}">画像シンボル登録</a>」から撮影してください。</p>
 {% endif %}
 
 <form method="post" class="form symbol-form" novalidate>
@@ -63,7 +62,7 @@
   <button type="submit" class="btn btn-primary btn-block btn-large">{% if is_new %}追加する{% else %}保存{% endif %}</button>
 </form>
 {% if symbol and symbol.kind == "qr" %}
-<form method="post" action="{% url 'explore:manage_symbol_token' symbol.pk %}" class="form" data-confirm="QR を作り直すと、いま掲示している QR は使えなくなります。新しい印刷用 SVG を掲示し直してください。よろしいですか?">
+<form method="post" action="{% url 'manage:symbol_token' symbol.pk %}" class="form" data-confirm="QR を作り直すと、いま掲示している QR は使えなくなります。新しい印刷用 SVG を掲示し直してください。よろしいですか?">
   {% csrf_token %}
   <fieldset class="option-group">
     <legend>QR の作り直し</legend>

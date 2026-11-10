@@ -1,8 +1,7 @@
-{% extends "base.html" %}
+{% extends "console/base.html" %}
 {% block title %}パーツ一覧{% endblock %}
 {% block content %}
-<p><a href="{% url 'wardrobe:index' %}">← きせかえ</a></p>
-<h1>パーツ一覧(管理者)</h1>
+<h1>パーツ一覧</h1>
 <p class="muted">全 {{ total }} 種類。追加・編集は管理画面の「アイテム」から行えます。新しいパーツは、ドロップ設定に入れると探索で手に入るようになります。</p>
 <nav class="subnav" aria-label="体のタイプ">
   {% for s in sections %}<a href="#type-{{ s.key }}">{{ s.label }}({{ s.count }})</a>{% endfor %}
@@ -15,7 +14,7 @@
   <ul class="catalog-grid">
     {% for i in c.items %}
     <li class="catalog-item{% if not i.is_active %} is-inactive{% endif %}">
-      <img src="{% url 'wardrobe:item_svg' i.code %}" alt="" width="96" height="144" loading="lazy">
+      <img src="{% url 'ops:item_svg' i.code %}" alt="" width="96" height="144" loading="lazy">
       <strong>{{ i.name }}</strong>
       <span class="rarity"><span aria-hidden="true">{{ i.rarity_stars }}</span><span class="visually-hidden">レア度 {{ i.rarity }}/5</span></span>
       <code>{{ i.code }}</code>

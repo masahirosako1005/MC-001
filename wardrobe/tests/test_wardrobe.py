@@ -6,6 +6,7 @@ from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 
 from accounts.models import User
+from core.testing import ops_login
 from wardrobe.avatar import Part, render_svg, safe_color, shade
 from wardrobe.models import AvatarConfig, Item, UserItem
 from wardrobe.services import EquipError, VersionConflict, ensure_starter_kit, equip
@@ -185,12 +186,11 @@ class BodyTypeEquipTests(TestCase):
         with self.assertRaises(EquipError):
             equip(self.user, expected_version=1, skin_tone="tone3", selections=self.sel(top=self.rare.pk))
 
-    def test_staff_can_choose_any_item(self):
-        """管理者は持っていないパーツも、別のタイプのパーツも自由に選べる。"""
-        cfg = equip(self.staff, expected_version=1, skin_tone="tone3", body_type="boy",
-                    selections=self.sel(hair=self.g_hair.pk, top=self.rare.pk))
-        self.assertEqual((cfg.hair, cfg.top), (self.g_hair, self.rare))
-        self.assertFalse(UserItem.objects.filter(user=self.staff, item=self.rare).exists())  # 付与はしない
+    def test_operator_has_no_special_equip(self):
+        """以前は運営者が持っていないパーツも選べたが廃止した (利用者の画面を使わないため)。"""
+        with self.assertRaises(EquipError):
+            equip(self.staff, expected_version=1, skin_tone="tone3", body_type="boy",
+                  selections=self.sel(top=self.rare.pk))
 
     def test_staff_still_cannot_use_wrong_category(self):
         with self.assertRaises(EquipError):
@@ -214,53 +214,56 @@ class BodyTypeEquipTests(TestCase):
         page = self.client.get(reverse("wardrobe:index"))
         self.assertNotContains(page, "管理者モード")
         self.assertNotContains(page, "/items/rare.svg")  # 未所持は出ない
+        # サイト運営者は利用者の画面 (きせかえ) を使えない (以前の「管理者モード」は廃止)
         self.client.force_login(self.staff)
-        page = self.client.get(reverse("wardrobe:index"))
-        self.assertContains(page, "管理者モード")
-        self.assertContains(page, "/items/rare.svg")
-        self.assertContains(page, "未所持")
+        res = self.client.get(reverse("wardrobe:index"))
+        self.assertRedirects(res, reverse("ops:dashboard"), fetch_redirect_response=False)
 
-    def test_staff_preview_and_item_svg_for_unowned(self):
-        self.client.force_login(self.staff)
-        self.assertEqual(self.client.get(reverse("wardrobe:item_svg", args=["rare"])).status_code, 200)
-        res = self.client.get(reverse("wardrobe:preview_svg"), {"top": self.rare.pk, "body_type": "girl", "eye_color": "pink"})
-        self.assertIn(b"#336699", res.content)
+    def test_preview_and_item_svg_ignore_unowned(self):
         self.client.force_login(self.user)
+        self.assertEqual(self.client.get(reverse("wardrobe:item_svg", args=["rare"])).status_code, 404)
         res = self.client.get(reverse("wardrobe:preview_svg"), {"top": self.rare.pk})
-        self.assertNotIn(b"#336699", res.content)  # 一般利用者は未所持を反映しない
+        self.assertNotIn(b"#336699", res.content)  # 未所持は反映しない
 
     def test_item_zoom_crops_to_part(self):
         """みっけの結果画面で使う、手に入れたパーツの拡大図 (?zoom=1)。"""
         from wardrobe.services import ZOOM_BOXES
 
-        self.client.force_login(self.staff)
+        acc = Item.objects.create(code="acc-z", name="リボン", category="accessory", style="ribbon", color="#FF0000")
+        for item in (self.rare, acc):
+            UserItem.objects.create(user=self.user, item=item)
+        self.client.force_login(self.user)
         full = self.client.get(reverse("wardrobe:item_svg", args=["rare"])).content.decode()
         zoom = self.client.get(reverse("wardrobe:item_svg", args=["rare"]), {"zoom": "1"}).content.decode()
         self.assertIn('viewBox="0 0 200 300"', full)
         self.assertIn('viewBox="{} {} {} {}"'.format(*ZOOM_BOXES["top"]), zoom)
         self.assertIn("#336699", zoom)
         # 拡大しない部位 (こもの) は全身のまま
-        acc = Item.objects.create(code="acc-z", name="リボン", category="accessory", style="ribbon", color="#FF0000")
         res = self.client.get(reverse("wardrobe:item_svg", args=[acc.code]), {"zoom": "1"}).content.decode()
         self.assertIn('viewBox="0 0 200 300"', res)
         # 持っていない人には拡大図も見せない
-        self.client.force_login(self.user)
+        other = User.objects.create_user("o@example.com", "correct horse battery staple", "べつ")
+        self.client.force_login(other)
         self.assertEqual(self.client.get(reverse("wardrobe:item_svg", args=["rare"]), {"zoom": "1"}).status_code, 404)
 
     def test_catalog_operator_only(self):
-        # 未ログインは運営者ログインへ。ログイン中の利用者には 404 (画面の存在を隠す)。
-        # 以前の staff_member_required は Django 管理画面のログイン URL (秘匿すべき DJANGO_ADMIN_URL) を
-        # リダイレクト先として漏らしていたため、core.permissions.operator_required に統一した。
-        res = self.client.get(reverse("wardrobe:catalog"))
+        # パーツ一覧は運営者の画面にある。未ログインは運営者ログインへ (管理画面の URL は漏らさない)。
+        # 利用者側のログインは運営側では読まれないので、利用者も運営者ログインへ。
+        url = reverse("ops:item_catalog")
+        res = self.client.get(url)
         self.assertEqual(res.status_code, 302)
         self.assertTrue(res["Location"].startswith(reverse("ops:login")))
         self.assertNotIn(settings.ADMIN_URL.rstrip("/"), res["Location"])
         self.client.force_login(self.user)
-        self.assertEqual(self.client.get(reverse("wardrobe:catalog")).status_code, 404)
-        self.client.force_login(self.staff)
-        res = self.client.get(reverse("wardrobe:catalog"))
+        self.assertTrue(self.client.get(url)["Location"].startswith(reverse("ops:login")))
+        ops_login(self.client, self.staff)
+        res = self.client.get(url)
         self.assertContains(res, "女の子用")
         self.assertContains(res, "男の子用")
+        self.assertContains(res, reverse("ops:item_svg", args=["rare"]))
+        svg = self.client.get(reverse("ops:item_svg", args=["rare"]))  # 持っていなくても描ける
+        self.assertEqual(svg.status_code, 200)
+        self.assertIn(b"#336699", svg.content)
 
 
 class FaceSceneEffectTests(SimpleTestCase):

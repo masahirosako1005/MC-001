@@ -1,7 +1,7 @@
-{% extends "base.html" %}{% load static %}
+{% extends "console/base.html" %}{% load static %}
 {% block title %}{% if mode == "edit" %}撮影角度の管理{% else %}画像シンボルを登録{% endif %}{% endblock %}
 {% block content %}
-<p><a href="{% url 'explore:symbol_print' %}">← シンボル一覧</a></p>
+<p><a href="{% url 'manage:symbols' %}">← シンボル一覧</a></p>
 {% if mode == "edit" %}
 <h1>「{{ symbol.name }}」の撮影角度</h1>
 <p class="muted">{{ symbol.spot.name }} ・ 角度を追加したり、撮り直したり、削除したりできます。</p>
@@ -35,7 +35,7 @@
     <div class="angle-grid" role="group" aria-labelledby="angle-h">
       {% for a in angles %}
       <button type="button" class="angle-cell" data-angle="{{ a.key }}" data-label="{{ a.label }}"
-              {% if a.view %}data-existing="1" data-thumb="{% url 'explore:symbol_view_image' symbol.pk a.key %}" data-kp="{{ a.view.keypoint_count }}"{% endif %}>
+              {% if a.view %}data-existing="1" data-thumb="{% url 'manage:symbol_view_image' symbol.pk a.key %}" data-kp="{{ a.view.keypoint_count }}"{% endif %}>
         <img class="angle-thumb" alt="" hidden>
         <span class="angle-label">{{ a.label }}</span>
         <span class="angle-state">未登録</span>

@@ -11,7 +11,7 @@ class SiteSetting(models.Model):
     """サイト全体の設定 (1 行だけ)。UI テーマを管理画面から切り替える。"""
 
     ui_theme = models.CharField("UI テーマ", max_length=32, choices=THEME_CHOICES, default=DEFAULT_THEME,
-                                help_text="利用者全員に適用されます。管理者は URL に ?ui=テーマ名 を付けると自分だけ試せます")
+                                help_text="利用者全員に適用されます")
     camera_radius_m = models.PositiveIntegerField(
         "カメラを起動できる距離 (m)", default=100,
         help_text="現在地からこの距離以内にシンボルがあるときだけ、カメラを起動できます (10〜5000)",

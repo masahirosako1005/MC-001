@@ -10,7 +10,11 @@ urlpatterns = [
     # Django 管理画面のログインは使わず、サイト運営者専用のログイン画面に集約する
     path(settings.ADMIN_URL + "login/", RedirectView.as_view(url=reverse_lazy("ops:login"), query_string=True)),
     path(settings.ADMIN_URL, admin.site.urls),
+    # 設定画面 (スポット・シンボル・クーポン): サイト運営者は運営側のセッションのまま使えるよう運営者の URL の下に置く
+    path(settings.OPS_URL + "manage/", include("explore.manage_urls", namespace="ops_manage")),
     path(settings.OPS_URL, include("ops.urls")),
+    # 管理者 (店舗・会社) の画面
+    path("manage/", include("explore.manage_urls", namespace="manage")),
     path("", include("core.urls")),
     path("accounts/", include("accounts.urls")),
     path("explore/", include("explore.urls")),

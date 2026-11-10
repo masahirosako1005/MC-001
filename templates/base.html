@@ -16,10 +16,6 @@
   {% if mikke_debug %}
   <p class="debug-bar" role="note">開発モード(DEBUG)で動いています。公開・デモのときは .env の DJANGO_DEBUG=0 にしてください。</p>
   {% endif %}
-  {% if ui_previewing %}
-  <p class="ui-preview-bar" role="status">管理者プレビュー: 「{{ ui_theme.label }}」を表示中(ほかの利用者には見えません)
-    <a href="?ui=reset">プレビューをやめる</a></p>
-  {% endif %}
   {% block site_header %}
   <header class="site-header">
     <a class="brand" href="{% url 'core:home' %}" aria-label="みっけ ホーム">
@@ -33,8 +29,6 @@
     <details class="site-menu">
       <summary class="btn btn-ghost btn-small" aria-label="メニューを開く"><span aria-hidden="true">≡</span> メニュー</summary>
       <nav class="site-menu-panel" aria-label="アカウントメニュー">
-        {% if user.is_operator %}<a href="{% url 'ops:dashboard' %}">運営メニュー(利用者管理・分析)</a>{% endif %}
-        {% if user.can_manage_spots %}<a href="{% url 'explore:manage_spots' %}">スポット・シンボルの設定</a>{% endif %}
         <a href="{% url 'explore:history' %}">みっけ履歴</a>
         <a href="{% url 'rewards:achievements' %}">実績</a>
         <a href="{% url 'accounts:account' %}">アカウント(パスワード・退会)</a>

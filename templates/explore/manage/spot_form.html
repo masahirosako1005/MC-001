@@ -1,8 +1,8 @@
-{% extends "base.html" %}{% load static %}
+{% extends "console/base.html" %}{% load static %}
 {% block title %}{% if spot %}スポットを編集{% else %}スポットを追加{% endif %}{% endblock %}
 {% block head %}<link rel="stylesheet" href="{% static 'vendor/leaflet/leaflet.css' %}">{% endblock %}
 {% block content %}
-<p><a href="{% url 'explore:manage_spots' %}">← スポット・シンボルの設定</a></p>
+<p><a href="{% url 'manage:spots' %}">← スポット・シンボルの設定</a></p>
 <h1>{% if spot %}「{{ spot.name }}」を編集{% else %}スポットを追加{% endif %}</h1>
 <form method="post" class="form spot-form" novalidate>
   {% csrf_token %}
@@ -46,16 +46,16 @@
   {% if symbols %}
   <ul class="list">
     {% for s in symbols %}
-    <li><a href="{% url 'explore:manage_symbol_edit' s.pk %}">{{ s.name }}</a>({{ s.get_kind_display }}{% if s.is_secret %}・シークレット{% endif %}{% if not s.is_active %}・非公開{% endif %}{% if s.latitude is not None %}・個別の位置あり{% endif %})</li>
+    <li><a href="{% url 'manage:symbol_edit' s.pk %}">{{ s.name }}</a>({{ s.get_kind_display }}{% if s.is_secret %}・シークレット{% endif %}{% if not s.is_active %}・非公開{% endif %}{% if s.latitude is not None %}・個別の位置あり{% endif %})</li>
     {% endfor %}
   </ul>
   <p class="help">シンボル名を押すと、位置・シークレット・手に入るコーデ(ドロップ)を設定できます。</p>
   {% else %}
   <p class="empty">まだシンボルがありません。</p>
   {% endif %}
-  <p><a class="btn btn-ghost" href="{% url 'explore:manage_symbol_create' %}?spot={{ spot.pk }}">＋ QR シンボルを追加</a>
-     <a class="btn btn-ghost" href="{% url 'explore:symbol_register' %}">＋ 画像シンボルを撮影して登録</a></p>
-  <p><a class="btn btn-ghost" href="{% url 'explore:manage_spot_delete' spot.pk %}">このスポットを削除…</a></p>
+  <p><a class="btn btn-ghost" href="{% url 'manage:symbol_create' %}?spot={{ spot.pk }}">＋ QR シンボルを追加</a>
+     <a class="btn btn-ghost" href="{% url 'manage:symbol_register' %}">＋ 画像シンボルを撮影して登録</a></p>
+  <p><a class="btn btn-ghost" href="{% url 'manage:spot_delete' spot.pk %}">このスポットを削除…</a></p>
 </section>
 {% endif %}
 {{ map_config|json_script:"map-config" }}

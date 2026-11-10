@@ -1,11 +1,11 @@
-{% extends "base.html" %}
+{% extends "console/base.html" %}
 {% block title %}クーポン{% endblock %}
 {% block content %}
 <h1>クーポン</h1>
-{% include "explore/manage/_nav.html" with active="coupons" %}
 <p class="muted">シンボルをみっけした人に配るクーポンを登録できます。登録したら、シンボルの設定の「手に入るもの」に追加すると配布されます。
   クーポンごとに<strong>クーポン ID</strong>(CP-から始まる)が付き、利用者に配る 1 枚ごとにも重ならない<strong>引換コード</strong>が付きます。引換コードは 1 回しか使えません。</p>
-<p><a class="btn btn-primary" href="{% url 'explore:manage_coupon_create' %}">＋ クーポンを登録</a></p>
+<p><a class="btn btn-primary" href="{% url 'manage:coupon_create' %}">＋ クーポンを登録</a>
+  <a class="btn btn-ghost" href="{% url 'manage:coupon_stats' %}">使用枚数・金額の実績</a></p>
 <div class="table-wrap">
 <table class="table manage-table table-cards">
   <caption class="visually-hidden">クーポンの一覧</caption>
@@ -13,13 +13,13 @@
   <tbody>
   {% for c in coupons %}
   <tr>
-    <td data-label="クーポン"><strong>{{ c.title }}</strong><br><span class="muted">{{ c.shop_name }} ・ {{ c.benefit }}</span></td>
+    <td data-label="クーポン"><strong>{{ c.title }}</strong><br><span class="muted">{{ c.shop_name }} ・ {{ c.benefit }}{% if c.value_yen %} ・ 1 枚 {{ c.value_yen }} 円{% endif %}</span></td>
     <td data-label="クーポン ID"><code>{{ c.coupon_id }}</code></td>
     {% if user.is_operator %}<td data-label="登録した管理者">{% if c.owner %}{{ c.owner.manager_profile.display_name|default:c.owner.nickname }}{% else %}<span class="muted">サイト運営者</span>{% endif %}</td>{% endif %}
     <td data-label="状態"><span class="badge">{{ c.status_label }}</span>{% if not c.n_drops %}<br><span class="muted">シンボル未設定</span>{% endif %}</td>
     <td data-label="有効期限">{% if c.available_until %}{{ c.available_until|date:"Y/n/j H:i" }}まで{% else %}<strong>無期限</strong>{% endif %}<br><span class="muted">受け取りから {{ c.valid_days }} 日</span></td>
     <td data-label="配布・使用">{{ c.n_issued }} 枚配布<br><span class="muted">{{ c.n_used }} 枚使用</span></td>
-    <td class="actions" data-label="操作"><a href="{% url 'explore:manage_coupon_edit' c.pk %}">編集</a></td>
+    <td class="actions" data-label="操作"><a href="{% url 'manage:coupon_edit' c.pk %}">編集</a></td>
   </tr>
   {% empty %}
   <tr><td colspan="{% if user.is_operator %}7{% else %}6{% endif %}">クーポンはまだありません。</td></tr>

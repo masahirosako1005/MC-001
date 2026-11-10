@@ -17,6 +17,26 @@ def mikke(request):
         "mikke_slot": slot,
         "mikke_slot_label": SLOT_LABELS[slot],
         "ui_theme": getattr(request, "ui_theme", None) or get_theme(None),
-        "ui_previewing": getattr(request, "ui_previewing", False),
         "ui_themes": THEMES.values(),
     }
+
+
+def console(request):
+    """管理者・サイト運営者の画面 (コンソール) か、利用者の画面か。
+
+    - console_role: "operator" (運営側の URL) / "manager" (管理者がログイン中) / None (利用者の画面)
+    - base_template: 共通の画面 (パスワード変更など) が継承する土台のテンプレート
+    """
+    from .sessions import REALM_OPS
+
+    user = getattr(request, "user", None)
+    if getattr(request, "session_realm", None) == REALM_OPS:
+        role = "operator"
+    elif user is not None and user.is_authenticated and user.is_manager:
+        role = "manager"
+    else:
+        role = None
+    from .console import nav_for
+
+    return {"console_role": role, "base_template": "console/base.html" if role else "base.html",
+            "console_nav": nav_for(request, role)}

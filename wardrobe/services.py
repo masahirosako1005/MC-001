@@ -28,8 +28,12 @@ class VersionConflict(EquipError):
 
 
 def can_use_any_item(user) -> bool:
-    """管理者 (運営スタッフ) は、持っていないパーツや別の体のタイプのパーツも自由に選べる。"""
-    return bool(getattr(user, "is_staff", False))
+    """持っていないパーツや別の体のタイプのパーツも選べるか。
+
+    以前はサイト運営者がきせかえ画面で全パーツを試せたが、運営者は利用者の画面を開けなくなったため、
+    利用者の画面では常に False (パーツの確認は運営の画面の「アイテム一覧」で行う)。
+    """
+    return False
 
 
 def to_part(item: Item | None) -> Part | None:

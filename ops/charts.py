@@ -46,7 +46,7 @@ def _truncate(label: str, n: int) -> str:
 
 
 def grouped_hbar(rows: list[dict], series: list[tuple[str, str]], *, title: str, label_key: str = "label",
-                 label_chars: int = 12, width: int = 720) -> str:
+                 label_chars: int = 12, width: int = 720, unit: str = "人") -> str:
     """横向きのグループ棒グラフ (行 = スポット、棒 = 段階)。series は (値のキー, 表示名)。"""
     bar_h, gap, group_gap = 9, 2, 14
     group_h = len(series) * bar_h + (len(series) - 1) * gap
@@ -74,8 +74,8 @@ def grouped_hbar(rows: list[dict], series: list[tuple[str, str]], *, title: str,
             path = (f"M{left},{y} H{left + w - rr:.1f} Q{left + w:.1f},{y} {left + w:.1f},{y + rr:.1f} "
                     f"V{y + bar_h - rr:.1f} Q{left + w:.1f},{y + bar_h} {left + w - rr:.1f},{y + bar_h} H{left} Z")
             parts.append(f'<path class="chart-bar series-{j + 1}" d="{path}"><title>{_esc(label)} ・ {_esc(name)}: '
-                         f'{_fmt(v)} 人</title></path>')
-            # 段階の 1 本目 (付近に来た人) だけ数値を添える (すべてに数値を付けると読みにくい)
+                         f'{_fmt(v)} {_esc(unit)}</title></path>')
+            # 1 本目の系列 (分析では「付近に来た人」) だけ数値を添える (すべてに数値を付けると読みにくい)
             if j == 0 and v:
                 parts.append(f'<text class="chart-value" x="{left + w + 4:.1f}" y="{y + bar_h - 1}">{_fmt(v)}</text>')
     parts.append(f'<line class="chart-axis" x1="{left}" y1="{top - 6}" x2="{left}" y2="{height - 6}"/>')
@@ -84,7 +84,7 @@ def grouped_hbar(rows: list[dict], series: list[tuple[str, str]], *, title: str,
 
 
 def grouped_vbar(rows: list[dict], series: list[tuple[str, str]], *, title: str, width: int = 360,
-                 height: int = 220) -> str:
+                 height: int = 220, unit: str = "人") -> str:
     """縦向きのグループ棒グラフ (時間帯・季節ごと)。"""
     left, right, top, bottom = 44, 8, 12, 28
     plot_w, plot_h = width - left - right, height - top - bottom
@@ -111,7 +111,7 @@ def grouped_vbar(rows: list[dict], series: list[tuple[str, str]], *, title: str,
                     f"H{x + bar_w - rr:.1f} Q{x + bar_w:.1f},{y:.1f} {x + bar_w:.1f},{y + rr:.1f} "
                     f"V{top + plot_h} Z")
             parts.append(f'<path class="chart-bar series-{j + 1}" d="{path}"><title>{_esc(r["label"])} ・ '
-                         f'{_esc(name)}: {_fmt(v)} 人</title></path>')
+                         f'{_esc(name)}: {_fmt(v)} {_esc(unit)}</title></path>')
         parts.append(f'<text class="chart-label" x="{left + i * slot_w + slot_w / 2:.1f}" y="{height - 8}" '
                      f'text-anchor="middle">{_esc(r["label"])}</text>')
     parts.append(f'<line class="chart-axis" x1="{left}" y1="{top + plot_h}" x2="{width - right}" y2="{top + plot_h}"/>')

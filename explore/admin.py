@@ -36,11 +36,11 @@ class SymbolAdmin(admin.ModelAdmin):
     def symbol_image(self, obj):
         if obj.pk is None:
             return format_html('画像シンボルは <a href="{}">撮影して登録</a> から追加してください。',
-                               reverse("explore:symbol_register"))
+                               reverse("ops_manage:symbol_register"))
         if obj.kind == Symbol.KIND_IMAGE:
             return format_html('<a href="{}">撮影角度の管理 ({} 角度)</a>',
-                               reverse("explore:symbol_views", args=[obj.pk]), obj.views.count())
-        url = reverse("explore:symbol_svg", args=[obj.pk])
+                               reverse("ops_manage:symbol_views", args=[obj.pk]), obj.views.count())
+        url = reverse("ops_manage:symbol_svg", args=[obj.pk])
         return format_html('<a href="{}" target="_blank" rel="noopener">表示</a> / <a href="{}?download=1">保存</a>', url, url)
 
 

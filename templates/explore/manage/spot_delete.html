@@ -1,7 +1,7 @@
-{% extends "base.html" %}{% load static %}
+{% extends "console/base.html" %}{% load static %}
 {% block title %}スポットの削除{% endblock %}
 {% block content %}
-<p><a href="{% url 'explore:manage_spot_edit' spot.pk %}">← 「{{ spot.name }}」の編集</a></p>
+<p><a href="{% url 'manage:spot_edit' spot.pk %}">← 「{{ spot.name }}」の編集</a></p>
 <h1>「{{ spot.name }}」を削除</h1>
 {% if blockers %}
 <div class="message message-warning" role="alert">

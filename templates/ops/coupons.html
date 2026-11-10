@@ -1,0 +1,57 @@
+{% extends "console/base.html" %}{% load mikke_format %}
+{% block title %}店舗ごとのクーポン利用{% endblock %}
+{% block body_class %}page-ops{% endblock %}
+{% block content %}
+<h1>店舗ごとのクーポン利用</h1>
+<p class="muted">店舗 = クーポンを登録した管理者(登録者がいなければ関連スポットの担当の管理者)。使用金額 = 使用枚数 × 使った時点の「1 枚あたりの金額」。
+  店舗名を押すと、その店舗のクーポンごとの実績を表示します(店舗の管理者も自分の管理画面で同じ内容を見られます)。</p>
+
+<form method="get" class="filter-bar" aria-label="絞り込み">
+  <label>期間 <select name="days">{% for d, label in periods %}<option value="{{ d }}"{% if period.days == d %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+  <button type="submit" class="btn btn-primary btn-small">表示</button>
+</form>
+
+<section aria-labelledby="kpi-h">
+  <h2 id="kpi-h" class="visually-hidden">{{ period.label }}の合計</h2>
+  <ul class="kpi-row">
+    <li class="kpi"><span class="kpi-label">配布枚数</span><span class="kpi-value">{{ totals.issued|num }}<small>枚</small></span><span class="kpi-sub">{{ period.label }}</span></li>
+    <li class="kpi"><span class="kpi-label">使用枚数</span><span class="kpi-value">{{ totals.used|num }}<small>枚</small></span><span class="kpi-sub">{{ period.label }}</span></li>
+    <li class="kpi kpi-hero"><span class="kpi-label">使用金額</span><span class="kpi-value">{{ totals.amount|num }}<small>円</small></span><span class="kpi-sub">{{ rows|length }} 店舗</span></li>
+  </ul>
+</section>
+
+<div class="chart-pair">
+  <section class="chart-card" aria-labelledby="amount-h">
+    <h2 id="amount-h">使用金額(上位 {{ chart_count }} 店舗)</h2>
+    {% if chart_count %}{{ amount_chart }}{% else %}<p class="empty">この期間に使われたクーポンはありません。</p>{% endif %}
+  </section>
+  <section class="chart-card" aria-labelledby="used-h">
+    <h2 id="used-h">使用枚数(上位 {{ chart_count }} 店舗)</h2>
+    {% if chart_count %}{{ used_chart }}{% else %}<p class="empty">この期間に使われたクーポンはありません。</p>{% endif %}
+  </section>
+</div>
+
+<section class="chart-card" aria-labelledby="table-h">
+  <h2 id="table-h">すべての店舗</h2>
+  {% if rows %}
+  <div class="table-wrap">
+  <table class="table num-table">
+    <caption class="visually-hidden">店舗ごとのクーポンの配布・使用枚数と使用金額({{ period.label }})</caption>
+    <thead><tr><th scope="col">店舗</th><th scope="col">クーポン</th><th scope="col">配布</th><th scope="col">使用</th><th scope="col">使用率</th><th scope="col">使用金額</th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+    <tr>
+      <th scope="row"><a href="{% url 'ops_manage:coupon_stats' %}?owner={{ r.key }}&amp;days={{ period.days }}">{{ r.label }}</a></th>
+      <td>{{ r.coupons }} 種類<br><span class="muted">配布中 {{ r.active }}</span></td>
+      <td>{{ r.issued|num }}</td><td>{{ r.used|num }}</td>
+      <td>{% if r.rate is not None %}{{ r.rate }}%{% else %}—{% endif %}</td>
+      <td>{{ r.amount|num }} 円</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+    <tfoot><tr><th scope="row">合計</th><td></td><td>{{ totals.issued|num }}</td><td>{{ totals.used|num }}</td><td></td><td>{{ totals.amount|num }} 円</td></tr></tfoot>
+  </table>
+  </div>
+  {% else %}<p class="empty">クーポンはまだありません。</p>{% endif %}
+</section>
+{% endblock %}

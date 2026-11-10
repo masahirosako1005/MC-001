@@ -7,6 +7,7 @@ import json
 import uuid
 from decimal import Decimal
 
+from django.conf import settings
 from django.core.cache import cache
 from django.db import IntegrityError, transaction
 from django.test import TestCase
@@ -15,6 +16,7 @@ from django.utils import timezone
 
 from accounts.models import User
 from core.models import AuditLog, SiteSetting
+from core.testing import ops_login
 from explore import services
 from explore.models import Discovery, DropEntry, Spot, SpotVisit, Symbol
 from wardrobe.models import Item
@@ -232,37 +234,38 @@ class SpotManageTests(Base):
         return {k: v for k, v in data.items() if v is not None}
 
     def test_staff_only(self):
-        urls = [reverse("explore:manage_spots"), reverse("explore:manage_spot_create"),
-                reverse("explore:manage_spot_edit", args=[self.spot.pk]),
-                reverse("explore:manage_spot_delete", args=[self.spot.pk])]
+        urls = [reverse("manage:spots"), reverse("manage:spot_create"),
+                reverse("manage:spot_edit", args=[self.spot.pk]),
+                reverse("manage:spot_delete", args=[self.spot.pk])]
         for u in urls:
             self.assertEqual(self.client.get(u).status_code, 302)
         self.client.force_login(self.user)
         for u in urls:
             self.assertEqual(self.client.get(u).status_code, 403)  # 利用者には設定画面を使わせない
-        self.client.force_login(self.staff)
+        # サイト運営者は運営側 (運営者の URL の下) で同じ画面を使う
+        ops_login(self.client, self.staff)
         for u in urls:
-            self.assertEqual(self.client.get(u).status_code, 200)
+            self.assertEqual(self.client.get(u.replace("/manage/", f"/{settings.OPS_URL}manage/", 1)).status_code, 200)
 
     def test_create_unlimited(self):
-        self.client.force_login(self.staff)
-        res = self.client.post(reverse("explore:manage_spot_create"), self.form(expires_at="2030-01-01T10:00"))
-        self.assertRedirects(res, reverse("explore:manage_spots"))
+        ops_login(self.client, self.staff)
+        res = self.client.post(reverse("ops_manage:spot_create"), self.form(expires_at="2030-01-01T10:00"))
+        self.assertRedirects(res, reverse("ops_manage:spots"))
         spot = Spot.objects.get(name="新しい公園")
         self.assertIsNone(spot.expires_at)  # 「無期限」が優先される
         self.assertTrue(spot.slug.startswith("spot-"))
         self.assertTrue(AuditLog.objects.filter(action="spot.create").exists())
 
     def test_create_with_expiry(self):
-        self.client.force_login(self.staff)
-        self.client.post(reverse("explore:manage_spot_create"),
+        ops_login(self.client, self.staff)
+        self.client.post(reverse("ops_manage:spot_create"),
                          self.form(no_expiry=None, starts_at="2030-01-01T10:00", expires_at="2030-02-01T10:00"))
         spot = Spot.objects.get(name="新しい公園")
         self.assertEqual(timezone.localtime(spot.expires_at).date(), dt.date(2030, 2, 1))
         self.assertEqual(spot.status(), "scheduled")
 
     def test_validation(self):
-        self.client.force_login(self.staff)
+        ops_login(self.client, self.staff)
         cases = [
             self.form(no_expiry=None, starts_at="2030-02-01T10:00", expires_at="2030-01-01T10:00"),
             self.form(longitude=""),
@@ -270,28 +273,28 @@ class SpotManageTests(Base):
             self.form(radius_m="5"),
         ]
         for data in cases:
-            res = self.client.post(reverse("explore:manage_spot_create"), data)
+            res = self.client.post(reverse("ops_manage:spot_create"), data)
             self.assertEqual(res.status_code, 200, data)
         self.assertFalse(Spot.objects.filter(name="新しい公園").exists())
 
     def test_edit(self):
-        self.client.force_login(self.staff)
-        self.client.post(reverse("explore:manage_spot_edit", args=[self.spot.pk]),
+        ops_login(self.client, self.staff)
+        self.client.post(reverse("ops_manage:spot_edit", args=[self.spot.pk]),
                          self.form(name="改名した温泉", no_expiry=None, expires_at="2031-01-01T00:00"))
         self.spot.refresh_from_db()
         self.assertEqual(self.spot.name, "改名した温泉")
         self.assertIsNotNone(self.spot.expires_at)
 
     def test_delete_without_records(self):
-        self.client.force_login(self.staff)
-        self.client.post(reverse("explore:manage_spot_delete", args=[self.spot.pk]), {"action": "delete"})
+        ops_login(self.client, self.staff)
+        self.client.post(reverse("ops_manage:spot_delete", args=[self.spot.pk]), {"action": "delete"})
         self.assertFalse(Spot.objects.filter(pk=self.spot.pk).exists())
         self.assertFalse(Symbol.objects.filter(spot_id=self.spot.pk).exists())
 
     def test_delete_blocked_by_records_then_hide_or_expire(self):
         SpotVisit.objects.create(user=self.user, spot=self.spot, visit_date=timezone.localdate(), season="autumn")
-        self.client.force_login(self.staff)
-        url = reverse("explore:manage_spot_delete", args=[self.spot.pk])
+        ops_login(self.client, self.staff)
+        url = reverse("ops_manage:spot_delete", args=[self.spot.pk])
         self.assertContains(self.client.get(url), "訪問記録")
         self.client.post(url, {"action": "delete"})
         self.assertTrue(Spot.objects.filter(pk=self.spot.pk).exists())

@@ -21,6 +21,9 @@ from rewards.models import Achievement, CouponTemplate
 from wardrobe.models import Item, UserItem
 from wardrobe.sample_items import SAMPLE_ITEMS
 
+# 1 枚あたりの金額 (円、分析の使用金額に使う)。割引率のクーポンは平均的な値引き額で換算する
+COUPON_VALUES = {"cp-onsen-manju": 150, "cp-retro-coffee": 50, "cp-shrine-omamori": 300,
+                 "cp-revisit-lunch": 100}
 COUPONS = [
     ("cp-onsen-manju", "湯けむり饅頭 1個サービス", "湯の花茶屋", "お買い上げで饅頭1個プレゼント", "onsen", 30),
     ("cp-retro-coffee", "レトロ喫茶 ドリンク50円引き", "喫茶 ほしぞら", "ドリンク全品 50円引き", "retro", 30),
@@ -121,6 +124,7 @@ class Command(BaseCommand):
         for code, title, shop, benefit, spot_slug, days in COUPONS:
             coupons[code], _ = CouponTemplate.objects.update_or_create(code=code, defaults=dict(
                 title=title, shop_name=shop, benefit=benefit, spot=spots[spot_slug], valid_days=days,
+                value_yen=COUPON_VALUES.get(code, 0),
                 description="※デモ用の架空店舗です。お一人様1回限り。", is_active=True))
 
         # シンボルはスポット中心から 20〜60m ほど離して置く (地図上で重ならないように)

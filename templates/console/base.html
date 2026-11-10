@@ -1,0 +1,64 @@
+{% load static %}<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <meta name="robots" content="noindex, nofollow">
+  <title>{% block title %}{% endblock %} | みっけ {% if console_role == "operator" %}運営{% else %}管理者{% endif %}</title>
+  <link rel="icon" href="{% static 'img/icon.svg' %}" type="image/svg+xml">
+  <link rel="stylesheet" href="{% static 'css/mikke.css' %}">
+  <link rel="stylesheet" href="{% static 'css/console.css' %}">
+  {% block head %}{% endblock %}
+</head>
+<body class="console console-{{ console_role|default:'manager' }} {% block body_class %}{% endblock %}">
+  <a class="skip-link" href="#main">本文へスキップ</a>
+  {% if mikke_debug %}
+  <p class="debug-bar" role="note">開発モード(DEBUG)で動いています。公開・デモのときは .env の DJANGO_DEBUG=0 にしてください。</p>
+  {% endif %}
+  <header class="console-header">
+    <a class="console-brand" href="{% if console_role == 'operator' %}{% url 'ops:dashboard' %}{% else %}{% url 'manage:home' %}{% endif %}">
+      <img src="{% static 'img/icon.svg' %}" alt="" width="28" height="28">
+      <span>みっけ</span>
+      <span class="console-role">{% if console_role == "operator" %}運営コンソール{% else %}管理者コンソール{% endif %}</span>
+    </a>
+    {% if user.is_authenticated %}
+    <p class="console-who">
+      {% if console_role == "operator" %}<span class="console-badge">サイト運営者</span> {{ user.nickname }}
+      {% else %}<span class="console-badge">管理者</span> {{ user.manager_profile.display_name|default:user.nickname }}
+        {% if user.manager_profile %}<span class="console-code">{{ user.manager_profile.manager_code }}</span>{% endif %}
+      {% endif %}
+    </p>
+    {% endif %}
+  </header>
+
+  <div class="console-layout{% if not console_nav %} console-layout-single{% endif %}">
+    {% if console_nav %}
+    <nav class="console-nav" aria-label="{% if console_role == 'operator' %}運営メニュー{% else %}管理者メニュー{% endif %}">
+      {% for g in console_nav %}
+      <div class="console-nav-group">
+        {% if g.title %}<p class="console-nav-title">{{ g.title }}</p>{% endif %}
+        <ul>
+          {% for i in g.items %}
+          <li>{% if i.post %}
+            <form method="post" action="{{ i.url }}">{% csrf_token %}<button type="submit">{{ i.label }}</button></form>
+          {% else %}<a href="{{ i.url }}"{% if i.active %} aria-current="page"{% endif %}>{{ i.label }}</a>{% endif %}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endfor %}
+    </nav>
+    {% endif %}
+    <div class="console-main">
+      {% if messages %}
+      <div class="messages" role="status" aria-live="polite">
+        {% for m in messages %}<p class="message message-{{ m.tags }}">{{ m }}</p>{% endfor %}
+      </div>
+      {% endif %}
+      <main id="main" tabindex="-1">{% block content %}{% endblock %}</main>
+    </div>
+  </div>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

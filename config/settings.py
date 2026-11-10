@@ -37,6 +37,8 @@ ADMIN_URL = env("DJANGO_ADMIN_URL", "admin/")
 OPS_URL = env("MIKKE_OPS_URL", "ops/")
 # サイト運営者のログインは短めに切れるようにする (秒)
 OPS_SESSION_SECONDS = int(env("MIKKE_OPS_SESSION_SECONDS", str(60 * 60 * 4)))
+# サイト運営者のセッションは利用者側と別の Cookie にする (core/sessions.py)。運営側の URL でしか読まない
+OPS_SESSION_COOKIE_NAME = "mikke_ops_session"
 
 # ---- フィールド暗号化鍵 (core/crypto.py) ----
 MIKKE_FIELD_KEYS = env("MIKKE_FIELD_KEYS", required=True)
@@ -63,12 +65,14 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.middleware.csp.ContentSecurityPolicyMiddleware",
     "core.middleware.SecurityHeadersMiddleware",
-    "django.contrib.sessions.middleware.SessionMiddleware",
+    # 利用者側と運営側でセッション Cookie を分ける (Django の SessionMiddleware の代わり)
+    "core.sessions.RealmSessionMiddleware",
     # 画面は日本語のみのため LocaleMiddleware は使わない (多言語化するときに戻す)
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    "core.middleware.RoleAreaMiddleware",
     "core.middleware.ForcePasswordChangeMiddleware",
     "core.middleware.UiThemeMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -88,6 +92,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "django.template.context_processors.csp",
                 "core.context_processors.mikke",
+                "core.context_processors.console",
             ],
         },
     },
