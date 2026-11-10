@@ -1,0 +1,85 @@
+# みっけ: ローカルの HTTPS リバースプロキシ (scripts/devproxy.py が二重波かっこの項目を埋めて生成する)
+#   ブラウザ ──https://localhost:{{PROXY_PORT}}── nginx ──http://127.0.0.1:{{APP_PORT}}── waitress + Django
+# このファイルを直接 nginx に読ませないこと (生成された conf を使う)。
+
+worker_processes  1;
+error_log  logs/error.log warn;
+pid        logs/nginx.pid;
+
+events {
+    worker_connections  256;
+}
+
+http {
+    include       "{{MIME_TYPES}}";
+    default_type  application/octet-stream;
+    charset       utf-8;
+    sendfile      on;
+
+    # 版番号などを出さない
+    server_tokens off;
+
+    # アクセスログ: 位置情報は POST 本文で送るので URL には載らない (クエリも記録しない)
+    log_format  mikke  '$remote_addr [$time_local] "$request_method $uri" $status $body_bytes_sent $request_time';
+    access_log  logs/access.log  mikke;
+
+    # 入口での防御: アップロード上限 (画像シンボルの登録は数 MB)、遅いリクエストの切断、接続・頻度の上限
+    client_max_body_size     20m;
+    client_body_timeout      15s;
+    client_header_timeout    15s;
+    send_timeout             30s;
+    keepalive_timeout        30s;
+    limit_req_zone   $binary_remote_addr zone=mikke_req:10m  rate=30r/s;
+    limit_conn_zone  $binary_remote_addr zone=mikke_conn:10m;
+
+    upstream mikke_app {
+        server 127.0.0.1:{{APP_PORT}};
+        keepalive 16;
+    }
+
+    server {
+        # 127.0.0.1 だけで待ち受ける (LAN など外からはつながらない)
+        listen       127.0.0.1:{{PROXY_PORT}} ssl;
+        http2        on;
+        server_name  localhost;
+
+        ssl_certificate      "{{CERT}}";
+        ssl_certificate_key  "{{KEY}}";
+        ssl_protocols        TLSv1.2 TLSv1.3;
+        ssl_prefer_server_ciphers off;
+        ssl_session_cache    shared:mikke_ssl:1m;
+        ssl_session_timeout  1h;
+
+        # http:// で同じポートに来たら https:// に転送する (497 = HTTPS のポートに HTTP で来た)
+        error_page 497 =301 https://$host:$server_port$request_uri;
+
+        # 静的ファイルは nginx が直接配信 (python manage.py collectstatic の結果)
+        location /static/ {
+            alias "{{STATIC_ROOT}}/";
+            expires 7d;
+            add_header Cache-Control "public";
+            add_header X-Content-Type-Options "nosniff";
+            add_header Cross-Origin-Resource-Policy "same-origin";
+        }
+
+        location / {
+            limit_req   zone=mikke_req burst=60 nodelay;
+            limit_conn  mikke_conn 30;
+            limit_req_status   429;
+            limit_conn_status  429;
+
+            proxy_pass          http://mikke_app;
+            proxy_http_version  1.1;
+            proxy_set_header    Connection "";
+            # Django の ALLOWED_HOSTS / CSRF の確認に使う (ポート込み)
+            proxy_set_header    Host               $host:$server_port;
+            # 接続元 IP: クライアントが送った X-Forwarded-For は捨て、nginx が見た接続元で上書きする (偽装防止)
+            proxy_set_header    X-Forwarded-For    $remote_addr;
+            proxy_set_header    X-Real-IP          $remote_addr;
+            # TLS は nginx で終端しているので、アプリには https だったことを伝える (SECURE_PROXY_SSL_HEADER)
+            proxy_set_header    X-Forwarded-Proto  https;
+            proxy_read_timeout  60s;
+            proxy_send_timeout  60s;
+        }
+    }
+}

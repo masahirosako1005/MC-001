@@ -74,6 +74,31 @@ python -m venv .venv
 - **PostgreSQL が使えない場合**: `.env` に `DB_ENGINE=sqlite` を書くと SQLite(`mikke.sqlite3`)で動きます。フィールド暗号化はどちらでも有効です。
 - アプリ制御ポリシー(WDAC / Smart App Control)が psycopg 同梱 DLL や `.venv\Scripts\*.exe` を拒否する環境では、`settings.py` が PostgreSQL 付属の `libpq.dll` を使う pure-python 実装に自動で切り替えます。コマンドは `python -m ruff` のように `python -m` 経由で実行してください。
 
+### nginx 経由の HTTPS で動かす(https://localhost:8000)
+
+```
+ブラウザ ──https://localhost:8000── nginx ──http://127.0.0.1:8080── waitress + Django
+```
+
+アプリ本体は 127.0.0.1:8080 だけで待ち受け、nginx が TLS の終端・http→https の転送・静的ファイルの配信・接続数と頻度の上限・`X-Forwarded-For` の上書き(偽装防止)を受け持ちます(設計の理由は [ADR 0012](docs/adr/0012-local-https-reverse-proxy.md))。
+
+1. nginx for Windows を `%LOCALAPPDATA%\nginx-1.28.0` に展開する(別の場所なら `.env` に `NGINX_HOME`)
+2. `.env` に次を書く(`DJANGO_DEBUG=0` のとき): `DJANGO_BEHIND_TLS_PROXY=1`、`DJANGO_SSL_REDIRECT=1`、`DJANGO_SECURE_COOKIES=1`、`DJANGO_HSTS_SECONDS=0`、`MIKKE_TRUSTED_PROXIES=127.0.0.1`、`MIKKE_CACHE=db`
+3. 起動(Ctrl+C で nginx も止まる。静的ファイルの収集・証明書の作成も自動)
+
+```bash
+.venv\Scripts\python.exe scripts\devproxy.py run
+```
+
+- 証明書は `localhost` / `127.0.0.1` / `::1` 専用の自己署名(ECDSA、1 年、認証局としては使えない)で、`%LOCALAPPDATA%\mikke\proxy\certs` に作られます(リポジトリには入りません)。作り直しは `scripts\devproxy.py cert`
+- **ブラウザの警告を消すには、証明書を自分のユーザーの「信頼されたルート証明機関」に登録します**(システムの設定変更なので各自で実行してください。不要になったら `certmgr.msc` から削除できます):
+
+```bash
+certutil -user -addstore Root "%LOCALAPPDATA%\mikke\proxy\certs\localhost.crt"
+```
+
+- nginx だけの起動・停止・状態: `scripts\devproxy.py start` / `stop` / `status`。ログは `%LOCALAPPDATA%\mikke\proxy\logs`(アクセスログにクエリ文字列は残しません)
+
 ### 公開・デモ・本番で動かすとき(必ず確認)
 
 - **`.env` の `DJANGO_DEBUG=0` にする。** DEBUG のままだと 404 などのエラー画面に内部の URL 構成(管理画面の場所など)が表示されます。DEBUG のときは画面上部に赤い警告帯が出ます。
@@ -84,7 +109,7 @@ python -m venv .venv
 
 ### スマートフォンで試すには
 
-カメラ API は「安全なコンテキスト」(HTTPS または localhost)でのみ動きます。PC の localhost では動作しますが、スマホから LAN 経由で開く場合は HTTPS 化(リバースプロキシや開発用証明書)が必要です。
+カメラ API は「安全なコンテキスト」(HTTPS または localhost)でのみ動きます。PC の localhost では動作しますが、スマホから LAN 経由で開く場合は HTTPS 化が必要です。上の nginx 構成は 127.0.0.1 だけで待ち受けるため、LAN に公開するには listen と証明書の SAN を変える必要があります(公開範囲が広がるので要検討)。
 
 ## テスト・品質チェック
 
@@ -115,7 +140,8 @@ maps/        地図タイル (PMTiles) の Range 配信、tiles/kyobashi.pmtiles
 ops/         サイト運営者: 専用ログイン・分析・利用者管理
 templates/   画面テンプレート (アプリごと、includes/ は共通部品)
 static/      css/ (themes/)、js/ (カメラ・地図・結果画面など)、img/、vendor/ (同梱ライブラリ)
-scripts/     ローカル PostgreSQL 管理、地図タイル切り出し、仮想写真の生成
+scripts/     ローカル PostgreSQL 管理、nginx + HTTPS の起動 (devproxy.py)、地図タイル切り出し、仮想写真の生成
+deploy/      nginx の設定ひな形
 docs/        設計書・要件・API・ADR・評価レポート
 <app>/tests/ 各アプリのテスト (test_*.py)
 ```

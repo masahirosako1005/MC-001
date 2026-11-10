@@ -45,6 +45,7 @@
 | 読み取り | jsQR(QR)、jsfeat(画像の特徴点・ORB) | 映像はサーバーに送らない |
 | 地図 | Leaflet + protomaps-leaflet、PMTiles をローカル配信 | 外部の地図 API を使わない |
 | 画像 | サーバーで SVG を組み立て(アバター・クーポン・グラフ・QR) | 文字はすべてエスケープ |
+| 配信 | nginx 1.28(TLS 終端・静的ファイル)+ waitress | `https://localhost:8000` → `127.0.0.1:8080`(ADR 0012) |
 
 ### 2.2 構成図
 ```mermaid
@@ -59,8 +60,9 @@ flowchart LR
     S --> M[(models)]
     MW[ミドルウェア<br>CSP・セキュリティヘッダー<br>強制パスワード変更・UI テーマ] --> V
   end
-  JS -- JSON (POST・CSRF) --> V
-  UI -- HTML --> V
+  JS -- JSON (POST・CSRF) --> NX[nginx<br>TLS・静的ファイル<br>localhost:8000]
+  UI -- HTML --> NX
+  NX -- http 127.0.0.1:8080 --> V
   M --> DB[(PostgreSQL 17<br>TLS)]
   V --> T[(PMTiles<br>maps/tiles)]
   S --> C[(キャッシュ<br>レート制限・ロック<br>みっけ仲間 ID)]
@@ -292,6 +294,7 @@ JSON API はすべて POST + CSRF + `Content-Type: application/json`。ログイ
 | クーポンの不正利用 | 引換コードは一意・暗号化、条件付き UPDATE で 1 回だけ使用 |
 | 情報漏えい | 暗号化保存、位置・映像を保存しない、運営画面の存在を隠す、エラー画面は日本語の独自ページ |
 | 監査 | ログイン・設定変更・権限操作・退会などを追記専用の監査ログに記録(IP はハッシュ) |
+| 盗聴・改ざん / 接続元の偽装 | nginx で TLS 1.2/1.3 を終端(localhost 専用の自己署名証明書)、アプリは 127.0.0.1 のみで待ち受け、`X-Forwarded-For` は nginx が上書き、`X-Forwarded-Proto` は `DJANGO_BEHIND_TLS_PROXY=1` のときだけ信頼 |
 
 ---
 
@@ -305,7 +308,9 @@ JSON API はすべて POST + CSRF + `Content-Type: application/json`。ログイ
 | `MIKKE_FIELD_KEYS` / `MIKKE_BLIND_INDEX_KEY` | 暗号鍵(必須) |
 | `DB_ENGINE` ほか `DB_*` | PostgreSQL / SQLite |
 | `MIKKE_CACHE` | `locmem`(既定、1 プロセス)/ `db` / `redis://…` |
-| `MIKKE_TRUSTED_PROXIES` | 信頼済みプロキシの IP / CIDR |
+| `MIKKE_TRUSTED_PROXIES` | 信頼済みプロキシの IP / CIDR(nginx 経由なら `127.0.0.1`) |
+| `DJANGO_BEHIND_TLS_PROXY` / `DJANGO_HSTS_SECONDS` | TLS 終端プロキシの内側で動かす / HSTS の秒数(localhost では 0) |
+| `NGINX_HOME` / `MIKKE_PROXY_DIR` / `MIKKE_PROXY_PORT` / `MIKKE_APP_PORT` | `scripts/devproxy.py` の nginx の場所・作業フォルダ・ポート(8000 / 8080) |
 | `MIKKE_SUPPORT_CONTACT` | 「パスワードを忘れた方」の問い合わせ先 |
 | `MIKKE_MAP_*` / `MIKKE_SHOW_SPOT_CARDS` | 地図の範囲・タイル / スポットカード一覧の表示 |
 
@@ -318,14 +323,14 @@ JSON API はすべて POST + CSRF + `Content-Type: application/json`。ログイ
 | `contest_reset_entry` | コンテストのエントリーを外す(確認用) |
 
 ### 9.3 品質
-- テスト: 各アプリの `tests/`(291 件)。開発環境の PostgreSQL 17 で全件成功(`DB_ENGINE=sqlite` でも実行できる)
+- テスト: 各アプリの `tests/`(313 件)。開発環境の PostgreSQL 17 で全件成功(`DB_ENGINE=sqlite` でも実行できる)。テストは `config/test_runner.py` で HTTPS 転送を止め、キャッシュをメモリにするため `.env` の本番相当の設定に左右されない
 - 静的解析: ruff(セキュリティ規則 S を含む)、依存の脆弱性: pip-audit
 - アクセシビリティ: タップ目標 44px 以上、文字 0.75rem 以上、`aria-describedby` / `aria-invalid`、レア度のテキスト代替、`prefers-reduced-motion`
 
 ---
 
 ## 10. 制約・今後の課題
-- 地図データは大阪府 京橋付近のみ。実機スマホでのカメラ検出・GPS 精度は未計測(HTTPS 化が必要)
+- 地図データは大阪府 京橋付近のみ。実機スマホでのカメラ検出・GPS 精度は未計測(nginx は 127.0.0.1 のみで待ち受けるため、LAN の端末から使うには listen と証明書の SAN の変更が必要)
 - 分析はその場で集計(数万行まで想定)。規模が大きくなったら日次の集計テーブルにする
 - 画面は日本語のみ(多言語化する場合は `LocaleMiddleware` と `{% translate %}` を導入)
 - メール送信の仕組みがないため、パスワードの再発行は運営者経由

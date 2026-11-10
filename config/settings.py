@@ -207,6 +207,9 @@ if not DEBUG:
 if env_bool("DJANGO_BEHIND_TLS_PROXY", False):
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
+# テストは .env の本番相当の設定 (HTTPS への転送) に左右されないようにする
+TEST_RUNNER = "config.test_runner.MikkeTestRunner"
+
 SECURE_CSP = {
     "default-src": [CSP.SELF],
     "script-src": [CSP.SELF],
