@@ -6,7 +6,7 @@
 集めたコーデはきせかえ・コンテストで楽しみ、お店はクーポンで来店につなげ、運営は再訪率で効果を確かめる。
 
 - 対象地域: 大阪府 京橋付近(地図データを同梱)
-- 仕様の詳細: [設計書](docs/design.md) ・ 1 枚の概要: [概要](docs/overview.md) ・ 設計判断: [ADR 0001〜0015](docs/README.md)
+- 仕様の詳細: [設計書](設計書/設計書.md) ・ 1 枚の概要: [概要](docs/overview.md) ・ 設計判断: [ADR 0001〜0015](docs/README.md)
 
 ---
 
@@ -174,7 +174,7 @@
 
 ## 7. セットアップと起動
 
-前提: Windows、Python 3.12 以上、PostgreSQL 17 のバイナリ(`%LOCALAPPDATA%\pg17`)、nginx for Windows(`%LOCALAPPDATA%\nginx-1.28.0`)。
+前提: Windows、Python 3.12 以上、PostgreSQL 17 のバイナリ(`.runtime\pg17`)、nginx for Windows(`.runtime\nginx-1.28.0`)。実行環境(PostgreSQL の本体とデータ・nginx・証明書の秘密鍵・ログ)はプロジェクトの **`.runtime\`** に置く(`.gitignore` 済み。**消すとデータも消える**)。`%LOCALAPPDATA%` に置くと、パッケージ化されたアプリ(Claude デスクトップなど)から書いた場合にそのアプリ専用の場所へ振り替えられ、ほかのコンソールから見えなくなるため。
 
 ### 7.1 初回だけ
 
@@ -219,6 +219,7 @@ stop.bat
 ```
 
 - 状態の確認: `.venv\Scripts\python.exe scripts\serve.py status`(PostgreSQL・アプリ・nginx・証明書の登録)
+- **ウィンドウを閉じても止まらないように動かすときは `start.bat --background`**(見えない別のコンソールで起動してすぐ戻る。ログは `.runtime\proxy\logs\app.log`。止めるときは `stop.bat`)
 - PC を再起動したあとも `start.bat` だけで動く。PostgreSQL は起動したウィンドウを閉じても止まらない
 - 開発で HTTPS なしに動かすときは `.env` を `DJANGO_DEBUG=1` にして `manage.py runserver`
 
@@ -266,7 +267,7 @@ certutil -user -addstore Root "certs\localhost.crt"
 | `MIKKE_CACHE` / `MIKKE_TRUSTED_PROXIES` / `MIKKE_LOGIN_MAX_FAILURES_PER_IP` | キャッシュ・プロキシ・IP 単位のロック |
 | `MIKKE_SUPPORT_CONTACT` | 「パスワードを忘れた方」の問い合わせ先 |
 | `MIKKE_MAP_BOUNDS` / `MIKKE_MAP_CENTER` / `MIKKE_MAP_TILES` | 地図の範囲・タイル |
-| `NGINX_HOME` / `MIKKE_PROXY_DIR` / `MIKKE_PROXY_PORT` / `MIKKE_APP_PORT` / `MIKKE_CERT_EXPORT` | nginx・ポート(8000 / 8080)・証明書の書き出し先 |
+| `PG_BIN` / `PGDATA` / `NGINX_HOME` / `MIKKE_PROXY_DIR` / `MIKKE_PROXY_PORT` / `MIKKE_APP_PORT` / `MIKKE_CERT_EXPORT` | PostgreSQL・nginx・作業フォルダ(既定はプロジェクトの `.runtime\`)・ポート(8000 / 8080)・証明書の書き出し先 |
 
 カメラを起動できる距離と UI テーマは、運営コンソールの「サイト設定」で変える。
 
@@ -298,6 +299,7 @@ certutil -user -addstore Root "certs\localhost.crt"
 ## 10. ディレクトリ構成
 
 ```
+.runtime/    実行環境 (PostgreSQL の本体とデータ・nginx・証明書の秘密鍵・ログ。コミットしない)
 config/        Django 設定 (環境変数から読み込み)・URL・テストランナー
 core/          共通: 暗号化・監査ログ・レート制限・権限・セッションの分離・コンソールのメニュー・ID・季節/時間帯・
                UI テーマ・ホーム・ログイン画面のコーデ・アプリの利用日・管理コマンド (シードなど)
@@ -319,7 +321,7 @@ start.bat / stop.bat   起動・停止
 <app>/tests/   各アプリのテスト
 ```
 
-ドキュメント: [概要](docs/overview.md) ・ [設計書](docs/design.md) ・ [ドキュメント一覧](docs/README.md)(要件とトレーサビリティ・API 仕様・ADR 0001〜0015)
+ドキュメント: [概要](docs/overview.md) ・ [設計書](設計書/設計書.md) ・ [ドキュメント一覧](docs/README.md)(要件とトレーサビリティ・API 仕様・ADR 0001〜0015)
 
 ---
 

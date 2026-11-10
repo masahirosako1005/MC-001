@@ -28,8 +28,11 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 ENV_PATH = BASE_DIR / ".env"
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", Path.home()))
-DEFAULT_PG_BIN = LOCALAPPDATA / "pg17" / "pgsql" / "bin"
-DEFAULT_PGDATA = LOCALAPPDATA / "mikke" / "pgdata"
+# 実行環境はプロジェクトの .runtime に置く (%LOCALAPPDATA% は、パッケージ化されたアプリから書くと
+# そのアプリ専用の場所に振り替えられ、ほかのコンソールから見えなくなることがあるため)
+RUNTIME_DIR = BASE_DIR / ".runtime"
+DEFAULT_PG_BIN = RUNTIME_DIR / "pg17" / "pgsql" / "bin"
+DEFAULT_PGDATA = RUNTIME_DIR / "pgdata"
 
 
 def _b64key(n: int = 32) -> str:

@@ -22,6 +22,8 @@ htmlcov/
 *.log
 
 # --- 生成物 ---
+# 実行環境 (PostgreSQL の本体とデータ・nginx・証明書の秘密鍵)。消すとデータも消えるので注意
+/.runtime/
 # ローカル HTTPS の証明書の書き出し先 (scripts/devproxy.py。PC ごとに違う)
 /certs/
 /symbols_out/

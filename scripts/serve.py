@@ -108,7 +108,39 @@ def pending_migrations() -> list[str]:
     return [f"{m.app_label}.{m.name}" for m, _ in plan]
 
 
+def start_background() -> None:
+    """自分自身 (serve.py start) を、見えない別のコンソールで起動して、すぐに戻る。
+
+    起動したウィンドウ・ターミナルを閉じても止まらない。出力は .runtime\\proxy\\logs\\app.log。
+    止めるときは stop.bat。
+    """
+    log = devproxy.PROXY_DIR / "logs" / "app.log"
+    log.parent.mkdir(parents=True, exist_ok=True)
+    flags = 0
+    info = None
+    if os.name == "nt":
+        info = subprocess.STARTUPINFO()
+        info.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        info.wShowWindow = 0  # SW_HIDE
+        flags = subprocess.CREATE_NEW_CONSOLE | subprocess.CREATE_NEW_PROCESS_GROUP
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUNBUFFERED": "1"}
+    with open(log, "ab") as out:
+        for extra in (getattr(subprocess, "CREATE_BREAKAWAY_FROM_JOB", 0), 0):  # 親のジョブから外れられれば外す
+            try:
+                subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "start"], cwd=str(BASE_DIR),
+                                 stdin=subprocess.DEVNULL, stdout=out, stderr=subprocess.STDOUT, env=env,
+                                 creationflags=flags | extra, startupinfo=info, close_fds=True)
+                break
+            except OSError:
+                if not extra:
+                    raise
+    say(f"バックグラウンドで起動しました: https://localhost:{devproxy.PROXY_PORT}/ (ログ: {log}、止めるときは stop.bat)")
+
+
 def cmd_start(args) -> None:
+    if getattr(args, "background", False):
+        start_background()
+        return
     if not localdb.ENV_PATH.exists():
         raise SystemExit("設定ファイル .env がありません。最初に README の「セットアップ」を行ってください "
                          "(python scripts\\localdb.py init → manage.py migrate → manage.py seed_mikke)。")
@@ -187,6 +219,8 @@ def main(argv=None) -> None:
     sub = parser.add_subparsers(dest="command", required=True)
     p = sub.add_parser("start", help="PostgreSQL・nginx・アプリを起動する (Ctrl+C で停止)")
     p.add_argument("--no-migrate", dest="migrate", action="store_false", help="マイグレーションを適用しない")
+    p.add_argument("--background", action="store_true",
+                   help="見えない別のコンソールで起動してすぐ戻る (ウィンドウを閉じても止まらない)")
     p.set_defaults(func=cmd_start)
     p = sub.add_parser("stop", help="アプリと nginx を止める")
     p.add_argument("--with-db", action="store_true", help="PostgreSQL も止める")

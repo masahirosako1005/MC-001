@@ -10,14 +10,14 @@
 構成:
     ブラウザ ──https://localhost:8000── nginx ──http://127.0.0.1:8080── waitress + Django
 
-- 証明書・鍵・nginx の設定・ログは %LOCALAPPDATA%\\mikke\\proxy に置く
+- 証明書・鍵・nginx の設定・ログはプロジェクトの .runtime\\proxy に置く (.gitignore 済み)
 - 信頼登録しやすいよう、証明書 (公開部分の .crt だけ) をプロジェクトの certs\\localhost.crt にも書き出す。
   秘密鍵はプロジェクトには出さない。certs/ は .gitignore 済み (PC ごとに違うのでコミットしない)
 - 証明書は localhost / 127.0.0.1 / ::1 だけに使える自己署名。ブラウザの警告を消すには、利用者が
   証明書を「信頼されたルート証明機関」に登録する (README 参照。システムの設定変更なので本人が行う)
 - アプリ本体は 127.0.0.1 だけで待ち受ける (nginx を通らないと外からは届かない)
 
-環境変数: NGINX_HOME (既定 %LOCALAPPDATA%\\nginx-1.28.0)、MIKKE_PROXY_DIR、MIKKE_PROXY_PORT (8000)、MIKKE_APP_PORT (8080)、
+環境変数または .env: NGINX_HOME (既定 .runtime\\nginx-1.28.0)、MIKKE_PROXY_DIR (既定 .runtime\\proxy)、MIKKE_PROXY_PORT (8000)、MIKKE_APP_PORT (8080)、
           MIKKE_CERT_EXPORT (証明書の書き出し先。既定はプロジェクトの certs\\localhost.crt)
 """
 
@@ -32,11 +32,27 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 TEMPLATE = BASE_DIR / "deploy" / "nginx" / "nginx.conf.template"
-LOCAL = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
-NGINX_HOME = Path(os.environ.get("NGINX_HOME", str(LOCAL / "nginx-1.28.0")))
-PROXY_DIR = Path(os.environ.get("MIKKE_PROXY_DIR", str(LOCAL / "mikke" / "proxy")))
-PROXY_PORT = int(os.environ.get("MIKKE_PROXY_PORT", "8000"))
-APP_PORT = int(os.environ.get("MIKKE_APP_PORT", "8080"))
+# nginx・作業フォルダはプロジェクトの .runtime に置く (%LOCALAPPDATA% はパッケージ化されたアプリから書くと
+# そのアプリ専用の場所に振り替えられ、ほかのコンソールから見えなくなることがあるため)。.env でも指定できる
+RUNTIME_DIR = BASE_DIR / ".runtime"
+
+
+def _setting(key: str, default: str) -> str:
+    if os.environ.get(key):
+        return os.environ[key]
+    env_file = BASE_DIR / ".env"
+    if env_file.exists():
+        for line in env_file.read_text(encoding="utf-8").splitlines():
+            k, _, v = line.partition("=")
+            if k.strip() == key and not line.lstrip().startswith("#") and v.strip():
+                return v.strip()
+    return default
+
+
+NGINX_HOME = Path(_setting("NGINX_HOME", str(RUNTIME_DIR / "nginx-1.28.0")))
+PROXY_DIR = Path(_setting("MIKKE_PROXY_DIR", str(RUNTIME_DIR / "proxy")))
+PROXY_PORT = int(_setting("MIKKE_PROXY_PORT", "8000"))
+APP_PORT = int(_setting("MIKKE_APP_PORT", "8080"))
 CERT = PROXY_DIR / "certs" / "localhost.crt"
 KEY = PROXY_DIR / "certs" / "localhost.key"
 CONF = PROXY_DIR / "conf" / "nginx.conf"
